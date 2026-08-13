@@ -1,0 +1,7 @@
+{
+  "name": "mercury-go",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
