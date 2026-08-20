@@ -28,11 +28,19 @@ import '@ionic/vue/css/display.css';
  */
 
 /* @import '@ionic/vue/css/palettes/dark.always.css'; */
-/* @import '@ionic/vue/css/palettes/dark.class.css'; */
-import '@ionic/vue/css/palettes/dark.system.css';
+import '@ionic/vue/css/palettes/dark.class.css';
+/* @import '@ionic/vue/css/palettes/dark.system.css'; */
 
 /* Theme variables */
 import './theme/variables.css';
+
+// Restaurar preferencia de tema guardada en localStorage
+const temaGuardado = localStorage.getItem('mi_app_tema');
+if (temaGuardado === 'oscuro') {
+  document.documentElement.classList.add('ion-palette-dark');
+} else if (!temaGuardado && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  document.documentElement.classList.add('ion-palette-dark');
+}
 
 const app = createApp(App)
   .use(IonicVue)
