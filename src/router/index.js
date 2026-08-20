@@ -1,15 +1,25 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
-import HomePage from '../views/HomePage.vue';
+import main_layout from '../layouts/main_layout.vue';
+import { navegacion } from '../config/navegacion';
+
+const rutas_app = navegacion.map(item => ({
+  path: item.ruta.replace('/app/', ''),
+  name: item.id,
+  component: item.componente
+}));
 
 const routes = [
   {
-    path: '/',
-    redirect: '/home'
+    path: '/app',
+    component: main_layout,
+    children: [
+      { path: '', redirect: '/app/inicio' },
+      ...rutas_app
+    ]
   },
   {
-    path: '/home',
-    name: 'Home',
-    component: HomePage
+    path: '/:pathMatch(.*)*',
+    redirect: '/app/inicio'
   }
 ];
 

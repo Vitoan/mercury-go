@@ -16,20 +16,5 @@ module.exports = {
     'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     'vue/no-deprecated-slot-attribute': 'off'
-  },
-  overrides: [
-    {
-      files: ['tests/e2e/**/*.{js,jsx}'],
-      globals: {
-        describe: 'readonly',
-        it: 'readonly',
-        cy: 'readonly',
-        before: 'readonly',
-        beforeEach: 'readonly',
-        after: 'readonly',
-        afterEach: 'readonly',
-        expect: 'readonly'
-      }
-    }
-  ]
+  }
 }

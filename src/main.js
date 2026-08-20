@@ -34,13 +34,10 @@ import '@ionic/vue/css/palettes/dark.class.css';
 /* Theme variables */
 import './theme/variables.css';
 
-// Restaurar preferencia de tema guardada en localStorage
-const temaGuardado = localStorage.getItem('mi_app_tema');
-if (temaGuardado === 'oscuro') {
-  document.documentElement.classList.add('ion-palette-dark');
-} else if (!temaGuardado && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-  document.documentElement.classList.add('ion-palette-dark');
-}
+import { aplicar_tema_guardado } from './config/tema';
+
+// Aplicar tema guardado antes de montar para evitar parpadeos
+aplicar_tema_guardado();
 
 const app = createApp(App)
   .use(IonicVue)
