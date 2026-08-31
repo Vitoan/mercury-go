@@ -36,7 +36,8 @@ if (builder.Environment.IsDevelopment())
         options.AddPolicy(corsPolicy, policy => 
             policy.SetIsOriginAllowed(EsOrigenDesarrolloPermitido)
                   .AllowAnyHeader()
-                  .AllowAnyMethod()));
+                  .AllowAnyMethod()
+                  .SetPreflightMaxAge(TimeSpan.FromHours(1))));
 }
 else if (corsAllowedOrigins.Length > 0)
 {
@@ -44,7 +45,8 @@ else if (corsAllowedOrigins.Length > 0)
         options.AddPolicy(corsPolicy, policy => 
             policy.WithOrigins(corsAllowedOrigins)
                   .AllowAnyHeader()
-                  .AllowAnyMethod()));
+                  .AllowAnyMethod()
+                  .SetPreflightMaxAge(TimeSpan.FromHours(1))));
 }
 
 var app = builder.Build();
