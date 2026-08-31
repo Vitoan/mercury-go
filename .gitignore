@@ -30,3 +30,16 @@ npm-debug.log*
 /platforms
 /plugins
 /www
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+_ReSharper*/
+
+# Environment
+.env.local
+.env.*.local
