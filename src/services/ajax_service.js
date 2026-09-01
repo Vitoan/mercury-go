@@ -27,15 +27,22 @@ function normalizar_error(respuesta, error_nativo) {
 export const ajax_service = {
   async get(endpoint, opciones = {}) {
     const url = construir_url(endpoint);
+    const timeout_ms = opciones.timeout || 5000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout_ms);
+
     try {
       const respuesta = await fetch(url, {
         method: 'GET',
+        signal: controller.signal,
         headers: {
           'Accept': 'application/json',
           ...opciones.headers
         },
         ...opciones
       });
+
+      clearTimeout(timer);
 
       if (!respuesta.ok) {
         let mensaje = `Error del servidor (${respuesta.status})`;
@@ -55,6 +62,15 @@ export const ajax_service = {
 
       return await respuesta.json();
     } catch (error) {
+      clearTimeout(timer);
+
+      if (error.name === 'AbortError') {
+        const err = new Error('Tiempo de espera agotado. La API no responde.');
+        err.estado_http = 0;
+        err.codigo = 'tiempo_espera_agotado';
+        throw err;
+      }
+
       if (error.estado_http) throw error;
       const normalizado = normalizar_error(null, error);
       const err = new Error(normalizado.mensaje);
