@@ -14,7 +14,7 @@ function normalizar_error(respuesta, error_nativo) {
     return {
       estado_http: 0,
       codigo: 'sin_conexion',
-      mensaje: 'No se pudo conectar con la API. Revisá que esté levantada y que la URL sea la correcta.'
+      mensaje: 'No se pudo conectar con la API. Revisá que el servidor esté levantado y que la URL sea la correcta.'
     };
   }
   return {
@@ -24,59 +24,86 @@ function normalizar_error(respuesta, error_nativo) {
   };
 }
 
-export const ajax_service = {
-  async get(endpoint, opciones = {}) {
-    const url = construir_url(endpoint);
-    const timeout_ms = opciones.timeout || 5000;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout_ms);
+async function enviar(metodo, endpoint, cuerpo = null, opciones = {}) {
+  const url = construir_url(endpoint);
+  const timeout_ms = opciones.timeout || 8000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout_ms);
 
-    try {
-      const respuesta = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json',
-          ...opciones.headers
-        },
-        ...opciones
-      });
+  const cabeceras = {
+    'Accept': 'application/json',
+    ...opciones.headers
+  };
 
-      clearTimeout(timer);
+  const config = {
+    method: metodo,
+    signal: controller.signal,
+    headers: cabeceras,
+    ...opciones
+  };
 
-      if (!respuesta.ok) {
-        let mensaje = `Error del servidor (${respuesta.status})`;
-        let codigo = 'error_servidor';
-        try {
-          const cuerpo = await respuesta.json();
-          if (cuerpo && cuerpo.mensaje) mensaje = cuerpo.mensaje;
-          if (cuerpo && cuerpo.codigo) codigo = cuerpo.codigo;
-        } catch {
-          // Ignorar error al parsear JSON
-        }
-        const error = new Error(mensaje);
-        error.estado_http = respuesta.status;
-        error.codigo = codigo;
-        throw error;
+  if (cuerpo !== null && cuerpo !== undefined && (metodo === 'POST' || metodo === 'PUT')) {
+    cabeceras['Content-Type'] = 'application/json';
+    config.body = JSON.stringify(cuerpo);
+  }
+
+  try {
+    const respuesta = await fetch(url, config);
+    clearTimeout(timer);
+
+    if (!respuesta.ok) {
+      let mensaje = `Error del servidor (${respuesta.status})`;
+      let codigo = 'error_servidor';
+      try {
+        const datosError = await respuesta.json();
+        if (datosError && datosError.mensaje) mensaje = datosError.mensaje;
+        if (datosError && datosError.codigo) codigo = datosError.codigo;
+      } catch {
+        // Respuesta no JSON (ej: error 502/503 del gateway)
       }
+      const error = new Error(mensaje);
+      error.estado_http = respuesta.status;
+      error.codigo = codigo;
+      throw error;
+    }
 
-      return await respuesta.json();
-    } catch (error) {
-      clearTimeout(timer);
+    // 204 No Content u operaciones sin cuerpo
+    if (respuesta.status === 204) return null;
 
-      if (error.name === 'AbortError') {
-        const err = new Error('Tiempo de espera agotado. La API no responde.');
-        err.estado_http = 0;
-        err.codigo = 'tiempo_espera_agotado';
-        throw err;
-      }
+    return await respuesta.json();
+  } catch (error) {
+    clearTimeout(timer);
 
-      if (error.estado_http) throw error;
-      const normalizado = normalizar_error(null, error);
-      const err = new Error(normalizado.mensaje);
+    if (error.name === 'AbortError') {
+      const err = new Error('Tiempo de espera agotado. La API no responde.');
       err.estado_http = 0;
-      err.codigo = normalizado.codigo;
+      err.codigo = 'tiempo_espera_agotado';
       throw err;
     }
+
+    if (error.estado_http) throw error;
+    const normalizado = normalizar_error(null, error);
+    const err = new Error(normalizado.mensaje);
+    err.estado_http = 0;
+    err.codigo = normalizado.codigo;
+    throw err;
+  }
+}
+
+export const ajax_service = {
+  get(endpoint, opciones = {}) {
+    return enviar('GET', endpoint, null, opciones);
+  },
+
+  post(endpoint, cuerpo, opciones = {}) {
+    return enviar('POST', endpoint, cuerpo, opciones);
+  },
+
+  put(endpoint, cuerpo, opciones = {}) {
+    return enviar('PUT', endpoint, cuerpo, opciones);
+  },
+
+  delete(endpoint, opciones = {}) {
+    return enviar('DELETE', endpoint, null, opciones);
   }
 };
