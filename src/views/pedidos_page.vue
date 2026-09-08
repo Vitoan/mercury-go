@@ -7,43 +7,70 @@
       @buscar="alBuscar"
     />
 
-    <!-- Filtros de estado logístico -->
-    <div class="mercury-filtros-estados">
-      <ion-chip
-        :color="estadoSeleccionado === '' ? 'primary' : 'medium'"
-        :outline="estadoSeleccionado !== ''"
-        @click="filtrarEstado('')"
-      >
-        <ion-label>Todos ({{ pedidos_store.total }})</ion-label>
-      </ion-chip>
-      <ion-chip
-        :color="estadoSeleccionado === 'Pendiente' ? 'primary' : 'medium'"
-        :outline="estadoSeleccionado !== 'Pendiente'"
-        @click="filtrarEstado('Pendiente')"
-      >
-        <ion-label>Pendientes</ion-label>
-      </ion-chip>
-      <ion-chip
-        :color="estadoSeleccionado === 'EnPreparacion' ? 'warning' : 'medium'"
-        :outline="estadoSeleccionado !== 'EnPreparacion'"
-        @click="filtrarEstado('EnPreparacion')"
-      >
-        <ion-label>En Depósito</ion-label>
-      </ion-chip>
-      <ion-chip
-        :color="estadoSeleccionado === 'Despachado' ? 'primary' : 'medium'"
-        :outline="estadoSeleccionado !== 'Despachado'"
-        @click="filtrarEstado('Despachado')"
-      >
-        <ion-label>En Ruta</ion-label>
-      </ion-chip>
-      <ion-chip
-        :color="estadoSeleccionado === 'Entregado' ? 'success' : 'medium'"
-        :outline="estadoSeleccionado !== 'Entregado'"
-        @click="filtrarEstado('Entregado')"
-      >
-        <ion-label>Entregados</ion-label>
-      </ion-chip>
+    <!-- Fila de Chips de Estado Logístico con Conteo Real e Iconos -->
+    <div class="mercury-seccion-chips">
+      <div class="mercury-chips-scroll">
+        <ion-chip
+          :color="estadoSeleccionado === '' ? 'primary' : 'medium'"
+          :outline="estadoSeleccionado !== ''"
+          class="mercury-chip"
+          @click="filtrarEstado('')"
+        >
+          <ion-icon :icon="layersOutline" />
+          <ion-label>Todos · {{ pedidos_store.total }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          :color="estadoSeleccionado === 'Pendiente' ? 'primary' : 'medium'"
+          :outline="estadoSeleccionado !== 'Pendiente'"
+          class="mercury-chip"
+          @click="filtrarEstado('Pendiente')"
+        >
+          <ion-icon :icon="timeOutline" />
+          <ion-label>Pendientes · {{ obtenerConteo('Pendiente') }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          :color="estadoSeleccionado === 'EnPreparacion' ? 'warning' : 'medium'"
+          :outline="estadoSeleccionado !== 'EnPreparacion'"
+          class="mercury-chip"
+          @click="filtrarEstado('EnPreparacion')"
+        >
+          <ion-icon :icon="cubeOutline" />
+          <ion-label>En Depósito · {{ obtenerConteo('EnPreparacion') }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          :color="estadoSeleccionado === 'Despachado' ? 'primary' : 'medium'"
+          :outline="estadoSeleccionado !== 'Despachado'"
+          class="mercury-chip"
+          @click="filtrarEstado('Despachado')"
+        >
+          <ion-icon :icon="trailSignOutline" />
+          <ion-label>En Ruta · {{ obtenerConteo('Despachado') }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          :color="estadoSeleccionado === 'Entregado' ? 'success' : 'medium'"
+          :outline="estadoSeleccionado !== 'Entregado'"
+          class="mercury-chip"
+          @click="filtrarEstado('Entregado')"
+        >
+          <ion-icon :icon="checkmarkCircleOutline" />
+          <ion-label>Entregados · {{ obtenerConteo('Entregado') }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          v-if="obtenerConteo('Cancelado') > 0"
+          :color="estadoSeleccionado === 'Cancelado' ? 'danger' : 'medium'"
+          :outline="estadoSeleccionado !== 'Cancelado'"
+          class="mercury-chip"
+          @click="filtrarEstado('Cancelado')"
+        >
+          <ion-icon :icon="closeCircleOutline" />
+          <ion-label>Cancelados · {{ obtenerConteo('Cancelado') }}</ion-label>
+        </ion-chip>
+      </div>
     </div>
 
     <!-- Estado 1: Cargando primera página -->
@@ -125,7 +152,15 @@ import {
   IonActionSheet,
   IonToast
 } from '@ionic/vue';
-import { documentTextOutline } from 'ionicons/icons';
+import {
+  layersOutline,
+  timeOutline,
+  cubeOutline,
+  trailSignOutline,
+  checkmarkCircleOutline,
+  closeCircleOutline,
+  documentTextOutline
+} from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
 import CompBuscador from '../components/base/comp_buscador.vue';
@@ -153,6 +188,13 @@ const alBuscar = (texto) => {
 const filtrarEstado = (estado) => {
   estadoSeleccionado.value = estado;
   pedidos_store.establecer_estados(estado);
+};
+
+const obtenerConteo = (estadoNombre) => {
+  const item = pedidos_store.conteos_por_estado.find(
+    (c) => c.estado?.toLowerCase() === estadoNombre?.toLowerCase()
+  );
+  return item ? item.cantidad : 0;
 };
 
 const recargar = (event = null) => {
@@ -267,16 +309,30 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.mercury-filtros-estados {
-  display: flex;
-  overflow-x: auto;
-  padding: 0 12px 6px 12px;
-  gap: 4px;
-  scrollbar-width: none;
+.mercury-seccion-chips {
+  padding-bottom: 8px;
 }
 
-.mercury-filtros-estados::-webkit-scrollbar {
+.mercury-chips-scroll {
+  display: flex;
+  overflow-x: auto;
+  padding: 0 12px;
+  gap: 6px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mercury-chips-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.mercury-chip {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0;
+  flex-shrink: 0;
+  --border-radius: 8px;
+  cursor: pointer;
 }
 
 .mercury-pedido-item {

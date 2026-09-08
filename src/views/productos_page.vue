@@ -7,39 +7,65 @@
       @buscar="alBuscar"
     />
 
-    <!-- Filtros de categoría por chips horizontales -->
-    <div v-if="productos_store.categorias.length > 0" class="mercury-filtros-categorias">
-      <ion-chip
-        :color="categoriaSeleccionada === null ? 'primary' : 'medium'"
-        :outline="categoriaSeleccionada !== null"
-        @click="filtrarCategoria(null)"
-      >
-        <ion-label>Todas</ion-label>
-      </ion-chip>
-      <ion-chip
-        v-for="cat in productos_store.categorias"
-        :key="cat.id"
-        :color="categoriaSeleccionada === cat.id ? 'primary' : 'medium'"
-        :outline="categoriaSeleccionada !== cat.id"
-        @click="filtrarCategoria(cat.id)"
-      >
-        <ion-label>{{ cat.nombre }}</ion-label>
-      </ion-chip>
+    <!-- Fila de Chips de Categorías con conteo real desde la base de datos -->
+    <div class="mercury-seccion-chips">
+      <div class="mercury-chips-scroll">
+        <ion-chip
+          :color="categoriaSeleccionada === null ? 'primary' : 'medium'"
+          :outline="categoriaSeleccionada !== null"
+          class="mercury-chip"
+          @click="filtrarCategoria(null)"
+        >
+          <ion-icon :icon="gridOutline" />
+          <ion-label>Todas · {{ productos_store.resumen.total }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          v-for="cat in productos_store.categorias"
+          :key="cat.id"
+          :color="categoriaSeleccionada === cat.id ? 'primary' : 'medium'"
+          :outline="categoriaSeleccionada !== cat.id"
+          class="mercury-chip"
+          @click="filtrarCategoria(cat.id)"
+        >
+          <ion-icon :icon="cubeOutline" />
+          <ion-label>{{ cat.nombre }} · {{ cat.cantidad }}</ion-label>
+        </ion-chip>
+      </div>
     </div>
 
-    <!-- Filtro de disponibilidad -->
-    <div class="mercury-filtro-disponibilidad ion-padding-horizontal">
-      <ion-segment :value="filtroDisponible" @ionChange="alCambiarDisponibilidad">
-        <ion-segment-button value="todos">
-          <ion-label>Todos ({{ productos_store.resumen.total }})</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="disponibles">
-          <ion-label>En Stock ({{ productos_store.resumen.disponibles }})</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="agotados">
-          <ion-label>Sin Stock ({{ productos_store.resumen.no_disponibles }})</ion-label>
-        </ion-segment-button>
-      </ion-segment>
+    <!-- Chips de Disponibilidad de Stock -->
+    <div class="mercury-seccion-chips mercury-chips-secundarios">
+      <div class="mercury-chips-scroll">
+        <ion-chip
+          :color="filtroDisponible === null ? 'primary' : 'medium'"
+          :outline="filtroDisponible !== null"
+          class="mercury-chip mercury-chip-sm"
+          @click="filtrarDisponibilidad(null)"
+        >
+          <ion-label>Todo el Stock</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          :color="filtroDisponible === true ? 'success' : 'medium'"
+          :outline="filtroDisponible !== true"
+          class="mercury-chip mercury-chip-sm"
+          @click="filtrarDisponibilidad(true)"
+        >
+          <ion-icon :icon="checkmarkCircleOutline" />
+          <ion-label>En Stock · {{ productos_store.resumen.disponibles }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          :color="filtroDisponible === false ? 'danger' : 'medium'"
+          :outline="filtroDisponible !== false"
+          class="mercury-chip mercury-chip-sm"
+          @click="filtrarDisponibilidad(false)"
+        >
+          <ion-icon :icon="closeCircleOutline" />
+          <ion-label>Sin Stock · {{ productos_store.resumen.no_disponibles }}</ion-label>
+        </ion-chip>
+      </div>
     </div>
 
     <!-- Estado 1: Cargando primera página -->
@@ -95,11 +121,14 @@ import {
   IonLabel,
   IonBadge,
   IonChip,
-  IonSegment,
-  IonSegmentButton,
   IonIcon
 } from '@ionic/vue';
-import { cubeOutline } from 'ionicons/icons';
+import {
+  gridOutline,
+  cubeOutline,
+  checkmarkCircleOutline,
+  closeCircleOutline
+} from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
 import CompBuscador from '../components/base/comp_buscador.vue';
@@ -112,7 +141,7 @@ import { productos_store } from '@/stores/productos_store';
 
 const busqueda = ref('');
 const categoriaSeleccionada = ref(null);
-const filtroDisponible = ref('todos');
+const filtroDisponible = ref(null);
 
 const alBuscar = (texto) => {
   productos_store.establecer_busqueda(texto);
@@ -123,16 +152,9 @@ const filtrarCategoria = (catId) => {
   productos_store.establecer_categoria(catId);
 };
 
-const alCambiarDisponibilidad = (evento) => {
-  const valor = evento.detail.value;
+const filtrarDisponibilidad = (valor) => {
   filtroDisponible.value = valor;
-  if (valor === 'disponibles') {
-    productos_store.establecer_disponible(true);
-  } else if (valor === 'agotados') {
-    productos_store.establecer_disponible(false);
-  } else {
-    productos_store.establecer_disponible(null);
-  }
+  productos_store.establecer_disponible(valor);
 };
 
 const recargar = (event = null) => {
@@ -147,20 +169,39 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.mercury-filtros-categorias {
-  display: flex;
-  overflow-x: auto;
-  padding: 0 12px 6px 12px;
-  gap: 4px;
-  scrollbar-width: none;
+.mercury-seccion-chips {
+  padding-bottom: 2px;
 }
 
-.mercury-filtros-categorias::-webkit-scrollbar {
+.mercury-chips-secundarios {
+  padding-bottom: 8px;
+}
+
+.mercury-chips-scroll {
+  display: flex;
+  overflow-x: auto;
+  padding: 0 12px;
+  gap: 6px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mercury-chips-scroll::-webkit-scrollbar {
   display: none;
 }
 
-.mercury-filtro-disponibilidad {
-  margin-bottom: 8px;
+.mercury-chip {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0;
+  flex-shrink: 0;
+  --border-radius: 8px;
+  cursor: pointer;
+}
+
+.mercury-chip-sm {
+  font-size: 0.76rem;
+  height: 28px;
 }
 
 .mercury-producto-item {

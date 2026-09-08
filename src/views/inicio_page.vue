@@ -9,13 +9,18 @@
       </ion-card-content>
     </ion-card>
 
-    
     <ion-card style="margin-inline: 0; margin-top: 16px;">
       <ion-card-header>
-        <ion-card-title>Versión 3 · Backend & MySQL</ion-card-title>
+        <ion-card-title style="color: #38BDF8;">Versión 4 · Paginación, ABM & Estados</ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        El estado real vive en el servidor. Catálogo, clientes y pedidos servidos por <strong>ASP.NET Core Web API</strong> conectada a <strong>MySQL</strong> con Entity Framework Core.
+        Flujo central transaccional activo:
+        <ul style="margin: 8px 0 0 16px; padding: 0;">
+          <li><strong>Paginación en Servidor:</strong> Listas con <code>Skip</code>/<code>Take</code> y carga incremental.</li>
+          <li><strong>Búsqueda con Debounce:</strong> Consultas optimizadas directo a MySQL.</li>
+          <li><strong>ABM con Validación en API:</strong> Altas y ediciones en modal con baja lógica.</li>
+          <li><strong>Gestión de Estados:</strong> Ciclo de vida para órdenes de carga y precios protegidos.</li>
+        </ul>
       </ion-card-content>
     </ion-card>
   </comp-page>
