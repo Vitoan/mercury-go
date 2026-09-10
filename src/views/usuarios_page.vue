@@ -322,14 +322,15 @@ const abrirAcciones = (u) => {
 }
 
 .mercury-usuario-item {
-  --background: #0f172a;
+  --background: var(--mercury-bg-card);
   --border-radius: 12px;
   margin-bottom: 8px;
+  border: 1px solid var(--mercury-border-subtle);
 }
 
 .mercury-avatar-inicial {
-  background: #1e293b;
-  color: #38bdf8;
+  background: var(--mercury-bg-subtle);
+  color: var(--mercury-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -347,6 +348,7 @@ const abrirAcciones = (u) => {
   font-size: 1rem;
   font-weight: 700;
   margin: 0;
+  color: var(--mercury-text-title);
 }
 
 .mercury-badge-rol {
@@ -357,17 +359,18 @@ const abrirAcciones = (u) => {
 
 .mercury-usuario-tel {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--mercury-text-muted);
 }
 
 .mercury-card-modal {
-  background: #0f172a;
+  background: var(--mercury-bg-card);
   border-radius: 16px;
+  border: 1px solid var(--mercury-border-subtle);
 }
 
 .mercury-modal-error {
   background: rgba(239, 68, 68, 0.12);
-  color: #f87171;
+  color: var(--ion-color-danger, #ef4444);
   border: 1px solid rgba(239, 68, 68, 0.25);
   padding: 8px 12px;
   border-radius: 8px;

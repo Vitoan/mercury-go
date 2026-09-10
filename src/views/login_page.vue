@@ -1,6 +1,12 @@
 <template>
   <ion-page class="mercury-login-page">
     <ion-content class="ion-padding mercury-login-content">
+      <div class="mercury-login-top-bar">
+        <ion-button fill="clear" size="small" class="mercury-theme-toggle" @click="cambiarTema">
+          <ion-icon slot="icon-only" :icon="modoOscuro ? sunnyOutline : moonOutline" />
+        </ion-button>
+      </div>
+
       <div class="mercury-login-container">
         <!-- Logo e Identidad Logística B2B -->
         <div class="mercury-login-header">
@@ -117,26 +123,35 @@ import {
   mailOutline,
   lockClosedOutline,
   fingerPrintOutline,
-  alertCircleOutline
+  alertCircleOutline,
+  sunnyOutline,
+  moonOutline
 } from 'ionicons/icons';
 import { sesion_store } from '@/stores/sesion_store';
 import { biometria_disponible, verificar_identidad } from '@/services/biometria_service';
 import { restaurar_sesion } from '@/services/token_service';
+import { es_tema_oscuro, alternar_tema } from '@/config/tema';
 
 const router = useRouter();
 
 const email = ref('');
 const password = ref('');
 const puede_biometria = ref(false);
+const modoOscuro = ref(false);
 
 const formularioValido = computed(() => {
   return email.value.trim().length > 0 && password.value.length >= 6;
 });
 
 onMounted(async () => {
+  modoOscuro.value = es_tema_oscuro();
   const tokenGuardado = await restaurar_sesion();
   puede_biometria.value = Boolean(tokenGuardado) && (await biometria_disponible());
 });
+
+const cambiarTema = () => {
+  modoOscuro.value = alternar_tema();
+};
 
 const entrar = async () => {
   if (!formularioValido.value) return;
@@ -164,38 +179,49 @@ const cargarCredenciales = (correo) => {
 
 <style scoped>
 .mercury-login-page {
-  --background: #090d16;
+  --background: var(--mercury-bg-page);
 }
 
 .mercury-login-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  --background: #090d16;
+  --background: var(--mercury-bg-page);
+}
+
+.mercury-login-top-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px 0 0;
+}
+
+.mercury-theme-toggle {
+  --color: var(--mercury-text-hint);
+  font-size: 1.25rem;
 }
 
 .mercury-login-container {
   max-width: 420px;
-  margin: 2rem auto;
+  margin: 1rem auto 2rem;
   padding: 0 1rem;
 }
 
 .mercury-login-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
 .mercury-logo-badge {
-  width: 72px;
-  height: 72px;
+  width: 76px;
+  height: 76px;
   margin: 0 auto 1.25rem;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: 20px;
+  background: var(--mercury-bg-card);
+  border: 1px solid var(--mercury-border);
+  border-radius: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--mercury-card-shadow);
   overflow: hidden;
   padding: 8px;
 }
@@ -211,45 +237,46 @@ const cargarCredenciales = (correo) => {
   font-size: 2rem;
   font-weight: 800;
   letter-spacing: -0.025em;
-  color: #f8fafc;
+  color: var(--mercury-text-title);
   margin: 0 0 0.25rem;
 }
 
 .mercury-login-subtitle {
   font-size: 0.95rem;
-  color: #94a3b8;
+  color: var(--mercury-text-muted);
   margin: 0 0 0.75rem;
 }
 
 .mercury-login-tag {
   display: inline-block;
-  background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
+  background: var(--mercury-accent-badge-bg);
+  color: var(--mercury-accent);
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  border: 1px solid var(--mercury-accent-badge-border);
 }
 
 .mercury-login-card {
-  background: #0f172a;
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: var(--mercury-bg-card);
+  border: 1px solid var(--mercury-border);
   border-radius: 20px;
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--mercury-card-shadow);
 }
 
 .mercury-input-item {
-  --background: #1e293b;
+  --background: var(--mercury-bg-item);
   --border-radius: 12px;
   margin-bottom: 1rem;
-  --highlight-color-focused: #38bdf8;
+  --highlight-color-focused: var(--mercury-accent);
+  --color: var(--mercury-text-title);
 }
 
 .mercury-input-icon {
-  color: #64748b;
+  color: var(--mercury-text-hint);
   margin-right: 0.5rem;
 }
 
@@ -258,7 +285,7 @@ const cargarCredenciales = (correo) => {
   align-items: center;
   gap: 0.5rem;
   background: rgba(239, 68, 68, 0.12);
-  color: #f87171;
+  color: var(--ion-color-danger, #ef4444);
   border: 1px solid rgba(239, 68, 68, 0.25);
   padding: 0.75rem 1rem;
   border-radius: 10px;
@@ -267,8 +294,8 @@ const cargarCredenciales = (correo) => {
 }
 
 .mercury-btn-login {
-  --background: #0284c7;
-  --background-activated: #0369a1;
+  --background: var(--ion-color-primary);
+  --background-activated: var(--ion-color-primary-shade);
   --border-radius: 12px;
   font-weight: 700;
   margin-top: 0.5rem;
@@ -276,8 +303,8 @@ const cargarCredenciales = (correo) => {
 }
 
 .mercury-btn-biometria {
-  --border-color: #38bdf8;
-  --color: #38bdf8;
+  --border-color: var(--mercury-accent);
+  --color: var(--mercury-accent);
   --border-radius: 12px;
   font-weight: 600;
   margin-top: 0.75rem;
@@ -291,7 +318,7 @@ const cargarCredenciales = (correo) => {
 
 .mercury-demo-title {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--mercury-text-hint);
   margin-bottom: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -306,8 +333,9 @@ const cargarCredenciales = (correo) => {
 }
 
 .mercury-demo-chip {
-  --background: #1e293b;
-  --color: #94a3b8;
+  --background: var(--mercury-bg-card);
+  --color: var(--mercury-text-muted);
+  border: 1px solid var(--mercury-border);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;

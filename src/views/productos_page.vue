@@ -228,18 +228,18 @@ onMounted(async () => {
   font-weight: 600;
   font-size: 0.98rem;
   margin: 0;
-  color: var(--ion-text-color, #f8fafc);
+  color: var(--mercury-text-title);
 }
 
 .mercury-producto-precio {
   font-weight: 700;
   font-size: 1.05rem;
-  color: #38bdf8;
+  color: var(--mercury-accent);
 }
 
 .mercury-producto-categoria {
   font-size: 0.82rem;
-  color: var(--ion-color-step-600, #94a3b8);
+  color: var(--mercury-text-muted);
   margin-top: 2px;
 }
 

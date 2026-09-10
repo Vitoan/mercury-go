@@ -71,7 +71,7 @@
             <ion-icon slot="start" :icon="cloudOutline" />
             <ion-label>
               <p>Esta app le pide los datos a</p>
-              <h3 style="font-weight: 600; color: #38bdf8;">{{ api_url }}</h3>
+              <h3 class="mercury-url-api">{{ api_url }}</h3>
             </ion-label>
           </ion-item>
 
@@ -168,7 +168,12 @@ onMounted(() => {
 
 .mercury-avatar-icon {
   font-size: 38px;
-  color: #38bdf8;
+  color: var(--mercury-accent);
+}
+
+.mercury-url-api {
+  font-weight: 600;
+  color: var(--mercury-accent);
 }
 
 .mercury-badge-rol {

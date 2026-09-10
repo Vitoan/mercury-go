@@ -2,7 +2,7 @@
   <comp-page titulo="MercuryGO">
     <ion-card style="margin-inline: 0;">
       <ion-card-header>
-        <ion-card-title style="color: #38BDF8;">Logística en Movimiento</ion-card-title>
+        <ion-card-title class="mercury-titulo-destacado">Logística en Movimiento</ion-card-title>
       </ion-card-header>
       <ion-card-content>
         Bienvenido a MercuryGO. Sistema integral para gestión de pedidos, rutas de carga LIFO y control de stock.
@@ -11,7 +11,7 @@
 
     <ion-card style="margin-inline: 0; margin-top: 16px;">
       <ion-card-header>
-        <ion-card-title style="color: #38BDF8;">Versión 4 · Paginación, ABM & Estados</ion-card-title>
+        <ion-card-title class="mercury-titulo-destacado">Versión 4 · Paginación, ABM & Estados</ion-card-title>
       </ion-card-header>
       <ion-card-content>
         Flujo central transaccional activo:

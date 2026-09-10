@@ -358,27 +358,27 @@ onMounted(() => {
 .mercury-pedido-numero {
   font-weight: 700;
   font-size: 0.95rem;
-  color: #38bdf8;
+  color: var(--mercury-accent);
   letter-spacing: 0.3px;
 }
 
 .mercury-pedido-total {
   font-weight: 700;
   font-size: 1rem;
-  color: var(--ion-text-color, #f8fafc);
+  color: var(--mercury-text-title);
 }
 
 .mercury-pedido-cliente {
   margin: 0;
   font-size: 0.92rem;
   font-weight: 600;
-  color: var(--ion-text-color, #e2e8f0);
+  color: var(--mercury-text-body);
 }
 
 .mercury-pedido-fecha {
   margin: 3px 0 0 0;
   font-size: 0.78rem;
-  color: var(--ion-color-step-600, #94a3b8);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-badge-estado {
