@@ -5,7 +5,7 @@
         <!-- Logo e Identidad Logística B2B -->
         <div class="mercury-login-header">
           <div class="mercury-logo-badge">
-            <ion-icon :icon="cubeOutline" class="mercury-logo-icon" />
+            <img src="/assets/logo.png" alt="MercuryGO Logo" class="mercury-logo-img" />
           </div>
           <h1 class="mercury-login-title">MercuryGO</h1>
           <p class="mercury-login-subtitle">Sistema de Distribución & Logística B2B</p>
@@ -114,7 +114,6 @@ import {
   IonLabel
 } from '@ionic/vue';
 import {
-  cubeOutline,
   mailOutline,
   lockClosedOutline,
   fingerPrintOutline,
@@ -187,20 +186,25 @@ const cargarCredenciales = (correo) => {
 }
 
 .mercury-logo-badge {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 1rem;
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  border-radius: 16px;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1.25rem;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  padding: 8px;
 }
 
-.mercury-logo-icon {
-  font-size: 32px;
-  color: #ffffff;
+.mercury-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .mercury-login-title {
