@@ -35,6 +35,7 @@ import '@ionic/vue/css/palettes/dark.class.css';
 import './theme/variables.css';
 
 import { aplicar_tema_guardado } from './config/tema';
+import { sesion_store } from './stores/sesion_store';
 
 // Aplicar tema guardado antes de montar para evitar parpadeos
 aplicar_tema_guardado();
@@ -43,6 +44,11 @@ const app = createApp(App)
   .use(IonicVue)
   .use(router);
 
-router.isReady().then(() => {
-  app.mount('#app');
+// La sesión se restaura ANTES de montar la app.
+// Si se hiciera después, el guard del router correría sin saber si hay usuario
+// y mandaría al login en cada arranque, incluso teniendo una sesión guardada válida.
+sesion_store.iniciar().finally(() => {
+  router.isReady().then(() => {
+    app.mount('#app');
+  });
 });

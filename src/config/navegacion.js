@@ -1,5 +1,15 @@
-import { homeOutline, pricetagsOutline, peopleOutline, receiptOutline, personCircleOutline } from 'ionicons/icons';
+import {
+  homeOutline,
+  cubeOutline,
+  businessOutline,
+  receiptOutline,
+  peopleOutline,
+  personCircleOutline
+} from 'ionicons/icons';
 
+// Matriz de navegación por roles logísticos para MercuryGO.
+// Roles: ADMIN, OPERARIO, CHOFER, CLIENTE.
+// Un usuario sin rol solo accede a 'inicio' y 'cuenta'.
 export const navegacion = [
   {
     id: 'inicio',
@@ -9,17 +19,19 @@ export const navegacion = [
     ruta: '/app/inicio',
     icono: homeOutline,
     componente: () => import('@/views/inicio_page.vue'),
-    en_tabs: true
+    en_tabs: true,
+    roles: ['ADMIN', 'OPERARIO', 'CHOFER', 'CLIENTE']
   },
   {
     id: 'productos',
     grupo_menu: 'principal',
-    titulo: 'Productos',
+    titulo: 'Catálogo',
     orden: 20,
     ruta: '/app/productos',
-    icono: pricetagsOutline,
+    icono: cubeOutline,
     componente: () => import('@/views/productos_page.vue'),
-    en_tabs: true
+    en_tabs: true,
+    roles: ['ADMIN', 'OPERARIO', 'CLIENTE']
   },
   {
     id: 'clientes',
@@ -27,9 +39,10 @@ export const navegacion = [
     titulo: 'Clientes',
     orden: 30,
     ruta: '/app/clientes',
-    icono: peopleOutline,
+    icono: businessOutline,
     componente: () => import('@/views/clientes_page.vue'),
-    en_tabs: true
+    en_tabs: true,
+    roles: ['ADMIN', 'OPERARIO']
   },
   {
     id: 'pedidos',
@@ -39,7 +52,19 @@ export const navegacion = [
     ruta: '/app/pedidos',
     icono: receiptOutline,
     componente: () => import('@/views/pedidos_page.vue'),
-    en_tabs: true
+    en_tabs: true,
+    roles: ['ADMIN', 'OPERARIO', 'CHOFER', 'CLIENTE']
+  },
+  {
+    id: 'usuarios',
+    grupo_menu: 'administracion',
+    titulo: 'Usuarios',
+    orden: 45,
+    ruta: '/app/usuarios',
+    icono: peopleOutline,
+    componente: () => import('@/views/usuarios_page.vue'),
+    en_tabs: false, // Accesible desde menú lateral para ADMIN
+    roles: ['ADMIN']
   },
   {
     id: 'cuenta',
@@ -49,6 +74,7 @@ export const navegacion = [
     ruta: '/app/cuenta',
     icono: personCircleOutline,
     componente: () => import('@/views/cuenta_page.vue'),
-    en_tabs: true
+    en_tabs: true,
+    roles: ['ADMIN', 'OPERARIO', 'CHOFER', 'CLIENTE']
   }
 ];
