@@ -168,7 +168,10 @@ const entrar_con_biometria = async () => {
   const usuario = await sesion_store.iniciar();
   if (usuario) {
     router.replace('/app/inicio');
+    return;
   }
+  // Si la sesión fue revocada o falló, se actualiza la disponibilidad del botón de huella
+  puede_biometria.value = Boolean(await restaurar_sesion());
 };
 
 const cargarCredenciales = (correo) => {

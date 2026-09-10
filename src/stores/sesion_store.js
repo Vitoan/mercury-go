@@ -36,8 +36,23 @@ export const sesion_store = {
   es_admin: computed(() => state.usuario?.rol_codigo === 'ADMIN'),
 
   // Acciones
-  async iniciar() {
+  // Se llama una vez al arrancar la app: NO entra automáticamente,
+  // solo verifica si hay un token guardado en SecureStorage para que el Login sepa
+  // si corresponde mostrar el botón de desbloqueo biométrico.
+  async preparar() {
     state.restaurando = true;
+    try {
+      return Boolean(await restaurar_sesion());
+    } finally {
+      state.restaurando = false;
+    }
+  },
+
+  // Desbloquea la sesión guardada mediante biometría:
+  // consulta a la API (/yo) para garantizar que el token siga siendo válido y que el rol esté actualizado.
+  async iniciar() {
+    state.cargando = true;
+    state.error = null;
     try {
       const token = await restaurar_sesion();
       if (!token) {
@@ -47,12 +62,16 @@ export const sesion_store = {
       const respuesta = await obtener_mi_usuario();
       state.usuario = respuesta?.usuario || null;
       return state.usuario;
-    } catch {
-      await borrar_sesion();
+    } catch (error) {
+      const revocada = error?.estado_http === 401;
+      if (revocada) await borrar_sesion();
+      state.error = revocada
+        ? 'La sesión guardada expiró. Ingresá con tu correo y contraseña.'
+        : error?.mensaje || 'No se pudo reanudar la sesión.';
       state.usuario = null;
       return null;
     } finally {
-      state.restaurando = false;
+      state.cargando = false;
     }
   },
 

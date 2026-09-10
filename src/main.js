@@ -44,10 +44,11 @@ const app = createApp(App)
   .use(IonicVue)
   .use(router);
 
-// La sesión se restaura ANTES de montar la app.
-// Si se hiciera después, el guard del router correría sin saber si hay usuario
-// y mandaría al login en cada arranque, incluso teniendo una sesión guardada válida.
-sesion_store.iniciar().finally(() => {
+// El token guardado se lee ANTES de montar: el guard y el login necesitan
+// saber si hay sesión guardada para habilitar el desbloqueo biométrico.
+// Leerlo NO es entrar automáticamente: la app arranca en el login, y allí la huella
+// digital desbloquea la sesión existente de forma segura.
+sesion_store.preparar().finally(() => {
   router.isReady().then(() => {
     app.mount('#app');
   });
