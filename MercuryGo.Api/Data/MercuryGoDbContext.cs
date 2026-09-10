@@ -14,6 +14,9 @@ public class MercuryGoDbContext : DbContext
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Pedido> Pedidos => Set<Pedido>();
     public DbSet<DetallePedido> DetallesPedido => Set<DetallePedido>();
+    public DbSet<Rol> Roles => Set<Rol>();
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -148,6 +151,69 @@ public class MercuryGoDbContext : DbContext
                 new DetallePedido { Id = 9, PedidoId = 5, ProductoId = 3, Cantidad = 4,  PrecioUnitario = 1800.00m, CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, DateTimeKind.Utc) },
                 new DetallePedido { Id = 10, PedidoId = 5, ProductoId = 2, Cantidad = 8, PrecioUnitario = 950.00m,  CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, DateTimeKind.Utc) }
             );
+        });
+
+        // ── Rol ───────────────────────────────────────────────────────────────
+        modelBuilder.Entity<Rol>(entity =>
+        {
+            entity.ToTable("roles");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Nombre).HasMaxLength(80).IsRequired();
+            entity.Property(e => e.Codigo).HasMaxLength(40).IsRequired();
+            entity.HasIndex(e => e.Codigo).IsUnique();
+            entity.Property(e => e.Descripcion).HasMaxLength(255);
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+
+            entity.HasData(
+                new Rol { Id = 1, Codigo = "ADMIN", Nombre = "Administrador", Descripcion = "Control total y auditoría del sistema", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Rol { Id = 2, Codigo = "OPERARIO", Nombre = "Operario de Depósito", Descripcion = "Picking, preparación de bultos y estiba LIFO", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Rol { Id = 3, Codigo = "CHOFER", Nombre = "Chofer Repartidor", Descripcion = "Hoja de ruta, entrega en destino y cobranza", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Rol { Id = 4, Codigo = "CLIENTE", Nombre = "Comercio / Cliente B2B", Descripcion = "Autogestión de compras y seguimiento de remitos", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) }
+            );
+        });
+
+        // ── Usuario ───────────────────────────────────────────────────────────
+        modelBuilder.Entity<Usuario>(entity =>
+        {
+            entity.ToTable("usuarios");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Nombre).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.Email).HasMaxLength(180).IsRequired();
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(e => e.PasswordHash).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Telefono).HasMaxLength(40);
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+
+            entity.HasOne(u => u.Rol)
+                  .WithMany()
+                  .HasForeignKey(u => u.RolId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            // Hash para la contraseña de taller "Mercury123!" (Identity V3 con salt)
+            const string hashMercury123 = "AQAAAAIAAYagAAAAEKiKxpDQBOt5YojXQ0cuDHJ/9Zt+6ShbGrXgpAh7vLC+ueHYS+BZCJS9OY/RPkQmIQ==";
+
+            entity.HasData(
+                new Usuario { Id = 1, RolId = 1, Nombre = "Administrador Central", Email = "admin@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4001122", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Usuario { Id = 2, RolId = 2, Nombre = "Operario de Picking", Email = "operario@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4003344", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Usuario { Id = 3, RolId = 3, Nombre = "Chofer Reparto 01", Email = "chofer@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4005566", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Usuario { Id = 4, RolId = 4, Nombre = "Cliente Autoservicio San Luis", Email = "cliente@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4007788", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Usuario { Id = 5, RolId = null, Nombre = "Usuario Nuevo Pendiente", Email = "nuevo@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4009900", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) }
+            );
+        });
+
+        // ── RefreshToken ──────────────────────────────────────────────────────
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TokenHash).HasMaxLength(120).IsRequired();
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => new { e.UsuarioId, e.ExpiraEn });
+
+            entity.HasOne(r => r.Usuario)
+                  .WithMany()
+                  .HasForeignKey(r => r.UsuarioId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
