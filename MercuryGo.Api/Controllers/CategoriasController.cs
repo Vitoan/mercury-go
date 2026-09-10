@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MercuryGo.Api.Auth;
 using MercuryGo.Api.Data;
 
 namespace MercuryGo.Api.Controllers;
 
 [ApiController]
+[Authorize(Roles = RolCodigos.Admin)]
 [Route("api/[controller]")]
 public class CategoriasController : ControllerBase
 {
@@ -15,6 +18,7 @@ public class CategoriasController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<IActionResult> Listar(CancellationToken ct)
     {

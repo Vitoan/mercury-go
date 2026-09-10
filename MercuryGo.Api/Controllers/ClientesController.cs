@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MercuryGo.Api.Auth;
 using MercuryGo.Api.Data;
 using MercuryGo.Api.Domain.Entities;
 
 namespace MercuryGo.Api.Controllers;
 
 [ApiController]
+[Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario}")]
 [Route("api/clientes")]
 public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
 {

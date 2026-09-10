@@ -1,15 +1,19 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MercuryGo.Api.Auth;
 using MercuryGo.Api.Data;
 using MercuryGo.Api.Domain.Entities;
 
 namespace MercuryGo.Api.Controllers;
 
 [ApiController]
+[Authorize(Roles = RolCodigos.Admin)]
 [Route("api/productos")]
 public sealed class ProductosController(MercuryGoDbContext db) : ControllerBase
 {
     // Vitrina no paginada: muestra el catálogo completo agrupado por categoría para inicio/resumen.
+    [AllowAnonymous]
     [HttpGet("resumen")]
     public async Task<IActionResult> Resumen(CancellationToken cancellationToken)
     {
@@ -55,6 +59,7 @@ public sealed class ProductosController(MercuryGoDbContext db) : ControllerBase
     }
 
     // Catálogo paginado con filtros en servidor: busca por texto, categoría y disponibilidad.
+    [AllowAnonymous]
     [HttpGet("listado")]
     public async Task<IActionResult> Listado(
         [FromQuery] string? busqueda,

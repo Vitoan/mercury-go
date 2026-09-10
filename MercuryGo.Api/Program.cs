@@ -1,7 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Net;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using MercuryGo.Api.Auth;
 using MercuryGo.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,6 +26,72 @@ if (builder.Environment.IsDevelopment() && corsAllowedOrigins.Length == 0)
         "ionic://localhost"
     ];
 }
+
+var jwtOpciones = builder.Configuration.GetSection(JwtOpciones.Seccion).Get<JwtOpciones>() ?? new JwtOpciones();
+if (string.IsNullOrWhiteSpace(jwtOpciones.Key))
+{
+    if (!builder.Environment.IsDevelopment())
+        throw new InvalidOperationException("No se configuró Jwt:Key en producción.");
+    jwtOpciones.Key = TokenService.GenerarClaveEfimera();
+}
+var tokenService = new TokenService(jwtOpciones);
+builder.Services.AddSingleton(jwtOpciones);
+builder.Services.AddSingleton(tokenService);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOpciones.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOpciones.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = tokenService.ClaveFirma,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+            RoleClaimType = ClaimTypes.Role
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            // Valida en cada request que el usuario siga activo y conserve el rol del token.
+            // Una baja o cambio de rol toma efecto instantáneamente.
+            OnTokenValidated = async contexto =>
+            {
+                var db = contexto.HttpContext.RequestServices.GetRequiredService<MercuryGoDbContext>();
+                var usuarioId = contexto.Principal?.UsuarioId() ?? 0;
+                if (usuarioId <= 0)
+                {
+                    contexto.Fail("Token sin usuario válido.");
+                    return;
+                }
+
+                var usuario = await db.Usuarios.AsNoTracking()
+                    .Where(u => u.Id == usuarioId)
+                    .Select(u => new { u.Activo, u.RolId })
+                    .FirstOrDefaultAsync(contexto.HttpContext.RequestAborted);
+
+                if (usuario is null || !usuario.Activo)
+                {
+                    contexto.Fail("El usuario fue dado de baja.");
+                    return;
+                }
+
+                var rolActual = usuario.RolId.HasValue
+                    ? await db.Roles.AsNoTracking().Where(r => r.Id == usuario.RolId.Value && r.Activo).Select(r => r.Codigo).FirstOrDefaultAsync(contexto.HttpContext.RequestAborted)
+                    : null;
+
+                if (rolActual != contexto.Principal?.RolCodigo())
+                {
+                    contexto.Fail("El rol del usuario cambió; vuelva a iniciar sesión.");
+                }
+            }
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddControllers().AddJsonOptions(options => ConfigurarJson(options.JsonSerializerOptions));
 builder.Services.ConfigureHttpJsonOptions(options => ConfigurarJson(options.SerializerOptions));
@@ -56,8 +126,12 @@ if (app.Environment.IsDevelopment() || corsAllowedOrigins.Length > 0)
     app.UseCors(corsPolicy);
 }
 
-// Las imagenes del catálogo se sirven desde wwwroot/seed/
+// Las imágenes del catálogo se sirven desde wwwroot/seed/
 app.UseStaticFiles();
+
+// Autenticación antes de Autorización
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
 {
