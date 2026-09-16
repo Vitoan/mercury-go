@@ -1,4 +1,4 @@
-import { reactive, computed } from 'vue';
+import { reactive } from 'vue';
 import { cerrar_sesion, iniciar_sesion, obtener_mi_usuario } from '@/services/sesion_service';
 import {
   al_expirar,
@@ -30,10 +30,10 @@ export const sesion_store = {
   get restaurando() { return state.restaurando; },
   get error() { return state.error; },
 
-  autenticado: computed(() => Boolean(state.usuario)),
-  rol_activo: computed(() => state.usuario?.rol_codigo || null),
-  pendiente_de_habilitacion: computed(() => Boolean(state.usuario) && !state.usuario.rol_codigo),
-  es_admin: computed(() => state.usuario?.rol_codigo === 'ADMIN'),
+  get autenticado() { return Boolean(state.usuario); },
+  get rol_activo() { return state.usuario?.rol_codigo || null; },
+  get pendiente_de_habilitacion() { return Boolean(state.usuario) && !state.usuario.rol_codigo; },
+  get es_admin() { return state.usuario?.rol_codigo === 'ADMIN'; },
 
   // Acciones
   // Se llama una vez al arrancar la app: NO entra automáticamente,

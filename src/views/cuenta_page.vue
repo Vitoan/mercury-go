@@ -119,7 +119,7 @@ const estado_diagnostico = ref('inicial');
 const mensaje_diagnostico = ref('');
 
 const badgeColor = computed(() => {
-  const rol = sesion_store.rol_activo.value;
+  const rol = sesion_store.rol_activo;
   switch (rol) {
     case 'ADMIN': return 'primary';
     case 'OPERARIO': return 'warning';

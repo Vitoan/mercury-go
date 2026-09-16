@@ -52,17 +52,17 @@ router.beforeEach((to) => {
   if (sesion_store.restaurando) return true;
 
   if (to.meta.publica) {
-    return sesion_store.autenticado.value ? { path: '/app/inicio', replace: true } : true;
+    return sesion_store.autenticado ? { path: '/app/inicio', replace: true } : true;
   }
 
-  if (!sesion_store.autenticado.value) {
+  if (!sesion_store.autenticado) {
     return { path: '/login', replace: true };
   }
 
   const rolesPermitidos = to.meta.roles;
   if (!rolesPermitidos || rolesPermitidos.length === 0) return true;
 
-  const rolActivo = sesion_store.rol_activo.value;
+  const rolActivo = sesion_store.rol_activo;
 
   // Si el usuario no tiene rol asignado (pendiente de habilitación), solo accede a inicio y cuenta
   if (!rolActivo) {

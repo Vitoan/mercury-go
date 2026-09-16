@@ -54,7 +54,7 @@ defineProps({
 });
 
 const puede_ver = (item) => {
-  const rol = sesion_store.rol_activo.value;
+  const rol = sesion_store.rol_activo;
   if (!rol) return item.id === 'inicio' || item.id === 'cuenta';
   return !item.roles || item.roles.includes(rol);
 };

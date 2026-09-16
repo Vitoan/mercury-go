@@ -14,7 +14,7 @@ import { navegacion } from '../../config/navegacion';
 import { sesion_store } from '@/stores/sesion_store';
 
 const tabs = computed(() => {
-  const rol = sesion_store.rol_activo.value;
+  const rol = sesion_store.rol_activo;
   return navegacion
     .filter(i => {
       if (!i.en_tabs) return false;
