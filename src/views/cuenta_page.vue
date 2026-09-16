@@ -3,25 +3,23 @@
     <div class="cuenta-stack">
       <!-- Tarjeta de Usuario y Rol -->
       <ion-card class="mercury-card-perfil">
-        <ion-card-header>
-          <ion-card-subtitle>Sesión Activa</ion-card-subtitle>
-          <ion-card-title>{{ sesion_store.usuario?.nombre || 'Usuario Conectado' }}</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-          <ion-item lines="none" class="mercury-item-perfil">
-            <ion-icon slot="start" :icon="personCircleOutline" class="mercury-avatar-icon" />
-            <ion-label>
-              <h3>{{ sesion_store.usuario?.email || 'Sin correo' }}</h3>
-              <p v-if="sesion_store.usuario?.telefono">📞 {{ sesion_store.usuario.telefono }}</p>
-            </ion-label>
-            <ion-badge
-              slot="end"
-              :color="badgeColor"
-              class="mercury-badge-rol"
-            >
-              {{ sesion_store.usuario?.rol_nombre || 'Sin Habilitar' }}
-            </ion-badge>
-          </ion-item>
+        <ion-card-content class="mercury-perfil-compacto">
+          <div class="mercury-perfil-principal">
+            <ion-icon :icon="personCircleOutline" class="mercury-avatar-icon" />
+            <div class="mercury-perfil-textos">
+              <div class="mercury-perfil-fila-nombre">
+                <h2>{{ sesion_store.usuario?.nombre || 'Usuario Conectado' }}</h2>
+                <ion-badge
+                  :color="badgeColor"
+                  class="mercury-badge-rol"
+                >
+                  {{ sesion_store.usuario?.rol_nombre || 'Sin Habilitar' }}
+                </ion-badge>
+              </div>
+              <p class="mercury-perfil-email">{{ sesion_store.usuario?.email || 'Sin correo' }}</p>
+              <p v-if="sesion_store.usuario?.telefono" class="mercury-perfil-tel">📞 {{ sesion_store.usuario.telefono }}</p>
+            </div>
+          </div>
 
           <!-- Aviso para usuario sin rol (pendiente de habilitación) -->
           <div v-if="sesion_store.pendiente_de_habilitacion" class="mercury-aviso-pendiente">
@@ -166,21 +164,66 @@ onMounted(() => {
   gap: 12px;
 }
 
+.mercury-perfil-compacto {
+  padding: 16px;
+}
+
+.mercury-perfil-principal {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .mercury-avatar-icon {
-  font-size: 38px;
+  font-size: 48px;
   color: var(--mercury-accent);
+  flex-shrink: 0;
+}
+
+.mercury-perfil-textos {
+  flex: 1;
+  min-width: 0;
+}
+
+.mercury-perfil-fila-nombre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mercury-perfil-fila-nombre h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--mercury-text-title);
+}
+
+.mercury-badge-rol {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  font-weight: 700;
+  border-radius: 6px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.mercury-perfil-email {
+  margin: 3px 0 0 0;
+  font-size: 0.9rem;
+  color: var(--mercury-text-muted);
+}
+
+.mercury-perfil-tel {
+  margin: 2px 0 0 0;
+  font-size: 0.82rem;
+  color: var(--mercury-text-hint);
 }
 
 .mercury-url-api {
   font-weight: 600;
   color: var(--mercury-accent);
-}
-
-.mercury-badge-rol {
-  font-size: 0.8rem;
-  padding: 6px 12px;
-  font-weight: 700;
-  border-radius: 9999px;
 }
 
 .mercury-aviso-pendiente {
