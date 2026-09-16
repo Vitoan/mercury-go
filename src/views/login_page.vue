@@ -176,7 +176,7 @@ const entrar_con_biometria = async () => {
 
 const cargarCredenciales = (correo) => {
   email.value = correo;
-  password.value = 'Gestor123!';
+  password.value = 'Mercury123!';
 };
 </script>
 

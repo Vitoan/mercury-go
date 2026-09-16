@@ -11,15 +11,15 @@
 
     <ion-card style="margin-inline: 0; margin-top: 16px;">
       <ion-card-header>
-        <ion-card-title class="mercury-titulo-destacado">Versión 4 · Paginación, ABM & Estados</ion-card-title>
+        <ion-card-title class="mercury-titulo-destacado">Versión 5 · Autenticación, Roles & Biometría</ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        Flujo central transaccional activo:
+        Capa de seguridad empresarial y control de acceso activa:
         <ul style="margin: 8px 0 0 16px; padding: 0;">
-          <li><strong>Paginación en Servidor:</strong> Listas con <code>Skip</code>/<code>Take</code> y carga incremental.</li>
-          <li><strong>Búsqueda con Debounce:</strong> Consultas optimizadas directo a MySQL.</li>
-          <li><strong>ABM con Validación en API:</strong> Altas y ediciones en modal con baja lógica.</li>
-          <li><strong>Gestión de Estados:</strong> Ciclo de vida para órdenes de carga y precios protegidos.</li>
+          <li><strong>Autenticación JWT & Refresh Tokens:</strong> Tokens en memoria con renovación transparente y rotación hasheada (SHA-256).</li>
+          <li><strong>Roles en Base de Datos (B2B):</strong> Permisos dinámicos para Administrador, Operario, Chofer y Cliente.</li>
+          <li><strong>Revocación Inmediata:</strong> Validación en cada petición (<code>OnTokenValidated</code>) ante bajas o cambios de permisos.</li>
+          <li><strong>Seguridad Móvil & Biometría:</strong> Almacenamiento cifrado en Keystore y desbloqueo local por huella digital.</li>
         </ul>
       </ion-card-content>
     </ion-card>
