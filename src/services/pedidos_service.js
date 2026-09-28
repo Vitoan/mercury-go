@@ -34,5 +34,11 @@ export const pedidos_service = {
 
   obtener_qr_url(id) {
     return ajax_service.blob(`api/pedidos/${id}/qr`);
+  },
+
+  subir_comprobante_pago(id, archivo) {
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    return ajax_service.post(`api/pedidos/${id}/comprobante-pago`, formData);
   }
 };

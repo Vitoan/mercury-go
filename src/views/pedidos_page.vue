@@ -130,6 +130,14 @@
       @didDismiss="mostrarActionSheet = false"
     />
 
+    <!-- Modal de Carga de Comprobante de Pago (Cámara / PDF) -->
+    <comp-comprobante-modal
+      :abierto="mostrarModalComprobante"
+      :pedido="pedidoSeleccionado"
+      @cerrar="mostrarModalComprobante = false"
+      @comprobante_subido="alSubirComprobante"
+    />
+
     <!-- Toast para feedback de transiciones y errores -->
     <ion-toast
       :is-open="mostrarToast"
@@ -168,13 +176,18 @@ import CompLista from '../components/base/comp_lista.vue';
 import CompEsqueleto from '../components/base/comp_esqueleto.vue';
 import CompEstadoError from '../components/base/comp_estado_error.vue';
 import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
+import CompComprobanteModal from '../components/dominio/pedidos/comp_comprobante_modal.vue';
 
 import { pedidos_store } from '@/stores/pedidos_store';
+import { pedidos_service } from '@/services/pedidos_service';
+import { compartir_archivo } from '@/services/compartir_service';
+import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 
 const busqueda = ref('');
 const estadoSeleccionado = ref('');
 
 const mostrarActionSheet = ref(false);
+const mostrarModalComprobante = ref(false);
 const pedidoSeleccionado = ref(null);
 
 const mostrarToast = ref(false);
@@ -236,6 +249,20 @@ const botonesTransicion = computed(() => {
   if (!pedidoSeleccionado.value) return [];
   const estadoActual = pedidoSeleccionado.value.estado;
   const botones = [];
+
+  // Opción siempre disponible: Descargar o compartir Comprobante PDF
+  botones.push({
+    text: '📄 Ver / Compartir Comprobante PDF (con QR)',
+    handler: () => compartirComprobante(pedidoSeleccionado.value)
+  });
+
+  // Si está en Pendiente o Confirmado, el cliente o admin puede adjuntar comprobante de pago
+  if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
+    botones.push({
+      text: '💳 Adjuntar Comprobante de Pago (Foto / PDF)',
+      handler: () => abrirModalComprobante(pedidoSeleccionado.value)
+    });
+  }
 
   if (estadoActual === 'Pendiente') {
     botones.push({
@@ -300,6 +327,57 @@ const ejecutarCambioEstado = async (nuevoEstado) => {
     mostrarToast.value = true;
   } finally {
     mostrarActionSheet.value = false;
+  }
+};
+
+const abrirModalComprobante = (pedido) => {
+  pedidoSeleccionado.value = pedido;
+  mostrarActionSheet.value = false;
+  mostrarModalComprobante.value = true;
+};
+
+const alSubirComprobante = () => {
+  mensajeToast.value = '¡Comprobante adjuntado con éxito!';
+  colorToast.value = 'success';
+  mostrarToast.value = true;
+  pedidos_store.cargar(true);
+};
+
+const compartirComprobante = async (pedido) => {
+  mostrarActionSheet.value = false;
+  if (!pedido) return;
+
+  try {
+    mensajeToast.value = 'Generando comprobante oficial PDF con QR…';
+    colorToast.value = 'primary';
+    mostrarToast.value = true;
+
+    const blob = await pedidos_service.descargar_comprobante(pedido.id);
+    const resultado = await compartir_archivo({
+      nombre_archivo: `${pedido.numero}.pdf`,
+      blob: blob,
+      titulo: `Comprobante ${pedido.numero}`,
+      texto: `Comprobante oficial de orden ${pedido.numero} de MercuryGO.`
+    });
+
+    if (resultado.ok) {
+      vibrar_exito();
+      if (resultado.mensaje) {
+        mensajeToast.value = resultado.mensaje;
+        colorToast.value = 'success';
+        mostrarToast.value = true;
+      }
+    } else {
+      vibrar_error();
+      mensajeToast.value = resultado.mensaje || 'No se pudo compartir el archivo.';
+      colorToast.value = 'warning';
+      mostrarToast.value = true;
+    }
+  } catch (err) {
+    vibrar_error();
+    mensajeToast.value = err.message || 'Error al generar el comprobante PDF.';
+    colorToast.value = 'danger';
+    mostrarToast.value = true;
   }
 };
 

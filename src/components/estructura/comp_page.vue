@@ -6,6 +6,9 @@
           <ion-menu-button></ion-menu-button>
         </ion-buttons>
         <ion-title>{{ titulo }}</ion-title>
+        <ion-buttons slot="end">
+          <slot name="acciones" />
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 

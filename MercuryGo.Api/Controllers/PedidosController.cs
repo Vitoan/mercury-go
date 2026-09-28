@@ -14,7 +14,7 @@ namespace MercuryGo.Api.Controllers;
 [ApiController]
 [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario},{RolCodigos.Chofer},{RolCodigos.Cliente}")]
 [Route("api/pedidos")]
-public sealed class PedidosController(MercuryGoDbContext db) : ControllerBase
+public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment env) : ControllerBase
 {
     // Diccionario de la máquina de estados de un pedido logístico.
     // La validación vive estrictamente en el servidor.
@@ -250,6 +250,48 @@ public sealed class PedidosController(MercuryGoDbContext db) : ControllerBase
         await db.SaveChangesAsync(ct);
 
         return Ok(new { cancelado = true });
+    }
+
+    // Subida de comprobante de transferencia bancaria (PDF o Foto: JPG, PNG, WEBP hasta 5 MB)
+    [HttpPost("{id:long}/comprobante-pago")]
+    public async Task<IActionResult> SubirComprobantePago(long id, IFormFile? archivo, CancellationToken ct)
+    {
+        if (archivo is null || archivo.Length == 0)
+            return BadRequest(new { codigo = "archivo_requerido", mensaje = "Debe adjuntar una foto o archivo PDF del comprobante de transferencia." });
+
+        var extensionesValidas = new[] { ".pdf", ".jpg", ".jpeg", ".png", ".webp" };
+        var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+        if (archivo.Length > 5_000_000 || !extensionesValidas.Contains(extension))
+            return BadRequest(new { codigo = "archivo_invalido", mensaje = "El comprobante debe ser un archivo PDF o imagen (JPG, PNG, WEBP) menor o igual a 5 MB." });
+
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var carpetaComprobantes = Path.Combine(webRoot, "uploads", "comprobantes");
+        Directory.CreateDirectory(carpetaComprobantes);
+
+        var nombreArchivo = $"{Guid.NewGuid():N}{extension}";
+        var rutaFisica = Path.Combine(carpetaComprobantes, nombreArchivo);
+        await using var stream = System.IO.File.Create(rutaFisica);
+        await archivo.CopyToAsync(stream, ct);
+
+        // Guardamos la referencia en observaciones si no hay columna o para registro histórico
+        var etiquetaComprobante = $"[Comprobante de pago: /uploads/comprobantes/{nombreArchivo}]";
+        if (string.IsNullOrWhiteSpace(pedido.Observaciones))
+            pedido.Observaciones = etiquetaComprobante;
+        else if (!pedido.Observaciones.Contains("/uploads/comprobantes/"))
+            pedido.Observaciones = $"{pedido.Observaciones} · {etiquetaComprobante}";
+
+        pedido.ActualizadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            comprobante_url = $"/uploads/comprobantes/{nombreArchivo}",
+            mensaje = "Comprobante de pago adjuntado exitosamente a la orden."
+        });
     }
 
     // Comprobante oficial en PDF con QuestPDF y QR impreso al pie

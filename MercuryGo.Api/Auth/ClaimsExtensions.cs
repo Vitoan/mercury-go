@@ -33,4 +33,20 @@ public static class ClaimsExtensions
     {
         return usuario.IsInRole(RolCodigos.Admin);
     }
+
+    public static bool EsCliente(this ClaimsPrincipal usuario)
+    {
+        return usuario.IsInRole(RolCodigos.Cliente);
+    }
+
+    public static bool EsOperario(this ClaimsPrincipal usuario)
+    {
+        return usuario.IsInRole(RolCodigos.Operario);
+    }
+
+    public static string? Email(this ClaimsPrincipal usuario)
+    {
+        return usuario.FindFirstValue(JwtRegisteredClaimNames.Email)
+            ?? usuario.FindFirstValue(ClaimTypes.Email);
+    }
 }

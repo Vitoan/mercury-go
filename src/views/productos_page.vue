@@ -1,5 +1,15 @@
 <template>
   <comp-page titulo="Catálogo de Mercadería" :mostrar_actualizar="true" @actualizar="recargar">
+    <!-- Botón del Carrito en Toolbar con Badge de conteo -->
+    <template #acciones>
+      <ion-button class="mercury-btn-carrito" @click="mostrarCarrito = true">
+        <ion-icon slot="icon-only" :icon="cartOutline" />
+        <ion-badge v-if="carrito_store.cantidad_total > 0" color="danger" class="mercury-badge-carrito">
+          {{ carrito_store.cantidad_total }}
+        </ion-badge>
+      </ion-button>
+    </template>
+
     <!-- Buscador con debounce en servidor -->
     <comp-buscador
       v-model="busqueda"
@@ -102,15 +112,44 @@
           </div>
           <p class="mercury-producto-categoria">{{ p.categoria_nombre }} · {{ p.descripcion || 'Sin descripción' }}</p>
         </ion-label>
-        <ion-badge
-          slot="end"
-          :color="p.disponible ? 'success' : 'medium'"
-          class="mercury-badge-stock"
-        >
-          {{ p.disponible ? 'En Stock' : 'Agotado' }}
-        </ion-badge>
+
+        <div slot="end" class="mercury-producto-item-acciones">
+          <ion-badge
+            :color="p.disponible ? 'success' : 'medium'"
+            class="mercury-badge-stock"
+          >
+            {{ p.disponible ? 'En Stock' : 'Agotado' }}
+          </ion-badge>
+
+          <ion-button
+            v-if="p.disponible"
+            size="small"
+            fill="solid"
+            color="primary"
+            class="mercury-btn-agregar-carrito"
+            @click="agregarAlCarrito(p)"
+          >
+            <ion-icon slot="icon-only" :icon="cartOutline" />
+          </ion-button>
+        </div>
       </ion-item>
     </comp-lista>
+
+    <!-- Modal de Carrito -->
+    <comp-carrito-modal
+      :abierto="mostrarCarrito"
+      @cerrar="mostrarCarrito = false"
+      @pedido_creado="alCrearPedido"
+    />
+
+    <!-- Toast de Notificación -->
+    <ion-toast
+      :is-open="mostrarToast"
+      :message="mensajeToast"
+      :color="colorToast"
+      duration="2500"
+      @didDismiss="mostrarToast = false"
+    />
   </comp-page>
 </template>
 
@@ -121,13 +160,16 @@ import {
   IonLabel,
   IonBadge,
   IonChip,
-  IonIcon
+  IonIcon,
+  IonButton,
+  IonToast
 } from '@ionic/vue';
 import {
   gridOutline,
   cubeOutline,
   checkmarkCircleOutline,
-  closeCircleOutline
+  closeCircleOutline,
+  cartOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -136,12 +178,19 @@ import CompLista from '../components/base/comp_lista.vue';
 import CompEsqueleto from '../components/base/comp_esqueleto.vue';
 import CompEstadoError from '../components/base/comp_estado_error.vue';
 import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
+import CompCarritoModal from '../components/dominio/pedidos/comp_carrito_modal.vue';
 
 import { productos_store } from '@/stores/productos_store';
+import { carrito_store } from '@/stores/carrito_store';
 
 const busqueda = ref('');
 const categoriaSeleccionada = ref(null);
 const filtroDisponible = ref(null);
+
+const mostrarCarrito = ref(false);
+const mostrarToast = ref(false);
+const mensajeToast = ref('');
+const colorToast = ref('success');
 
 const alBuscar = (texto) => {
   productos_store.establecer_busqueda(texto);
@@ -155,6 +204,19 @@ const filtrarCategoria = (catId) => {
 const filtrarDisponibilidad = (valor) => {
   filtroDisponible.value = valor;
   productos_store.establecer_disponible(valor);
+};
+
+const agregarAlCarrito = (producto) => {
+  carrito_store.agregar_producto(producto, 1);
+  mensajeToast.value = `¡${producto.nombre} agregado al carrito!`;
+  colorToast.value = 'success';
+  mostrarToast.value = true;
+};
+
+const alCrearPedido = (pedidoCreado) => {
+  mensajeToast.value = `¡Orden ${pedidoCreado.numero} confirmada como Pendiente!`;
+  colorToast.value = 'success';
+  mostrarToast.value = true;
 };
 
 const recargar = (event = null) => {
@@ -248,5 +310,32 @@ onMounted(async () => {
   font-weight: 600;
   padding: 4px 8px;
   border-radius: 6px;
+}
+
+.mercury-btn-carrito {
+  position: relative;
+  --padding-start: 8px;
+  --padding-end: 8px;
+}
+
+.mercury-badge-carrito {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  font-size: 0.72rem;
+  border-radius: 10px;
+  padding: 2px 6px;
+}
+
+.mercury-producto-item-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mercury-btn-agregar-carrito {
+  --padding-start: 10px;
+  --padding-end: 10px;
+  height: 32px;
 }
 </style>
