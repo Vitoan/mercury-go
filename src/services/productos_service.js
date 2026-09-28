@@ -25,5 +25,11 @@ export const productos_service = {
 
   eliminar(id) {
     return ajax_service.delete(`api/productos/${id}`);
+  },
+
+  subir_imagen(id, archivo) {
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    return ajax_service.post(`api/productos/${id}/imagen`, formData);
   }
 };

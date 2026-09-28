@@ -10,7 +10,7 @@ namespace MercuryGo.Api.Controllers;
 [ApiController]
 [Authorize(Roles = RolCodigos.Admin)]
 [Route("api/productos")]
-public sealed class ProductosController(MercuryGoDbContext db) : ControllerBase
+public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironment env) : ControllerBase
 {
     // Vitrina no paginada: muestra el catálogo completo agrupado por categoría para inicio/resumen.
     [AllowAnonymous]
@@ -190,6 +190,37 @@ public sealed class ProductosController(MercuryGoDbContext db) : ControllerBase
         await db.SaveChangesAsync(ct);
 
         return Ok(new { eliminado = true });
+    }
+
+    [HttpPost("{id:long}/imagen")]
+    public async Task<IActionResult> SubirImagen(long id, IFormFile? archivo, CancellationToken ct)
+    {
+        if (archivo is null || archivo.Length == 0)
+            return BadRequest(new { codigo = "archivo_requerido", mensaje = "Debe adjuntar una foto del producto." });
+
+        var extensionesValidas = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+        var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+        if (archivo.Length > 5_000_000 || !extensionesValidas.Contains(extension))
+            return BadRequest(new { codigo = "archivo_invalido", mensaje = "La imagen debe ser un archivo JPG, PNG o WEBP menor o igual a 5 MB." });
+
+        var producto = await db.Productos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (producto is null)
+            return NotFound(new { codigo = "producto_no_encontrado", mensaje = "El producto no existe o está inactivo." });
+
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var carpeta = Path.Combine(webRoot, "uploads", "productos");
+        Directory.CreateDirectory(carpeta);
+
+        var nombreArchivo = $"{Guid.NewGuid():N}{extension}";
+        var rutaFisica = Path.Combine(carpeta, nombreArchivo);
+        await using var stream = System.IO.File.Create(rutaFisica);
+        await archivo.CopyToAsync(stream, ct);
+
+        producto.ImagenUrl = $"/uploads/productos/{nombreArchivo}";
+        producto.ActualizadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new { imagen_url = producto.ImagenUrl });
     }
 
     private async Task<object?> ValidarAsync(GuardarProductoRequest request, CancellationToken ct)

@@ -10,3 +10,10 @@ export function obtener_api_url() {
   if (debug_config.debug_activado) return debug_config.api_url_debug;
   return api_url_entorno;
 }
+
+export function resolver_url_imagen(rutaRelativa) {
+  if (!rutaRelativa) return null;
+  if (/^https?:\/\//i.test(rutaRelativa)) return rutaRelativa;
+  const base = obtener_api_url();
+  return `${base}/${rutaRelativa.replace(/^\/+/, '')}`;
+}

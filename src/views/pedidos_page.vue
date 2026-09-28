@@ -1,5 +1,14 @@
 <template>
   <comp-page titulo="Órdenes de Carga y Despacho" :mostrar_actualizar="true" @actualizar="recargar">
+    <template #acciones>
+      <ion-button title="Escanear Código QR de Remito" @click="escanearRemitoQr">
+        <ion-icon slot="icon-only" :icon="qrCodeOutline" />
+      </ion-button>
+      <ion-button v-if="sesion_store.es_admin" title="Nuevo Pedido Asistido" @click="mostrarModalNuevoPedido = true">
+        <ion-icon slot="icon-only" :icon="addCircleOutline" />
+      </ion-button>
+    </template>
+
     <!-- Buscador con debounce en servidor -->
     <comp-buscador
       v-model="busqueda"
@@ -159,6 +168,13 @@
       @picking_completado="alCompletarPicking"
     />
 
+    <!-- Modal de Creación de Pedido Asistido / Teléfono (Admin) -->
+    <comp-pedido-admin-modal
+      :abierto="mostrarModalNuevoPedido"
+      @cerrar="mostrarModalNuevoPedido = false"
+      @pedido_creado="alCrearPedidoAdmin"
+    />
+
     <!-- Toast para feedback de transiciones y errores -->
     <ion-toast
       :is-open="mostrarToast"
@@ -178,6 +194,7 @@ import {
   IonBadge,
   IonChip,
   IonIcon,
+  IonButton,
   IonActionSheet,
   IonToast
 } from '@ionic/vue';
@@ -188,7 +205,9 @@ import {
   trailSignOutline,
   checkmarkCircleOutline,
   closeCircleOutline,
-  documentTextOutline
+  documentTextOutline,
+  qrCodeOutline,
+  addCircleOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -199,12 +218,14 @@ import CompEstadoError from '../components/base/comp_estado_error.vue';
 import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
 import CompComprobanteModal from '../components/dominio/pedidos/comp_comprobante_modal.vue';
 import CompPickingModal from '../components/dominio/pedidos/comp_picking_modal.vue';
+import CompPedidoAdminModal from '../components/dominio/pedidos/comp_pedido_admin_modal.vue';
 
 import { pedidos_store } from '@/stores/pedidos_store';
 import { sesion_store } from '@/stores/sesion_store';
 import { pedidos_service } from '@/services/pedidos_service';
 import { compartir_archivo } from '@/services/compartir_service';
-import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
+import { escanear_qr } from '@/services/qr_service';
+import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 
 const busqueda = ref('');
 const estadoSeleccionado = ref('');
@@ -212,6 +233,7 @@ const estadoSeleccionado = ref('');
 const mostrarActionSheet = ref(false);
 const mostrarModalComprobante = ref(false);
 const mostrarModalPicking = ref(false);
+const mostrarModalNuevoPedido = ref(false);
 const pedidoSeleccionado = ref(null);
 
 const mostrarToast = ref(false);
@@ -394,6 +416,31 @@ const tieneSubEtiquetas = (pedido) => {
     pedido.observaciones.includes('[Picking:') ||
     pedido.observaciones.includes('[Comprobante de pago:')
   );
+};
+
+const escanearRemitoQr = async () => {
+  vibrar_toque();
+  const res = await escanear_qr();
+  if (res.ok && res.contenido) {
+    await vibrar_exito();
+    busqueda.value = res.contenido.trim();
+    alBuscar(busqueda.value);
+    mensajeToast.value = `Código QR detectado: ${res.contenido}`;
+    colorToast.value = 'success';
+    mostrarToast.value = true;
+  } else if (res.mensaje) {
+    await vibrar_error();
+    mensajeToast.value = res.mensaje;
+    colorToast.value = 'warning';
+    mostrarToast.value = true;
+  }
+};
+
+const alCrearPedidoAdmin = (res) => {
+  mensajeToast.value = `¡Pedido ${res?.numero || ''} creado con éxito!`;
+  colorToast.value = 'success';
+  mostrarToast.value = true;
+  pedidos_store.cargar(true);
 };
 
 const compartirComprobante = async (pedido) => {

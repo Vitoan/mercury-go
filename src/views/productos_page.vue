@@ -104,7 +104,11 @@
       @cargar_mas="productos_store.cargar_mas"
     >
       <ion-item v-for="p in productos_store.productos" :key="p.id" class="mercury-producto-item">
-        <ion-icon :icon="cubeOutline" slot="start" class="mercury-icono-producto" />
+        <ion-thumbnail v-if="p.imagen_url" slot="start" class="mercury-thumb-producto">
+          <img :src="resolver_url_imagen(p.imagen_url)" alt="Foto" />
+        </ion-thumbnail>
+        <ion-icon v-else :icon="cubeOutline" slot="start" class="mercury-icono-producto" />
+
         <ion-label>
           <div class="mercury-producto-fila-titulo">
             <h3>{{ p.nombre }}</h3>
@@ -114,6 +118,18 @@
         </ion-label>
 
         <div slot="end" class="mercury-producto-item-acciones">
+          <ion-button
+            v-if="sesion_store.es_admin"
+            size="small"
+            fill="clear"
+            color="medium"
+            class="mercury-btn-foto"
+            title="Cambiar foto con cámara o galería"
+            @click="abrirOpcionesFoto(p)"
+          >
+            <ion-icon slot="icon-only" :icon="cameraOutline" />
+          </ion-button>
+
           <ion-badge
             :color="p.disponible ? 'success' : 'medium'"
             class="mercury-badge-stock"
@@ -142,6 +158,24 @@
       @pedido_creado="alCrearPedido"
     />
 
+    <!-- Action Sheet para tomar foto o elegir de galería -->
+    <ion-action-sheet
+      :is-open="mostrarActionSheetFoto"
+      header="Actualizar Foto de Mercadería"
+      :sub-header="productoSeleccionadoParaFoto ? productoSeleccionadoParaFoto.nombre : ''"
+      :buttons="botonesFoto"
+      @didDismiss="mostrarActionSheetFoto = false"
+    />
+
+    <!-- Input file invisible para navegador web o selección de archivo -->
+    <input
+      ref="inputFotoProducto"
+      type="file"
+      accept="image/*"
+      style="display: none;"
+      @change="alSeleccionarFotoWeb"
+    />
+
     <!-- Toast de Notificación -->
     <ion-toast
       :is-open="mostrarToast"
@@ -154,7 +188,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import {
   IonItem,
   IonLabel,
@@ -162,6 +196,8 @@ import {
   IonChip,
   IonIcon,
   IonButton,
+  IonThumbnail,
+  IonActionSheet,
   IonToast
 } from '@ionic/vue';
 import {
@@ -169,7 +205,8 @@ import {
   cubeOutline,
   checkmarkCircleOutline,
   closeCircleOutline,
-  cartOutline
+  cartOutline,
+  cameraOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -181,16 +218,99 @@ import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
 import CompCarritoModal from '../components/dominio/pedidos/comp_carrito_modal.vue';
 
 import { productos_store } from '@/stores/productos_store';
+import { productos_service } from '@/services/productos_service';
 import { carrito_store } from '@/stores/carrito_store';
+import { sesion_store } from '@/stores/sesion_store';
+import { tomar_foto, camara_disponible } from '@/services/camara_service';
+import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
+import { resolver_url_imagen } from '@/config/debug';
 
 const busqueda = ref('');
 const categoriaSeleccionada = ref(null);
 const filtroDisponible = ref(null);
 
 const mostrarCarrito = ref(false);
+const mostrarActionSheetFoto = ref(false);
+const productoSeleccionadoParaFoto = ref(null);
+const inputFotoProducto = ref(null);
+
 const mostrarToast = ref(false);
 const mensajeToast = ref('');
 const colorToast = ref('success');
+
+const botonesFoto = computed(() => {
+  const botones = [];
+  if (camara_disponible()) {
+    botones.push({
+      text: '📷 Tomar Foto con Cámara',
+      handler: () => capturarFotoProducto('camara')
+    });
+    botones.push({
+      text: '🖼 Elegir de Galería / Fotos',
+      handler: () => capturarFotoProducto('galeria')
+    });
+  }
+  botones.push({
+    text: '📁 Seleccionar Archivo (PC / Web)',
+    handler: () => {
+      if (inputFotoProducto.value) {
+        inputFotoProducto.value.click();
+      }
+    }
+  });
+  botones.push({
+    text: 'Cancelar',
+    role: 'cancel'
+  });
+  return botones;
+});
+
+const abrirOpcionesFoto = (producto) => {
+  productoSeleccionadoParaFoto.value = producto;
+  mostrarActionSheetFoto.value = true;
+};
+
+const capturarFotoProducto = async (origen) => {
+  mostrarActionSheetFoto.value = false;
+  vibrar_toque();
+  const res = await tomar_foto(origen);
+  if (res.ok && res.archivo && productoSeleccionadoParaFoto.value) {
+    await subirFotoProducto(productoSeleccionadoParaFoto.value, res.archivo);
+  } else if (res.mensaje && !res.cancelado) {
+    await vibrar_error();
+    mensajeToast.value = res.mensaje;
+    colorToast.value = 'warning';
+    mostrarToast.value = true;
+  }
+};
+
+const alSeleccionarFotoWeb = async (event) => {
+  const archivo = event?.target?.files?.[0];
+  if (archivo && productoSeleccionadoParaFoto.value) {
+    await subirFotoProducto(productoSeleccionadoParaFoto.value, archivo);
+  }
+  if (event?.target) event.target.value = '';
+};
+
+const subirFotoProducto = async (producto, archivo) => {
+  try {
+    mensajeToast.value = 'Subiendo imagen del producto…';
+    colorToast.value = 'primary';
+    mostrarToast.value = true;
+
+    const res = await productos_service.subir_imagen(producto.id, archivo);
+    producto.imagen_url = res.imagen_url;
+    await vibrar_exito();
+    mensajeToast.value = `¡Foto de '${producto.nombre}' actualizada exitosamente!`;
+    colorToast.value = 'success';
+    mostrarToast.value = true;
+  } catch (err) {
+    await vibrar_error();
+    mensajeToast.value = err.mensaje || 'Error al subir la imagen del producto.';
+    colorToast.value = 'danger';
+    mostrarToast.value = true;
+  }
+};
 
 const alBuscar = (texto) => {
   productos_store.establecer_busqueda(texto);
@@ -337,5 +457,23 @@ onMounted(async () => {
   --padding-start: 10px;
   --padding-end: 10px;
   height: 32px;
+}
+
+.mercury-thumb-producto {
+  --size: 46px;
+  --border-radius: 8px;
+  margin-inline-end: 10px;
+}
+
+.mercury-thumb-producto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.mercury-btn-foto {
+  --padding-start: 4px;
+  --padding-end: 4px;
 }
 </style>

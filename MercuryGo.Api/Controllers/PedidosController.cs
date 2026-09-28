@@ -173,11 +173,17 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         var totalPedidos = await db.Pedidos.CountAsync(ct);
         var numeroRemito = $"PED-{(totalPedidos + 1):D6}";
 
+        var estadoInicial = EstadoPedido.Pendiente;
+        if (!string.IsNullOrWhiteSpace(request.Estado) && Enum.TryParse<EstadoPedido>(request.Estado, true, out var est) && est == EstadoPedido.Confirmado)
+        {
+            estadoInicial = EstadoPedido.Confirmado;
+        }
+
         var nuevoPedido = new Pedido
         {
             ClienteId = request.ClienteId,
             Numero = numeroRemito,
-            Estado = EstadoPedido.Pendiente,
+            Estado = estadoInicial,
             FechaPedido = DateTime.UtcNow,
             Observaciones = NormalizarTexto(request.Observaciones),
             Activo = true,
@@ -538,7 +544,7 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 }
 
 public sealed record CrearPedidoItemRequest(long ProductoId, int Cantidad);
-public sealed record CrearPedidoRequest(long ClienteId, string? Observaciones, List<CrearPedidoItemRequest> Items);
+public sealed record CrearPedidoRequest(long ClienteId, string? Observaciones, List<CrearPedidoItemRequest> Items, string? Estado = null);
 public sealed record CambiarEstadoRequest(string Estado);
 public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);
 public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items);
