@@ -87,9 +87,15 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
     ...opciones
   };
 
+  const esFormData = cuerpo instanceof FormData;
   if (cuerpo !== null && cuerpo !== undefined && (metodo === 'POST' || metodo === 'PUT')) {
-    cabeceras['Content-Type'] = 'application/json';
-    config.body = JSON.stringify(cuerpo);
+    if (esFormData) {
+      // El navegador/webview arma el boundary multipart automáticamente: no fijar Content-Type
+      config.body = cuerpo;
+    } else {
+      cabeceras['Content-Type'] = 'application/json';
+      config.body = JSON.stringify(cuerpo);
+    }
   }
 
   try {
@@ -124,6 +130,9 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
     }
 
     if (respuesta.status === 204) return null;
+    if (opciones.es_blob) {
+      return await respuesta.blob();
+    }
     return await respuesta.json();
   } catch (error) {
     clearTimeout(timer);
@@ -159,5 +168,16 @@ export const ajax_service = {
 
   delete(endpoint, opciones = {}) {
     return ejecutar_fetch('DELETE', endpoint, null, opciones);
+  },
+
+  blob(endpoint, opciones = {}) {
+    return ejecutar_fetch('GET', endpoint, null, {
+      ...opciones,
+      es_blob: true,
+      headers: {
+        'Accept': '*/*',
+        ...(opciones.headers || {})
+      }
+    });
   }
 };

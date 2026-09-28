@@ -26,5 +26,13 @@ export const pedidos_service = {
 
   cancelar(id) {
     return ajax_service.delete(`api/pedidos/${id}`);
+  },
+
+  descargar_comprobante(id) {
+    return ajax_service.blob(`api/pedidos/${id}/comprobante`);
+  },
+
+  obtener_qr_url(id) {
+    return ajax_service.blob(`api/pedidos/${id}/qr`);
   }
 };

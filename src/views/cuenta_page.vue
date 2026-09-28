@@ -43,17 +43,25 @@
         </ion-card-content>
       </ion-card>
 
-      <!-- Tarjeta de Apariencia -->
+      <!-- Tarjeta de Preferencias y Apariencia -->
       <ion-card>
         <ion-card-header>
-          <ion-card-subtitle>Apariencia</ion-card-subtitle>
-          <ion-card-title>Tema de la app</ion-card-title>
+          <ion-card-subtitle>Preferencias</ion-card-subtitle>
+          <ion-card-title>Tema y Respuesta Táctil</ion-card-title>
         </ion-card-header>
         <ion-card-content>
-          <ion-item lines="none">
+          <ion-item lines="inset">
             <ion-icon slot="start" :icon="contrastOutline" />
             <ion-label>Modo oscuro</ion-label>
             <ion-toggle slot="end" :checked="modoOscuro" @ionChange="toggleTema" />
+          </ion-item>
+          <ion-item lines="none">
+            <ion-icon slot="start" :icon="phonePortraitOutline" />
+            <ion-label>
+              <h3>Vibración y Respuesta Táctil</h3>
+              <p>Feedback al tocar botones y confirmar acciones</p>
+            </ion-label>
+            <ion-toggle slot="end" :checked="vibracionActiva" @ionChange="toggleVibracion" />
           </ion-item>
         </ion-card-content>
       </ion-card>
@@ -103,10 +111,12 @@ import {
 } from '@ionic/vue';
 import { 
   personCircleOutline, contrastOutline, cloudOutline, 
-  checkmarkCircleOutline, alertCircleOutline, logOutOutline 
+  checkmarkCircleOutline, alertCircleOutline, logOutOutline,
+  phonePortraitOutline
 } from 'ionicons/icons';
 import CompPage from '../components/estructura/comp_page.vue';
 import { alternar_tema, es_tema_oscuro } from '../config/tema';
+import { alternar_vibracion, es_vibracion_activa } from '../services/vibracion_service';
 import { obtener_api_url } from '../config/debug';
 import { consultar_health } from '../services/health_service';
 import { sesion_store } from '@/stores/sesion_store';
@@ -114,6 +124,7 @@ import { sesion_store } from '@/stores/sesion_store';
 const router = useRouter();
 
 const modoOscuro = ref(false);
+const vibracionActiva = ref(true);
 const api_url = ref(obtener_api_url());
 const estado_diagnostico = ref('inicial');
 const mensaje_diagnostico = ref('');
@@ -131,6 +142,10 @@ const badgeColor = computed(() => {
 
 const toggleTema = () => {
   modoOscuro.value = alternar_tema();
+};
+
+const toggleVibracion = () => {
+  vibracionActiva.value = alternar_vibracion();
 };
 
 const probar_conexion = async () => {
@@ -154,6 +169,7 @@ const confirmarCerrarSesion = async () => {
 
 onMounted(() => {
   modoOscuro.value = es_tema_oscuro();
+  vibracionActiva.value = es_vibracion_activa();
 });
 </script>
 

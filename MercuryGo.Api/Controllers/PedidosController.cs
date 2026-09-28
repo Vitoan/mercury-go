@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QRCoder;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 using MercuryGo.Api.Auth;
 using MercuryGo.Api.Data;
 using MercuryGo.Api.Domain.Entities;
@@ -246,6 +250,166 @@ public sealed class PedidosController(MercuryGoDbContext db) : ControllerBase
         await db.SaveChangesAsync(ct);
 
         return Ok(new { cancelado = true });
+    }
+
+    // Comprobante oficial en PDF con QuestPDF y QR impreso al pie
+    [HttpGet("{id:long}/comprobante")]
+    public async Task<IActionResult> Comprobante(long id, CancellationToken ct)
+    {
+        var pedido = await (
+            from p in db.Pedidos.AsNoTracking()
+            join c in db.Clientes.AsNoTracking() on p.ClienteId equals c.Id
+            where p.Id == id && p.Activo
+            select new { p, c }
+        ).FirstOrDefaultAsync(ct);
+
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var detalles = await (
+            from d in db.DetallesPedido.AsNoTracking()
+            join prod in db.Productos.AsNoTracking() on d.ProductoId equals prod.Id
+            where d.PedidoId == id
+            orderby prod.Nombre
+            select new DetallePedidoResponse(
+                d.Id,
+                prod.Id,
+                prod.Nombre,
+                d.Cantidad,
+                d.PrecioUnitario,
+                d.Cantidad * d.PrecioUnitario
+            )
+        ).ToListAsync(ct);
+
+        var total = Math.Round(detalles.Sum(d => d.Subtotal), 2);
+
+        var pdfBytes = GenerarComprobantePdf(pedido.p, pedido.c, detalles, total);
+        return File(pdfBytes, "application/pdf", $"{pedido.p.Numero}.pdf");
+    }
+
+    // Código QR en PNG con QRCoder conteniendo el número de remito (PED-00000X)
+    [HttpGet("{id:long}/qr")]
+    public async Task<IActionResult> Qr(long id, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe." });
+
+        var qrBytes = GenerarQrPedido(pedido.Numero);
+        return File(qrBytes, "image/png", $"{pedido.Numero}-qr.png");
+    }
+
+    private static byte[] GenerarComprobantePdf(Pedido p, Cliente c, List<DetallePedidoResponse> detalles, decimal total)
+    {
+        return Document.Create(doc =>
+        {
+            doc.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(36);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Header().Column(col =>
+                {
+                    col.Item().Row(r =>
+                    {
+                        r.RelativeItem().Column(cLeft =>
+                        {
+                            cLeft.Item().Text("MercuryGO").FontSize(18).Bold().FontColor(Colors.Blue.Darken2);
+                            cLeft.Item().Text("Logística & Distribución B2B").FontSize(10).FontColor(Colors.Grey.Darken1);
+                        });
+                        r.ConstantItem(140).Column(cRight =>
+                        {
+                            cRight.Item().AlignRight().Text($"Orden: {p.Numero}").FontSize(12).Bold();
+                            cRight.Item().AlignRight().Text($"Fecha: {p.FechaPedido:dd/MM/yyyy HH:mm}").FontSize(9);
+                            cRight.Item().AlignRight().Text($"Estado: {p.Estado}").FontSize(9).Bold().FontColor(Colors.Green.Darken2);
+                        });
+                    });
+
+                    col.Item().PaddingTop(10).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+
+                    col.Item().PaddingTop(10).Row(r =>
+                    {
+                        r.RelativeItem().Column(clienteCol =>
+                        {
+                            clienteCol.Item().Text($"Cliente: {c.RazonSocial}").Bold();
+                            clienteCol.Item().Text($"CUIT: {c.Cuit}");
+                            if (!string.IsNullOrWhiteSpace(c.Direccion))
+                                clienteCol.Item().Text($"Entrega: {c.Direccion} ({c.Localidad})");
+                            if (!string.IsNullOrWhiteSpace(c.Telefono))
+                                clienteCol.Item().Text($"Tel: {c.Telefono}");
+                        });
+                    });
+
+                    col.Item().PaddingVertical(10).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                });
+
+                page.Content().Column(col =>
+                {
+                    col.Item().Table(tabla =>
+                    {
+                        tabla.ColumnsDefinition(cols =>
+                        {
+                            cols.ConstantColumn(30);
+                            cols.RelativeColumn(4);
+                            cols.RelativeColumn(2);
+                            cols.RelativeColumn(2);
+                            cols.RelativeColumn(2);
+                        });
+
+                        tabla.Header(h =>
+                        {
+                            h.Cell().Element(CeldaEncabezado).Text("#").Bold();
+                            h.Cell().Element(CeldaEncabezado).Text("Producto / Mercadería").Bold();
+                            h.Cell().Element(CeldaEncabezado).AlignRight().Text("Cantidad").Bold();
+                            h.Cell().Element(CeldaEncabezado).AlignRight().Text("P. Unit.").Bold();
+                            h.Cell().Element(CeldaEncabezado).AlignRight().Text("Subtotal").Bold();
+                        });
+
+                        var idx = 1;
+                        foreach (var d in detalles)
+                        {
+                            tabla.Cell().Element(CeldaCuerpo).Text($"{idx++}");
+                            tabla.Cell().Element(CeldaCuerpo).Text(d.ProductoNombre);
+                            tabla.Cell().Element(CeldaCuerpo).AlignRight().Text($"{d.Cantidad}");
+                            tabla.Cell().Element(CeldaCuerpo).AlignRight().Text($"${d.PrecioUnitario:N2}");
+                            tabla.Cell().Element(CeldaCuerpo).AlignRight().Text($"${d.Subtotal:N2}").Bold();
+                        }
+                    });
+
+                    col.Item().PaddingTop(12).AlignRight().Text($"TOTAL: ${total:N2}").FontSize(14).Bold().FontColor(Colors.Blue.Darken3);
+
+                    if (!string.IsNullOrWhiteSpace(p.Observaciones))
+                    {
+                        col.Item().PaddingTop(10).Background(Colors.Grey.Lighten4).Padding(8).Column(obs =>
+                        {
+                            obs.Item().Text("Observaciones de Entrega:").Bold().FontSize(9);
+                            obs.Item().Text(p.Observaciones).FontSize(9);
+                        });
+                    }
+                });
+
+                page.Footer().AlignCenter().Column(f =>
+                {
+                    f.Item().AlignCenter().Width(75).Image(GenerarQrPedido(p.Numero));
+                    f.Item().AlignCenter().Text(p.Numero).FontSize(8).Bold();
+                    f.Item().AlignCenter().Text("Escanee este código desde la app móvil para consultar la orden.").FontSize(7).FontColor(Colors.Grey.Darken1);
+                });
+            });
+        }).GeneratePdf();
+    }
+
+    private static IContainer CeldaEncabezado(IContainer c) =>
+        c.BorderBottom(1).BorderColor(Colors.Grey.Lighten1).PaddingVertical(5);
+
+    private static IContainer CeldaCuerpo(IContainer c) =>
+        c.BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten3).PaddingVertical(4);
+
+    private static byte[] GenerarQrPedido(string numeroRemito)
+    {
+        using var generador = new QRCodeGenerator();
+        using var datos = generador.CreateQrCode(numeroRemito, QRCodeGenerator.ECCLevel.M);
+        return new PngByteQRCode(datos).GetGraphic(8);
     }
 
     private static string? NormalizarTexto(string? texto)
