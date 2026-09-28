@@ -37,6 +37,16 @@ export async function vibrar_exito() {
   }
 }
 
+// Patrón de advertencia
+export async function vibrar_advertencia() {
+  if (!es_vibracion_activa()) return;
+  try {
+    await Haptics.notification({ type: NotificationType.Warning });
+  } catch {
+    // Silencio en web
+  }
+}
+
 // Patrón de error
 export async function vibrar_error() {
   if (!es_vibracion_activa()) return;

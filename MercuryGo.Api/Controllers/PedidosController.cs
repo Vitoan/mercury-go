@@ -72,7 +72,8 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
                     db.DetallesPedido
                         .Where(d => d.PedidoId == pedido.Id)
                         .Sum(d => (decimal?)d.Cantidad * d.PrecioUnitario) ?? 0m,
-                    2)
+                    2),
+                pedido.Observaciones
             )
         ).PaginarAsync(PaginaConsulta.Desde(pagina, tamano), ct);
 
@@ -250,6 +251,81 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         await db.SaveChangesAsync(ct);
 
         return Ok(new { cancelado = true });
+    }
+
+    // Registro de picking/preparación de depósito (Operario o Admin)
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario}")]
+    [HttpPut("{id:long}/picking")]
+    public async Task<IActionResult> ActualizarPicking(long id, [FromBody] ActualizarPickingRequest request, CancellationToken ct)
+    {
+        if (request.Items is null || request.Items.Count == 0)
+            return BadRequest(new { codigo = "items_requeridos", mensaje = "Debe enviar el estado de picking de los productos." });
+
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
+            return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede realizar picking sobre un pedido finalizado o cancelado." });
+
+        var detalles = await (
+            from d in db.DetallesPedido
+            join prod in db.Productos on d.ProductoId equals prod.Id
+            where d.PedidoId == id
+            select new { d, ProductoNombre = prod.Nombre }
+        ).ToListAsync(ct);
+
+        var mapaRequest = request.Items.ToDictionary(i => i.ProductoId);
+        var faltantes = new List<string>();
+        var esCompleto = true;
+
+        foreach (var item in detalles)
+        {
+            if (mapaRequest.TryGetValue(item.d.ProductoId, out var pick))
+            {
+                var enFalta = string.Equals(pick.EstadoItem, "EnFalta", StringComparison.OrdinalIgnoreCase) || pick.CantidadPreparada < item.d.Cantidad;
+                if (enFalta)
+                {
+                    esCompleto = false;
+                    faltantes.Add($"{item.ProductoNombre} (prep. {pick.CantidadPreparada}/{item.d.Cantidad})");
+                }
+            }
+            else
+            {
+                esCompleto = false;
+                faltantes.Add($"{item.ProductoNombre} (no verificado)");
+            }
+        }
+
+        var logPicking = esCompleto
+            ? "[Picking: COMPLETO]"
+            : $"[Picking: INCOMPLETO - Faltantes: {string.Join(", ", faltantes)}]";
+
+        var obsActual = pedido.Observaciones ?? string.Empty;
+        var patronPicking = System.Text.RegularExpressions.Regex.Replace(obsActual, @"\s*·?\s*\[Picking:[^\]]+\]", string.Empty).Trim();
+
+        pedido.Observaciones = string.IsNullOrWhiteSpace(patronPicking)
+            ? logPicking
+            : $"{patronPicking} · {logPicking}";
+
+        if (pedido.Estado == EstadoPedido.Confirmado)
+        {
+            pedido.Estado = EstadoPedido.EnPreparacion;
+        }
+
+        pedido.ActualizadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            completo = esCompleto,
+            estado = pedido.Estado.ToString(),
+            faltantes,
+            observaciones = pedido.Observaciones,
+            mensaje = esCompleto
+                ? "Picking completado exitosamente. Todo listo para despacho."
+                : "Picking registrado con faltantes para revisión del Administrador."
+        });
     }
 
     // Subida de comprobante de transferencia bancaria (PDF o Foto: JPG, PNG, WEBP hasta 5 MB)
@@ -464,6 +540,8 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 public sealed record CrearPedidoItemRequest(long ProductoId, int Cantidad);
 public sealed record CrearPedidoRequest(long ClienteId, string? Observaciones, List<CrearPedidoItemRequest> Items);
 public sealed record CambiarEstadoRequest(string Estado);
+public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);
+public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items);
 
 public sealed record PedidoListaResponse(
     long Id,
@@ -472,7 +550,8 @@ public sealed record PedidoListaResponse(
     DateTime FechaPedido,
     long ClienteId,
     string ClienteRazonSocial,
-    decimal Total
+    decimal Total,
+    string? Observaciones
 );
 
 public sealed record PedidoDetalleResponse(

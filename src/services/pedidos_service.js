@@ -40,5 +40,9 @@ export const pedidos_service = {
     const formData = new FormData();
     formData.append('archivo', archivo);
     return ajax_service.post(`api/pedidos/${id}/comprobante-pago`, formData);
+  },
+
+  actualizar_picking(id, items) {
+    return ajax_service.put(`api/pedidos/${id}/picking`, { items });
   }
 };

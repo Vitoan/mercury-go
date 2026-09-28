@@ -107,6 +107,19 @@
           </div>
           <h3 class="mercury-pedido-cliente">{{ p.cliente_razon_social }}</h3>
           <p class="mercury-pedido-fecha">📅 {{ formatear_fecha(p.fecha_pedido) }}</p>
+
+          <!-- Badges de estado de Picking y Comprobante -->
+          <div v-if="tieneSubEtiquetas(p)" class="mercury-pedido-sub-tags">
+            <span v-if="p.observaciones?.includes('[Picking: INCOMPLETO')" class="mercury-sub-tag tag-warning">
+              ⚠ Faltantes detectados
+            </span>
+            <span v-else-if="p.observaciones?.includes('[Picking: COMPLETO')" class="mercury-sub-tag tag-success">
+              ✔ Picking completo
+            </span>
+            <span v-if="p.observaciones?.includes('[Comprobante de pago:')" class="mercury-sub-tag tag-info">
+              💳 Pago adjunto
+            </span>
+          </div>
         </ion-label>
 
         <!-- Badge de estado clickeable para abrir opciones de transición -->
@@ -136,6 +149,14 @@
       :pedido="pedidoSeleccionado"
       @cerrar="mostrarModalComprobante = false"
       @comprobante_subido="alSubirComprobante"
+    />
+
+    <!-- Modal de Picking en Depósito (Operario / Admin) -->
+    <comp-picking-modal
+      :abierto="mostrarModalPicking"
+      :pedido="pedidoSeleccionado"
+      @cerrar="mostrarModalPicking = false"
+      @picking_completado="alCompletarPicking"
     />
 
     <!-- Toast para feedback de transiciones y errores -->
@@ -177,8 +198,10 @@ import CompEsqueleto from '../components/base/comp_esqueleto.vue';
 import CompEstadoError from '../components/base/comp_estado_error.vue';
 import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
 import CompComprobanteModal from '../components/dominio/pedidos/comp_comprobante_modal.vue';
+import CompPickingModal from '../components/dominio/pedidos/comp_picking_modal.vue';
 
 import { pedidos_store } from '@/stores/pedidos_store';
+import { sesion_store } from '@/stores/sesion_store';
 import { pedidos_service } from '@/services/pedidos_service';
 import { compartir_archivo } from '@/services/compartir_service';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
@@ -188,6 +211,7 @@ const estadoSeleccionado = ref('');
 
 const mostrarActionSheet = ref(false);
 const mostrarModalComprobante = ref(false);
+const mostrarModalPicking = ref(false);
 const pedidoSeleccionado = ref(null);
 
 const mostrarToast = ref(false);
@@ -261,6 +285,15 @@ const botonesTransicion = computed(() => {
     botones.push({
       text: '💳 Adjuntar Comprobante de Pago (Foto / PDF)',
       handler: () => abrirModalComprobante(pedidoSeleccionado.value)
+    });
+  }
+
+  // Operario o Admin: opción de realizar picking en depósito
+  const puedePicking = !sesion_store.rol_activo || sesion_store.rol_activo === 'ADMIN' || sesion_store.rol_activo === 'OPERARIO';
+  if (puedePicking && (estadoActual === 'Confirmado' || estadoActual === 'EnPreparacion')) {
+    botones.push({
+      text: '📦 Realizar Picking / Preparación en Depósito',
+      handler: () => abrirModalPicking(pedidoSeleccionado.value)
     });
   }
 
@@ -341,6 +374,26 @@ const alSubirComprobante = () => {
   colorToast.value = 'success';
   mostrarToast.value = true;
   pedidos_store.cargar(true);
+};
+
+const abrirModalPicking = (pedido) => {
+  pedidoSeleccionado.value = pedido;
+  mostrarActionSheet.value = false;
+  mostrarModalPicking.value = true;
+};
+
+const alCompletarPicking = (res) => {
+  mensajeToast.value = res?.mensaje || 'Picking registrado con éxito.';
+  colorToast.value = res?.completo ? 'success' : 'warning';
+  mostrarToast.value = true;
+  pedidos_store.cargar(true);
+};
+
+const tieneSubEtiquetas = (pedido) => {
+  return pedido?.observaciones && (
+    pedido.observaciones.includes('[Picking:') ||
+    pedido.observaciones.includes('[Comprobante de pago:')
+  );
 };
 
 const compartirComprobante = async (pedido) => {
@@ -465,5 +518,38 @@ onMounted(() => {
   padding: 5px 8px;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.mercury-pedido-sub-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.mercury-sub-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.tag-warning {
+  background: rgba(234, 179, 8, 0.15);
+  color: #b45309;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.tag-success {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+  border: 1px solid rgba(22, 163, 74, 0.3);
+}
+
+.tag-info {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.3);
 }
 </style>

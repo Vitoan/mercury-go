@@ -106,6 +106,12 @@ async function cancelar_orden(id) {
   return res;
 }
 
+async function actualizar_picking(id, items) {
+  const res = await pedidos_service.actualizar_picking(id, items);
+  await cargar(true);
+  return res;
+}
+
 export const pedidos_store = {
   get cargando() { return state.cargando; },
   get error() { return state.error; },
@@ -122,5 +128,6 @@ export const pedidos_store = {
   establecer_estados,
   crear_orden,
   cambiar_estado,
-  cancelar_orden
+  cancelar_orden,
+  actualizar_picking
 };
