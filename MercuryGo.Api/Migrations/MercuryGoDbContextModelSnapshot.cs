@@ -493,6 +493,12 @@ namespace MercuryGo.Api.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("disponible");
 
+                    b.Property<bool>("EnOferta")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("en_oferta");
+
                     b.Property<string>("ImagenUrl")
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)")
@@ -526,6 +532,7 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             Descripcion = "Caja x 12 unidades",
                             Disponible = true,
+                            EnOferta = true,
                             Nombre = "Aceite de Girasol 1.5L",
                             Precio = 2400.00m
                         },
@@ -537,6 +544,7 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             Descripcion = "Pack x 10 unidades",
                             Disponible = true,
+                            EnOferta = false,
                             Nombre = "Harina 000 1kg",
                             Precio = 950.00m
                         },
@@ -548,6 +556,7 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             Descripcion = "Bolsa x 10 unidades",
                             Disponible = false,
+                            EnOferta = false,
                             Nombre = "Arroz Largo Fino 1kg",
                             Precio = 1800.00m
                         },
@@ -559,6 +568,7 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             Descripcion = "Caja x 20 paquetes",
                             Disponible = true,
+                            EnOferta = false,
                             Nombre = "Fideos Guiseros 500g",
                             Precio = 1100.00m
                         },
@@ -570,6 +580,7 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             Descripcion = "Fardo x 10 unidades",
                             Disponible = true,
+                            EnOferta = false,
                             Nombre = "Azúcar Común 1kg",
                             Precio = 1250.00m
                         },
@@ -581,6 +592,7 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             Descripcion = "Pack x 6 unidades",
                             Disponible = true,
+                            EnOferta = true,
                             Nombre = "Yerba Mate 1kg",
                             Precio = 3400.00m
                         });

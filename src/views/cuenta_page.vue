@@ -43,6 +43,69 @@
         </ion-card-content>
       </ion-card>
 
+      <!-- Tarjeta de Cuenta Corriente y Saldo Deudor (Exclusivo para CLIENTE o ADMIN) -->
+      <ion-card v-if="sesion_store.rol_activo === 'CLIENTE' || sesion_store.es_admin" class="mercury-card-cuenta-corriente">
+        <ion-card-header>
+          <div class="mercury-cc-cabecera">
+            <div>
+              <ion-card-subtitle>Estado Financiero B2B</ion-card-subtitle>
+              <ion-card-title>Cuenta Corriente</ion-card-title>
+            </div>
+            <ion-badge :color="cuentaCorriente?.saldo_deudor > 0 ? 'warning' : 'success'">
+              {{ cuentaCorriente?.saldo_deudor > 0 ? 'Saldo Deudor' : 'Al Día' }}
+            </ion-badge>
+          </div>
+        </ion-card-header>
+        <ion-card-content>
+          <div v-if="cargandoCC" class="mercury-cc-loading">
+            <ion-spinner name="dots" color="primary" />
+            <span>Consultando estado contable…</span>
+          </div>
+          <div v-else>
+            <div class="mercury-cc-balance-caja">
+              <span class="mercury-cc-balance-label">Total Adeudado:</span>
+              <strong class="mercury-cc-balance-monto">
+                ${{ (cuentaCorriente?.saldo_deudor || 0).toLocaleString('es-AR') }}
+              </strong>
+            </div>
+
+            <div class="mercury-cc-desglose">
+              <div class="mercury-cc-fila">
+                <span>Total Facturado:</span>
+                <span>${{ (cuentaCorriente?.total_facturado || 0).toLocaleString('es-AR') }}</span>
+              </div>
+              <div class="mercury-cc-fila">
+                <span>Comprobantes Acreditados:</span>
+                <span class="text-success">${{ (cuentaCorriente?.total_pagado || 0).toLocaleString('es-AR') }}</span>
+              </div>
+              <div class="mercury-cc-fila">
+                <span>Pedidos Pendientes de Entrega:</span>
+                <span>{{ cuentaCorriente?.pedidos_pendientes || 0 }}</span>
+              </div>
+            </div>
+
+            <div class="mercury-cc-acciones">
+              <ion-button
+                expand="block"
+                color="success"
+                @click="abrirSubidaComprobante"
+              >
+                <ion-icon slot="start" :icon="cardOutline" />
+                Cargar Comprobante de Pago
+              </ion-button>
+            </div>
+          </div>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Modal de Carga de Comprobante de Pago Directo -->
+      <comp-comprobante-modal
+        :abierto="mostrarModalComprobante"
+        :pedido="{ id: 1, numero: 'PAGO-CTA-CTE', total: cuentaCorriente?.saldo_deudor || 0 }"
+        @cerrar="mostrarModalComprobante = false"
+        @comprobante_subido="alSubirComprobanteCC"
+      />
+
       <!-- Tarjeta de Preferencias y Apariencia -->
       <ion-card>
         <ion-card-header>
@@ -112,14 +175,16 @@ import {
 import { 
   personCircleOutline, contrastOutline, cloudOutline, 
   checkmarkCircleOutline, alertCircleOutline, logOutOutline,
-  phonePortraitOutline
+  phonePortraitOutline, cardOutline
 } from 'ionicons/icons';
 import CompPage from '../components/estructura/comp_page.vue';
+import CompComprobanteModal from '../components/dominio/pedidos/comp_comprobante_modal.vue';
 import { alternar_tema, es_tema_oscuro } from '../config/tema';
-import { alternar_vibracion, es_vibracion_activa } from '../services/vibracion_service';
+import { alternar_vibracion, es_vibracion_activa, vibrar_toque } from '../services/vibracion_service';
 import { obtener_api_url } from '../config/debug';
 import { consultar_health } from '../services/health_service';
 import { sesion_store } from '@/stores/sesion_store';
+import { pedidos_service } from '@/services/pedidos_service';
 
 const router = useRouter();
 
@@ -128,6 +193,33 @@ const vibracionActiva = ref(true);
 const api_url = ref(obtener_api_url());
 const estado_diagnostico = ref('inicial');
 const mensaje_diagnostico = ref('');
+
+const cuentaCorriente = ref(null);
+const cargandoCC = ref(false);
+const mostrarModalComprobante = ref(false);
+
+const cargarCuentaCorriente = async () => {
+  if (sesion_store.rol_activo !== 'CLIENTE' && !sesion_store.es_admin) return;
+  cargandoCC.value = true;
+  try {
+    const res = await pedidos_service.obtener_cuenta_corriente();
+    cuentaCorriente.value = res;
+  } catch {
+    // Silencioso si no aplica
+  } finally {
+    cargandoCC.value = false;
+  }
+};
+
+const abrirSubidaComprobante = () => {
+  vibrar_toque();
+  mostrarModalComprobante.value = true;
+};
+
+const alSubirComprobanteCC = async () => {
+  mostrarModalComprobante.value = false;
+  await cargarCuentaCorriente();
+};
 
 const badgeColor = computed(() => {
   const rol = sesion_store.rol_activo;
@@ -170,6 +262,7 @@ const confirmarCerrarSesion = async () => {
 onMounted(() => {
   modoOscuro.value = es_tema_oscuro();
   vibracionActiva.value = es_vibracion_activa();
+  cargarCuentaCorriente();
 });
 </script>
 
@@ -178,6 +271,70 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.mercury-card-cuenta-corriente {
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.mercury-cc-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mercury-cc-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ion-color-medium, #64748b);
+  padding: 8px 0;
+}
+
+.mercury-cc-balance-caja {
+  background: var(--ion-color-light, #f8fafc);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mercury-cc-balance-label {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium, #64748b);
+  font-weight: 500;
+}
+
+.mercury-cc-balance-monto {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--ion-color-danger, #ef4444);
+}
+
+.mercury-cc-desglose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.mercury-cc-fila {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ion-color-medium, #64748b);
+}
+
+.text-success {
+  color: var(--ion-color-success, #16a34a);
+  font-weight: 600;
+}
+
+.mercury-cc-acciones {
+  margin-top: 10px;
 }
 
 .mercury-perfil-compacto {

@@ -9,5 +9,6 @@ public sealed class Producto : EntityBase
     public decimal Precio { get; set; }
     public string? ImagenUrl { get; set; }
     public bool Disponible { get; set; } = true;
+    public bool EnOferta { get; set; } = false;
     public bool Activo { get; set; } = true;
 }

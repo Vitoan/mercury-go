@@ -9,6 +9,7 @@ public enum EstadoPedido
     Confirmado,
     EnPreparacion,
     Despachado,
+    EnPuerta,
     Entregado,
     Cancelado
 }

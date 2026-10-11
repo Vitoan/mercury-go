@@ -19,7 +19,8 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
     {
         var total = await db.Productos.CountAsync(x => x.Activo, cancellationToken);
         var disponibles = await db.Productos.CountAsync(x => x.Activo && x.Disponible, cancellationToken);
-        var resumen = new ProductosResumenResponse(total, disponibles, total - disponibles);
+        var enOferta = await db.Productos.CountAsync(x => x.Activo && x.EnOferta, cancellationToken);
+        var resumen = new ProductosResumenResponse(total, disponibles, total - disponibles, enOferta);
 
         var categoriasBase = await db.Categorias.AsNoTracking()
             .Where(x => x.Activo)
@@ -50,21 +51,25 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
                 producto.Precio,
                 producto.ImagenUrl,
                 producto.Disponible,
+                producto.EnOferta,
                 categoria.Id,
                 categoria.Nombre
             )
         ).ToListAsync(cancellationToken);
 
-        return Ok(new { resumen, categorias, productos });
+        var ofertas = productos.Where(p => p.EnOferta).Take(6).ToList();
+
+        return Ok(new { resumen, categorias, productos, ofertas });
     }
 
-    // Catálogo paginado con filtros en servidor: busca por texto, categoría y disponibilidad.
+    // Catálogo paginado con filtros en servidor: busca por texto, categoría, disponibilidad y oferta.
     [AllowAnonymous]
     [HttpGet("listado")]
     public async Task<IActionResult> Listado(
         [FromQuery] string? busqueda,
         [FromQuery] long? categoria_id,
         [FromQuery] bool? disponible,
+        [FromQuery] bool? en_oferta,
         [FromQuery] int? pagina,
         [FromQuery] int? tamano,
         CancellationToken ct)
@@ -87,6 +92,11 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
             consulta = consulta.Where(p => p.Disponible == disponible.Value);
         }
 
+        if (en_oferta.HasValue)
+        {
+            consulta = consulta.Where(p => p.EnOferta == en_oferta.Value);
+        }
+
         var (items, paginaResponse) = await (
             from p in consulta
             join c in db.Categorias.AsNoTracking() on p.CategoriaId equals c.Id
@@ -98,6 +108,7 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
                 p.Precio,
                 p.ImagenUrl,
                 p.Disponible,
+                p.EnOferta,
                 c.Id,
                 c.Nombre
             )
@@ -120,6 +131,7 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
                 p.Precio,
                 p.ImagenUrl,
                 p.Disponible,
+                p.EnOferta,
                 categoria.Id,
                 categoria.Nombre
             )
@@ -145,6 +157,7 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
             Precio = request.Precio,
             ImagenUrl = NormalizarTexto(request.ImagenUrl),
             Disponible = request.Disponible,
+            EnOferta = request.EnOferta,
             Activo = true,
             CreadoEn = DateTime.UtcNow
         };
@@ -171,6 +184,7 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
         producto.Precio = request.Precio;
         producto.ImagenUrl = NormalizarTexto(request.ImagenUrl);
         producto.Disponible = request.Disponible;
+        producto.EnOferta = request.EnOferta;
         producto.ActualizadoEn = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -251,6 +265,7 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
                 p.Precio,
                 p.ImagenUrl,
                 p.Disponible,
+                p.EnOferta,
                 c.Id,
                 c.Nombre
             )
@@ -270,10 +285,11 @@ public sealed record GuardarProductoRequest(
     string? Descripcion,
     decimal Precio,
     string? ImagenUrl,
-    bool Disponible
+    bool Disponible,
+    bool EnOferta = false
 );
 
-public sealed record ProductosResumenResponse(int Total, int Disponibles, int NoDisponibles);
+public sealed record ProductosResumenResponse(int Total, int Disponibles, int NoDisponibles, int EnOferta);
 public sealed record CategoriaProductoResponse(long Id, string Nombre, string? Descripcion, int Cantidad);
 public sealed record ProductoResumenResponse(
     long Id,
@@ -282,6 +298,7 @@ public sealed record ProductoResumenResponse(
     decimal Precio,
     string? ImagenUrl,
     bool Disponible,
+    bool EnOferta,
     long CategoriaId,
     string CategoriaNombre
 );

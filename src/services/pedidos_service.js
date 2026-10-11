@@ -44,5 +44,17 @@ export const pedidos_service = {
 
   actualizar_picking(id, items) {
     return ajax_service.put(`api/pedidos/${id}/picking`, { items });
+  },
+
+  actualizar_pedido(id, datos) {
+    return ajax_service.put(`api/pedidos/${id}`, datos);
+  },
+
+  registrar_cobro_chofer(id, monto, metodo = 'Efectivo') {
+    return ajax_service.post(`api/pedidos/${id}/cobro-chofer`, { monto, metodo });
+  },
+
+  obtener_cuenta_corriente() {
+    return ajax_service.get('api/pedidos/cuenta-corriente');
   }
 };

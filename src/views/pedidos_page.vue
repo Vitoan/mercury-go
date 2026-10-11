@@ -60,6 +60,16 @@
         </ion-chip>
 
         <ion-chip
+          :color="estadoSeleccionado === 'EnPuerta' ? 'secondary' : 'medium'"
+          :outline="estadoSeleccionado !== 'EnPuerta'"
+          class="mercury-chip"
+          @click="filtrarEstado('EnPuerta')"
+        >
+          <ion-icon :icon="homeOutline" />
+          <ion-label>En Puerta · {{ obtenerConteo('EnPuerta') }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
           :color="estadoSeleccionado === 'Entregado' ? 'success' : 'medium'"
           :outline="estadoSeleccionado !== 'Entregado'"
           class="mercury-chip"
@@ -98,7 +108,7 @@
       mensaje="No se encontraron órdenes de carga con los filtros aplicados."
     />
 
-    <!-- Estado 4: Lista paginada con máquina de transiciones -->
+    <!-- Estado 4: Lista paginada con interacción contextual según rol -->
     <comp-lista
       v-else
       :cargando="pedidos_store.cargando"
@@ -107,7 +117,13 @@
       :total="pedidos_store.total"
       @cargar_mas="pedidos_store.cargar_mas"
     >
-      <ion-item v-for="p in pedidos_store.pedidos" :key="p.id" class="mercury-pedido-item">
+      <ion-item
+        v-for="p in pedidos_store.pedidos"
+        :key="p.id"
+        class="mercury-pedido-item"
+        button
+        @click="alTocarPedido(p)"
+      >
         <ion-icon :icon="documentTextOutline" slot="start" class="mercury-icono-pedido" />
         <ion-label>
           <div class="mercury-pedido-cabecera">
@@ -117,7 +133,7 @@
           <h3 class="mercury-pedido-cliente">{{ p.cliente_razon_social }}</h3>
           <p class="mercury-pedido-fecha">📅 {{ formatear_fecha(p.fecha_pedido) }}</p>
 
-          <!-- Badges de estado de Picking y Comprobante -->
+          <!-- Badges de estado de Picking, Comprobante y Cobro Chofer -->
           <div v-if="tieneSubEtiquetas(p)" class="mercury-pedido-sub-tags">
             <span v-if="p.observaciones?.includes('[Picking: INCOMPLETO')" class="mercury-sub-tag tag-warning">
               ⚠ Faltantes detectados
@@ -128,6 +144,9 @@
             <span v-if="p.observaciones?.includes('[Comprobante de pago:')" class="mercury-sub-tag tag-info">
               💳 Pago adjunto
             </span>
+            <span v-if="p.observaciones?.includes('[Cobro Chofer:')" class="mercury-sub-tag tag-success">
+              💵 Cobrado en destino
+            </span>
           </div>
         </ion-label>
 
@@ -136,12 +155,20 @@
           slot="end"
           :color="obtener_color_estado(p.estado)"
           class="mercury-badge-estado"
-          @click="abrirOpcionesEstado(p)"
+          @click.stop="abrirOpcionesEstado(p)"
         >
           {{ formatear_nombre_estado(p.estado) }}
         </ion-badge>
       </ion-item>
     </comp-lista>
+
+    <!-- Modal de Detalle Completo de Pedido (Ver, PDF y Edición Admin) -->
+    <comp-detalle-pedido-modal
+      :abierto="mostrarModalDetalle"
+      :pedido-id="pedidoSeleccionado?.id"
+      @cerrar="mostrarModalDetalle = false"
+      @pedido_actualizado="alActualizarPedidoDetalle"
+    />
 
     <!-- Action Sheet para transiciones válidas de la máquina de estados -->
     <ion-action-sheet
@@ -158,6 +185,14 @@
       :pedido="pedidoSeleccionado"
       @cerrar="mostrarModalComprobante = false"
       @comprobante_subido="alSubirComprobante"
+    />
+
+    <!-- Modal de Cobro en Destino para Chofer -->
+    <comp-cobro-chofer-modal
+      :abierto="mostrarModalCobro"
+      :pedido="pedidoSeleccionado"
+      @cerrar="mostrarModalCobro = false"
+      @cobro_registrado="alRegistrarCobro"
     />
 
     <!-- Modal de Picking en Depósito (Operario / Admin) -->
@@ -207,7 +242,8 @@ import {
   closeCircleOutline,
   documentTextOutline,
   qrCodeOutline,
-  addCircleOutline
+  addCircleOutline,
+  homeOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -219,6 +255,8 @@ import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
 import CompComprobanteModal from '../components/dominio/pedidos/comp_comprobante_modal.vue';
 import CompPickingModal from '../components/dominio/pedidos/comp_picking_modal.vue';
 import CompPedidoAdminModal from '../components/dominio/pedidos/comp_pedido_admin_modal.vue';
+import CompDetallePedidoModal from '../components/dominio/pedidos/comp_detalle_pedido_modal.vue';
+import CompCobroChoferModal from '../components/dominio/pedidos/comp_cobro_chofer_modal.vue';
 
 import { pedidos_store } from '@/stores/pedidos_store';
 import { sesion_store } from '@/stores/sesion_store';
@@ -234,6 +272,8 @@ const mostrarActionSheet = ref(false);
 const mostrarModalComprobante = ref(false);
 const mostrarModalPicking = ref(false);
 const mostrarModalNuevoPedido = ref(false);
+const mostrarModalDetalle = ref(false);
+const mostrarModalCobro = ref(false);
 const pedidoSeleccionado = ref(null);
 
 const mostrarToast = ref(false);
@@ -290,17 +330,68 @@ const abrirOpcionesEstado = (pedido) => {
   mostrarActionSheet.value = true;
 };
 
+const alTocarPedido = (pedido) => {
+  pedidoSeleccionado.value = pedido;
+  vibrar_toque();
+
+  if (sesion_store.rol_activo === 'OPERARIO') {
+    // Para operario de depósito, click abre directo la lista de picking
+    mostrarModalPicking.value = true;
+  } else if (sesion_store.rol_activo === 'CHOFER') {
+    // Para chofer, si está en ruta ofrece opciones directas de En Puerta / Cobrar / Entregar
+    mostrarActionSheet.value = true;
+  } else {
+    // Para Admin o Cliente: abre la vista completa de pedido
+    mostrarModalDetalle.value = true;
+  }
+};
+
+const alActualizarPedidoDetalle = () => {
+  mensajeToast.value = '¡Pedido actualizado exitosamente!';
+  colorToast.value = 'success';
+  mostrarToast.value = true;
+  pedidos_store.cargar(true);
+};
+
+const alRegistrarCobro = (res) => {
+  mensajeToast.value = res?.mensaje || '¡Cobro registrado exitosamente!';
+  colorToast.value = 'success';
+  mostrarToast.value = true;
+  pedidos_store.cargar(true);
+};
+
 // Genera botones de transición válidos según el estado actual (máquina de estados):
 const botonesTransicion = computed(() => {
   if (!pedidoSeleccionado.value) return [];
   const estadoActual = pedidoSeleccionado.value.estado;
   const botones = [];
 
+  // Ver detalles completos (solo admin o cliente)
+  botones.push({
+    text: '🔍 Ver Detalle Completo de la Orden',
+    handler: () => {
+      mostrarActionSheet.value = false;
+      mostrarModalDetalle.value = true;
+    }
+  });
+
   // Opción siempre disponible: Descargar o compartir Comprobante PDF
   botones.push({
     text: '📄 Ver / Compartir Comprobante PDF (con QR)',
     handler: () => compartirComprobante(pedidoSeleccionado.value)
   });
+
+  // Si el chofer está en ruta o en puerta, puede cobrar en destino
+  const esChoferOAdmin = sesion_store.rol_activo === 'CHOFER' || sesion_store.es_admin;
+  if (esChoferOAdmin && (estadoActual === 'Despachado' || estadoActual === 'EnPuerta')) {
+    botones.push({
+      text: '💵 Registrar Cobro en Destino (Efectivo / QR)',
+      handler: () => {
+        mostrarActionSheet.value = false;
+        mostrarModalCobro.value = true;
+      }
+    });
+  }
 
   // Si está en Pendiente o Confirmado, el cliente o admin puede adjuntar comprobante de pago
   if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
@@ -351,7 +442,21 @@ const botonesTransicion = computed(() => {
     });
   } else if (estadoActual === 'Despachado') {
     botones.push({
-      text: 'Confirmar Entrega en Destino (✔ Entregado)',
+      text: 'Llegando al Destino (▶ En Puerta)',
+      handler: () => ejecutarCambioEstado('EnPuerta')
+    });
+    botones.push({
+      text: 'Confirmar Entrega Directa (✔ Entregado)',
+      handler: () => ejecutarCambioEstado('Entregado')
+    });
+    botones.push({
+      text: 'Devolución / Cancelación (✖ Cancelado)',
+      role: 'destructive',
+      handler: () => ejecutarCambioEstado('Cancelado')
+    });
+  } else if (estadoActual === 'EnPuerta') {
+    botones.push({
+      text: 'Confirmar Entrega Final (✔ Entregado)',
       handler: () => ejecutarCambioEstado('Entregado')
     });
     botones.push({

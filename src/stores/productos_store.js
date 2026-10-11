@@ -6,6 +6,7 @@ const state = reactive({
   error: null,
   productos: [],
   categorias: [],
+  ofertas: [],
   resumen: {
     total: 0,
     disponibles: 0,
@@ -20,7 +21,8 @@ const state = reactive({
   filtros: {
     busqueda: '',
     categoria_id: null,
-    disponible: null
+    disponible: null,
+    en_oferta: null
   }
 });
 
@@ -38,6 +40,7 @@ async function cargar_resumen(event = null) {
     const data = await productos_service.obtener_resumen();
     state.productos = data.productos || [];
     state.categorias = data.categorias || [];
+    state.ofertas = data.ofertas || (data.productos ? data.productos.filter(p => p.en_oferta) : []);
     state.resumen = data.resumen || { total: 0, disponibles: 0, no_disponibles: 0 };
     state.pagina = {
       pagina: 1,
@@ -70,6 +73,7 @@ async function cargar_listado(resetear = false, event = null) {
       busqueda: state.filtros.busqueda,
       categoria_id: state.filtros.categoria_id,
       disponible: state.filtros.disponible,
+      en_oferta: state.filtros.en_oferta,
       pagina: state.pagina.pagina,
       tamano: state.pagina.tamano
     });
@@ -116,6 +120,11 @@ async function establecer_disponible(disponible) {
   await cargar_listado(true);
 }
 
+async function establecer_oferta(enOferta) {
+  state.filtros.en_oferta = enOferta;
+  await cargar_listado(true);
+}
+
 async function guardar_producto(datos, id = null) {
   if (id) {
     await productos_service.actualizar(id, datos);
@@ -135,6 +144,7 @@ export const productos_store = {
   get error() { return state.error; },
   get productos() { return state.productos; },
   get categorias() { return state.categorias; },
+  get ofertas() { return state.ofertas; },
   get resumen() { return state.resumen; },
   get filtros() { return state.filtros; },
   total,
@@ -148,6 +158,7 @@ export const productos_store = {
   establecer_busqueda,
   establecer_categoria,
   establecer_disponible,
+  establecer_oferta,
   guardar_producto,
   eliminar_producto
 };

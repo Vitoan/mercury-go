@@ -44,16 +44,26 @@
       </div>
     </div>
 
-    <!-- Chips de Disponibilidad de Stock -->
+    <!-- Chips de Disponibilidad y Ofertas -->
     <div class="mercury-seccion-chips mercury-chips-secundarios">
       <div class="mercury-chips-scroll">
         <ion-chip
-          :color="filtroDisponible === null ? 'primary' : 'medium'"
-          :outline="filtroDisponible !== null"
+          :color="filtroDisponible === null && filtroOferta === null ? 'primary' : 'medium'"
+          :outline="filtroDisponible !== null || filtroOferta !== null"
           class="mercury-chip mercury-chip-sm"
-          @click="filtrarDisponibilidad(null)"
+          @click="limpiarFiltrosSecundarios"
         >
-          <ion-label>Todo el Stock</ion-label>
+          <ion-label>Todo el Catálogo</ion-label>
+        </ion-chip>
+
+        <ion-chip
+          :color="filtroOferta === true ? 'danger' : 'medium'"
+          :outline="filtroOferta !== true"
+          class="mercury-chip mercury-chip-sm"
+          @click="toggleOferta"
+        >
+          <ion-icon :icon="flameOutline" />
+          <ion-label>🔥 Ofertas</ion-label>
         </ion-chip>
 
         <ion-chip
@@ -94,7 +104,7 @@
       mensaje="No se encontraron productos con los filtros aplicados."
     />
 
-    <!-- Estado 4: Lista paginada desde el servidor -->
+    <!-- Estado 4: Lista paginada con tarjeta destacada (Imagen arriba, datos abajo) -->
     <comp-lista
       v-else
       :cargando="productos_store.cargando"
@@ -103,52 +113,66 @@
       :total="productos_store.total"
       @cargar_mas="productos_store.cargar_mas"
     >
-      <ion-item v-for="p in productos_store.productos" :key="p.id" class="mercury-producto-item">
-        <ion-thumbnail v-if="p.imagen_url && !imagenesConError[p.id]" slot="start" class="mercury-thumb-producto">
-          <img :src="resolver_url_imagen(p.imagen_url)" alt="Foto" @error="marcarErrorImagen(p.id)" />
-        </ion-thumbnail>
-        <ion-icon v-else :icon="cubeOutline" slot="start" class="mercury-icono-producto" />
+      <div class="mercury-productos-grid">
+        <ion-card v-for="p in productos_store.productos" :key="p.id" class="mercury-card-producto">
+          <!-- Bloque Superior: Imagen y Badges -->
+          <div class="mercury-producto-img-bloque">
+            <img
+              v-if="p.imagen_url && !imagenesConError[p.id]"
+              :src="resolver_url_imagen(p.imagen_url)"
+              :alt="p.nombre"
+              class="mercury-producto-foto-portada"
+              @error="marcarErrorImagen(p.id)"
+            />
+            <div v-else class="mercury-producto-sin-foto">
+              <ion-icon :icon="cubeOutline" />
+            </div>
 
-        <ion-label>
-          <div class="mercury-producto-fila-titulo">
-            <h3>{{ p.nombre }}</h3>
-            <span class="mercury-producto-precio">${{ p.precio.toLocaleString('es-AR') }}</span>
+            <div class="mercury-badges-flotantes">
+              <ion-badge v-if="p.en_oferta" color="danger" class="mercury-flotante-badge">
+                🔥 OFERTA
+              </ion-badge>
+              <ion-badge :color="p.disponible ? 'success' : 'medium'" class="mercury-flotante-badge">
+                {{ p.disponible ? 'En Stock' : 'Sin Stock' }}
+              </ion-badge>
+            </div>
+
+            <ion-button
+              v-if="sesion_store.es_admin"
+              size="small"
+              fill="solid"
+              color="light"
+              class="mercury-btn-foto-flotante"
+              title="Cambiar foto con cámara o galería"
+              @click="abrirOpcionesFoto(p)"
+            >
+              <ion-icon slot="icon-only" :icon="cameraOutline" />
+            </ion-button>
           </div>
-          <p class="mercury-producto-categoria">{{ p.categoria_nombre }} · {{ p.descripcion || 'Sin descripción' }}</p>
-        </ion-label>
 
-        <div slot="end" class="mercury-producto-item-acciones">
-          <ion-button
-            v-if="sesion_store.es_admin"
-            size="small"
-            fill="clear"
-            color="medium"
-            class="mercury-btn-foto"
-            title="Cambiar foto con cámara o galería"
-            @click="abrirOpcionesFoto(p)"
-          >
-            <ion-icon slot="icon-only" :icon="cameraOutline" />
-          </ion-button>
+          <!-- Bloque Inferior: Nombre, Descripción y Pie con Precio y Carrito -->
+          <ion-card-content class="mercury-producto-cuerpo">
+            <h3 class="mercury-producto-titulo">{{ p.nombre }}</h3>
+            <p class="mercury-producto-categoria-texto">{{ p.categoria_nombre }}</p>
+            <p class="mercury-producto-desc-texto">{{ p.descripcion || 'Sin descripción adicional' }}</p>
 
-          <ion-badge
-            :color="p.disponible ? 'success' : 'medium'"
-            class="mercury-badge-stock"
-          >
-            {{ p.disponible ? 'En Stock' : 'Agotado' }}
-          </ion-badge>
-
-          <ion-button
-            v-if="p.disponible"
-            size="small"
-            fill="solid"
-            color="primary"
-            class="mercury-btn-agregar-carrito"
-            @click="agregarAlCarrito(p)"
-          >
-            <ion-icon slot="icon-only" :icon="cartOutline" />
-          </ion-button>
-        </div>
-      </ion-item>
+            <div class="mercury-producto-acciones-pie">
+              <span class="mercury-producto-precio-grande">${{ p.precio.toLocaleString('es-AR') }}</span>
+              <ion-button
+                v-if="p.disponible"
+                size="small"
+                fill="solid"
+                color="primary"
+                class="mercury-btn-agregar"
+                @click="agregarAlCarrito(p)"
+              >
+                <ion-icon slot="start" :icon="cartOutline" />
+                Agregar
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </div>
     </comp-lista>
 
     <!-- Modal de Carrito -->
@@ -206,7 +230,8 @@ import {
   checkmarkCircleOutline,
   closeCircleOutline,
   cartOutline,
-  cameraOutline
+  cameraOutline,
+  flameOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -223,11 +248,12 @@ import { carrito_store } from '@/stores/carrito_store';
 import { sesion_store } from '@/stores/sesion_store';
 import { tomar_foto, camara_disponible } from '@/services/camara_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
-import { resolver_url_imagen } from '@/config/debug';
+import { resolver_url_imagen } from '@/utils/imagenes';
 
 const busqueda = ref('');
 const categoriaSeleccionada = ref(null);
 const filtroDisponible = ref(null);
+const filtroOferta = ref(null);
 
 const mostrarCarrito = ref(false);
 const mostrarActionSheetFoto = ref(false);
@@ -328,10 +354,27 @@ const filtrarCategoria = (catId) => {
 
 const filtrarDisponibilidad = (valor) => {
   filtroDisponible.value = valor;
+  filtroOferta.value = null;
+  productos_store.establecer_oferta(null);
   productos_store.establecer_disponible(valor);
 };
 
+const toggleOferta = () => {
+  filtroOferta.value = filtroOferta.value ? null : true;
+  filtroDisponible.value = null;
+  productos_store.establecer_disponible(null);
+  productos_store.establecer_oferta(filtroOferta.value);
+};
+
+const limpiarFiltrosSecundarios = () => {
+  filtroDisponible.value = null;
+  filtroOferta.value = null;
+  productos_store.establecer_oferta(null);
+  productos_store.establecer_disponible(null);
+};
+
 const agregarAlCarrito = (producto) => {
+  vibrar_toque();
   carrito_store.agregar_producto(producto, 1);
   mensajeToast.value = `¡${producto.nombre} agregado al carrito!`;
   colorToast.value = 'success';
@@ -391,52 +434,6 @@ onMounted(async () => {
   height: 28px;
 }
 
-.mercury-producto-item {
-  --padding-start: 12px;
-  --padding-end: 12px;
-  --padding-top: 8px;
-  --padding-bottom: 8px;
-  --border-color: var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
-}
-
-.mercury-icono-producto {
-  font-size: 1.5rem;
-  color: var(--ion-color-primary, #38bdf8);
-}
-
-.mercury-producto-fila-titulo {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.mercury-producto-fila-titulo h3 {
-  font-weight: 600;
-  font-size: 0.98rem;
-  margin: 0;
-  color: var(--mercury-text-title);
-}
-
-.mercury-producto-precio {
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: var(--mercury-accent);
-}
-
-.mercury-producto-categoria {
-  font-size: 0.82rem;
-  color: var(--mercury-text-muted);
-  margin-top: 2px;
-}
-
-.mercury-badge-stock {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-
 .mercury-btn-carrito {
   position: relative;
   --padding-start: 8px;
@@ -452,33 +449,116 @@ onMounted(async () => {
   padding: 2px 6px;
 }
 
-.mercury-producto-item-acciones {
+/* Grilla de Tarjetas de Productos */
+.mercury-productos-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 12px 16px 12px;
+}
+
+.mercury-card-producto {
+  margin: 0;
+  border-radius: 14px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mercury-producto-img-bloque {
+  position: relative;
+  width: 100%;
+  height: 150px;
+  background: var(--ion-color-light, #f1f5f9);
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  overflow: hidden;
 }
 
-.mercury-btn-agregar-carrito {
-  --padding-start: 10px;
-  --padding-end: 10px;
-  height: 32px;
-}
-
-.mercury-thumb-producto {
-  --size: 46px;
-  --border-radius: 8px;
-  margin-inline-end: 10px;
-}
-
-.mercury-thumb-producto img {
+.mercury-producto-foto-portada {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 8px;
 }
 
-.mercury-btn-foto {
-  --padding-start: 4px;
-  --padding-end: 4px;
+.mercury-producto-sin-foto {
+  font-size: 3.5rem;
+  color: var(--ion-color-medium, #94a3b8);
+}
+
+.mercury-badges-flotantes {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.mercury-flotante-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.mercury-btn-foto-flotante {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  --border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  opacity: 0.9;
+}
+
+.mercury-producto-cuerpo {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.mercury-producto-titulo {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 2px 0;
+  color: var(--ion-color-dark, #0f172a);
+}
+
+.mercury-producto-categoria-texto {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ion-color-primary, #2563eb);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 4px 0;
+}
+
+.mercury-producto-desc-texto {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium, #64748b);
+  margin: 0 0 12px 0;
+  line-height: 1.35;
+}
+
+.mercury-producto-acciones-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  border-top: 1px solid var(--ion-color-light, #f1f5f9);
+  padding-top: 10px;
+}
+
+.mercury-producto-precio-grande {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--ion-color-dark, #0f172a);
+}
+
+.mercury-btn-agregar {
+  --border-radius: 8px;
+  font-weight: 600;
 }
 </style>

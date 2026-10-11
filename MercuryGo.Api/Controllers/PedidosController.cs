@@ -23,7 +23,8 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         [EstadoPedido.Pendiente] = [EstadoPedido.Confirmado, EstadoPedido.Cancelado],
         [EstadoPedido.Confirmado] = [EstadoPedido.EnPreparacion, EstadoPedido.Cancelado],
         [EstadoPedido.EnPreparacion] = [EstadoPedido.Despachado, EstadoPedido.Cancelado],
-        [EstadoPedido.Despachado] = [EstadoPedido.Entregado, EstadoPedido.Cancelado],
+        [EstadoPedido.Despachado] = [EstadoPedido.EnPuerta, EstadoPedido.Entregado, EstadoPedido.Cancelado],
+        [EstadoPedido.EnPuerta] = [EstadoPedido.Entregado, EstadoPedido.Cancelado],
         [EstadoPedido.Entregado] = [], // Estado final: no admite cambios posteriores
         [EstadoPedido.Cancelado] = []  // Estado final
     };
@@ -39,6 +40,34 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         CancellationToken ct)
     {
         var consulta = db.Pedidos.AsNoTracking().Where(p => p.Activo);
+
+        // Segmentación de pedidos según rol del usuario autenticado
+        if (User.EsCliente())
+        {
+            var emailUsuario = User.Email();
+            var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct)
+                       ?? await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == 1 && c.Activo, ct);
+            if (cliente is not null)
+            {
+                consulta = consulta.Where(p => p.ClienteId == cliente.Id);
+            }
+        }
+        else if (User.EsOperario())
+        {
+            // Operario de depósito: se enfoca en órdenes confirmadas y en preparación
+            if (string.IsNullOrWhiteSpace(estados))
+            {
+                consulta = consulta.Where(p => p.Estado == EstadoPedido.Confirmado || p.Estado == EstadoPedido.EnPreparacion);
+            }
+        }
+        else if (User.IsInRole(RolCodigos.Chofer))
+        {
+            // Chofer: se enfoca en órdenes despachadas y en puerta de entrega
+            if (string.IsNullOrWhiteSpace(estados))
+            {
+                consulta = consulta.Where(p => p.Estado == EstadoPedido.Despachado || p.Estado == EstadoPedido.EnPuerta);
+            }
+        }
 
         var texto = (busqueda ?? string.Empty).Trim();
         if (texto.Length > 0)
@@ -257,6 +286,133 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         await db.SaveChangesAsync(ct);
 
         return Ok(new { cancelado = true });
+    }
+
+    // Edición de pedido exclusivo para ADMINISTRADOR
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPut("{id:long}")]
+    public async Task<IActionResult> ActualizarPedido(long id, [FromBody] EditarPedidoRequest request, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
+            return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede editar un pedido finalizado o cancelado." });
+
+        if (request.Items is not null && request.Items.Count > 0)
+        {
+            var productosIds = request.Items.Select(i => i.ProductoId).Distinct().ToList();
+            var productosDb = await db.Productos.Where(p => productosIds.Contains(p.Id) && p.Activo).ToDictionaryAsync(p => p.Id, ct);
+
+            // Eliminar detalles previos
+            var detallesPrevios = await db.DetallesPedido.Where(d => d.PedidoId == id).ToListAsync(ct);
+            db.DetallesPedido.RemoveRange(detallesPrevios);
+
+            foreach (var item in request.Items)
+            {
+                if (productosDb.TryGetValue(item.ProductoId, out var prod) && item.Cantidad > 0)
+                {
+                    db.DetallesPedido.Add(new DetallePedido
+                    {
+                        PedidoId = pedido.Id,
+                        ProductoId = prod.Id,
+                        Cantidad = item.Cantidad,
+                        PrecioUnitario = prod.Precio,
+                        CreadoEn = DateTime.UtcNow
+                    });
+                }
+            }
+        }
+
+        if (request.Observaciones is not null)
+        {
+            pedido.Observaciones = NormalizarTexto(request.Observaciones);
+        }
+
+        pedido.ActualizadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new { mensaje = "Pedido actualizado correctamente.", id = pedido.Id });
+    }
+
+    // Registro de cobro en destino por parte del CHOFER (Efectivo o Transferencia)
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Chofer}")]
+    [HttpPost("{id:long}/cobro-chofer")]
+    public async Task<IActionResult> RegistrarCobroChofer(long id, [FromBody] CobroChoferRequest request, CancellationToken ct)
+    {
+        if (request.Monto <= 0)
+            return BadRequest(new { codigo = "monto_invalido", mensaje = "El monto cobrado debe ser mayor a cero." });
+
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var metodo = string.IsNullOrWhiteSpace(request.Metodo) ? "Efectivo" : request.Metodo.Trim();
+        var logCobro = $"[Cobro Chofer: ${request.Monto:N2} ({metodo})]";
+
+        var obs = pedido.Observaciones ?? string.Empty;
+        pedido.Observaciones = string.IsNullOrWhiteSpace(obs) ? logCobro : $"{obs} · {logCobro}";
+        pedido.ActualizadoEn = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Cobro de ${request.Monto:N2} registrado exitosamente.",
+            observaciones = pedido.Observaciones
+        });
+    }
+
+    // Resumen de Cuenta Corriente y Deuda para el CLIENTE autenticado
+    [HttpGet("cuenta-corriente")]
+    public async Task<IActionResult> ObtenerCuentaCorriente(CancellationToken ct)
+    {
+        var emailUsuario = User.Email();
+        var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct)
+                   ?? await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == 1 && c.Activo, ct);
+
+        if (cliente is null)
+            return NotFound(new { codigo = "cliente_no_encontrado", mensaje = "No se encontró el registro comercial del cliente." });
+
+        var pedidosCliente = await db.Pedidos
+            .AsNoTracking()
+            .Where(p => p.ClienteId == cliente.Id && p.Activo && p.Estado != EstadoPedido.Cancelado)
+            .Select(p => new
+            {
+                p.Id,
+                p.Numero,
+                p.Estado,
+                p.FechaPedido,
+                Total = db.DetallesPedido.Where(d => d.PedidoId == p.Id).Sum(d => (decimal?)d.Cantidad * d.PrecioUnitario) ?? 0m,
+                p.Observaciones
+            })
+            .ToListAsync(ct);
+
+        var totalFacturado = pedidosCliente.Sum(p => p.Total);
+        var totalPagado = 0m;
+
+        // Sumar pagos registrados en etiquetas
+        foreach (var p in pedidosCliente)
+        {
+            if (!string.IsNullOrEmpty(p.Observaciones) && p.Observaciones.Contains("[Comprobante de pago:"))
+            {
+                totalPagado += p.Total; // Comprobante presentado
+            }
+        }
+
+        var saldoDeudor = Math.Max(0m, totalFacturado - totalPagado);
+
+        return Ok(new
+        {
+            cliente_id = cliente.Id,
+            razon_social = cliente.RazonSocial,
+            cuit = cliente.Cuit,
+            total_facturado = totalFacturado,
+            total_pagado = totalPagado,
+            saldo_deudor = saldoDeudor,
+            pedidos_pendientes = pedidosCliente.Count(p => p.Estado != EstadoPedido.Entregado)
+        });
     }
 
     // Registro de picking/preparación de depósito (Operario o Admin)
@@ -545,6 +701,8 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
 public sealed record CrearPedidoItemRequest(long ProductoId, int Cantidad);
 public sealed record CrearPedidoRequest(long ClienteId, string? Observaciones, List<CrearPedidoItemRequest> Items, string? Estado = null);
+public sealed record EditarPedidoRequest(List<CrearPedidoItemRequest>? Items, string? Observaciones);
+public sealed record CobroChoferRequest(decimal Monto, string? Metodo = "Efectivo");
 public sealed record CambiarEstadoRequest(string Estado);
 public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);
 public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items);
