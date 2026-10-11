@@ -130,8 +130,21 @@ if (app.Environment.IsDevelopment() || corsAllowedOrigins.Length > 0)
     app.UseCors(corsPolicy);
 }
 
-// Las imágenes del catálogo se sirven desde wwwroot/seed/
-app.UseStaticFiles();
+// Asegurar directorios de uploads de archivos y fotos
+var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "productos"));
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "comprobantes"));
+
+// Las imágenes del catálogo y archivos se sirven desde wwwroot con cabeceras CORS para WebView/Android
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    }
+});
 
 // Autenticación antes de Autorización
 app.UseAuthentication();

@@ -1,5 +1,6 @@
 import { obtener_api_url } from '@/config/debug';
 import {
+  asegurar_token,
   cabecera_autorizacion,
   guardar_sesion,
   notificar_sesion_expirada,
@@ -70,12 +71,17 @@ function normalizar_error(respuesta) {
 
 async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = false) {
   const url = construir_url(endpoint);
-  const timeout_ms = opciones.timeout || 10000;
+  const timeout_ms = opciones.timeout || 15000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout_ms);
 
+  // Asegura que el token esté cargado desde SecureStorage antes de construir la cabecera
+  if (!endpoint.includes('/api/sesion/')) {
+    await asegurar_token();
+  }
+
   const cabeceras = {
-    'Accept': 'application/json',
+    'Accept': opciones.es_blob ? '*/*' : 'application/json',
     ...cabecera_autorizacion(),
     ...opciones.headers
   };
@@ -111,17 +117,26 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
       }
       // Si la renovación falló, notificamos la expiración para redirigir al login
       notificar_sesion_expirada();
+      const err401 = new Error('Sesión expirada. Por favor vuelva a iniciar sesión.');
+      err401.estado_http = 401;
+      err401.codigo = 'sesion_expirada';
+      throw err401;
     }
 
     if (!respuesta.ok) {
       let mensaje = `Error del servidor (${respuesta.status})`;
       let codigo = 'error_servidor';
       try {
-        const datosError = await respuesta.json();
-        if (datosError && datosError.mensaje) mensaje = datosError.mensaje;
-        if (datosError && datosError.codigo) codigo = datosError.codigo;
+        const textoError = await respuesta.text();
+        try {
+          const datosError = JSON.parse(textoError);
+          if (datosError && datosError.mensaje) mensaje = datosError.mensaje;
+          if (datosError && datosError.codigo) codigo = datosError.codigo;
+        } catch {
+          if (textoError && textoError.length < 200) mensaje = textoError;
+        }
       } catch {
-        // Respuesta no JSON
+        // Respuesta no leíble
       }
       const error = new Error(mensaje);
       error.estado_http = respuesta.status;

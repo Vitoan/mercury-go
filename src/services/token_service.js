@@ -61,6 +61,14 @@ export function cabecera_autorizacion() {
   return token_en_memoria ? { Authorization: `Bearer ${token_en_memoria}` } : {};
 }
 
+// Garantiza que el token esté en memoria antes de una petición autenticada
+export async function asegurar_token() {
+  if (!token_en_memoria) {
+    await restaurar_sesion();
+  }
+  return token_en_memoria;
+}
+
 // Suscripción desacoplada para evitar dependencias circulares con los stores
 export function al_expirar(callback) {
   al_expirar_sesion = callback;

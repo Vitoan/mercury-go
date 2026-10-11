@@ -11,9 +11,4 @@ export function obtener_api_url() {
   return api_url_entorno;
 }
 
-export function resolver_url_imagen(rutaRelativa) {
-  if (!rutaRelativa) return null;
-  if (/^https?:\/\//i.test(rutaRelativa)) return rutaRelativa;
-  const base = obtener_api_url();
-  return `${base}/${rutaRelativa.replace(/^\/+/, '')}`;
-}
+export { resolver_url_imagen } from '@/utils/imagenes';

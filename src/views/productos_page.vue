@@ -104,8 +104,8 @@
       @cargar_mas="productos_store.cargar_mas"
     >
       <ion-item v-for="p in productos_store.productos" :key="p.id" class="mercury-producto-item">
-        <ion-thumbnail v-if="p.imagen_url" slot="start" class="mercury-thumb-producto">
-          <img :src="resolver_url_imagen(p.imagen_url)" alt="Foto" />
+        <ion-thumbnail v-if="p.imagen_url && !imagenesConError[p.id]" slot="start" class="mercury-thumb-producto">
+          <img :src="resolver_url_imagen(p.imagen_url)" alt="Foto" @error="marcarErrorImagen(p.id)" />
         </ion-thumbnail>
         <ion-icon v-else :icon="cubeOutline" slot="start" class="mercury-icono-producto" />
 
@@ -237,6 +237,11 @@ const inputFotoProducto = ref(null);
 const mostrarToast = ref(false);
 const mensajeToast = ref('');
 const colorToast = ref('success');
+
+const imagenesConError = ref({});
+const marcarErrorImagen = (id) => {
+  imagenesConError.value[id] = true;
+};
 
 const botonesFoto = computed(() => {
   const botones = [];
