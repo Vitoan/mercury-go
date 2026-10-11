@@ -29,11 +29,11 @@ export const pedidos_service = {
   },
 
   descargar_comprobante(id) {
-    return ajax_service.blob(`api/pedidos/${id}/comprobante`);
+    return ajax_service.blob(`/api/pedidos/${id}/comprobante`);
   },
 
   obtener_qr_url(id) {
-    return ajax_service.blob(`api/pedidos/${id}/qr`);
+    return ajax_service.blob(`/api/pedidos/${id}/qr`);
   },
 
   subir_comprobante_pago(id, archivo) {

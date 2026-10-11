@@ -168,6 +168,103 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
   }
 }
 
+// Descargas binarias (PDF / QR): XMLHttpRequest permite controlar el stream binario de forma nativa
+// con el mismo token y la misma renovación automática ante un 401 que las llamadas JSON.
+export function ajax_binario(configuracion = {}) {
+  return ejecutar_binario(configuracion, true);
+}
+
+async function ejecutar_binario(configuracion, permitir_renovar) {
+  const {
+    endpoint,
+    metodo = 'GET',
+    timeout = 30000,
+    headers = {}
+  } = configuracion;
+
+  await asegurar_token();
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(metodo.toUpperCase(), construir_url(endpoint), true);
+    xhr.responseType = 'blob';
+    xhr.timeout = timeout;
+
+    const cabeceras = {
+      ...cabecera_autorizacion(),
+      ...headers
+    };
+
+    Object.keys(cabeceras).forEach(nombre => xhr.setRequestHeader(nombre, cabeceras[nombre]));
+
+    xhr.onload = async function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.response);
+        return;
+      }
+
+      if (xhr.status === 401) {
+        if (!permitir_renovar) {
+          notificar_sesion_expirada();
+          reject({
+            estado_http: 401,
+            codigo: 'sesion_expirada',
+            mensaje: 'La sesión expiró. Volvé a iniciar sesión.'
+          });
+          return;
+        }
+
+        const renovado = await renovar_sesion();
+        if (renovado) {
+          ejecutar_binario(configuracion, false).then(resolve, reject);
+          return;
+        }
+
+        notificar_sesion_expirada();
+        reject({
+          estado_http: 401,
+          codigo: 'sesion_expirada',
+          mensaje: 'La sesión expiró. Volvé a iniciar sesión.'
+        });
+        return;
+      }
+
+      let mensaje = `Error del servidor (${xhr.status})`;
+      let codigo = 'error_servidor';
+      try {
+        if (/json/i.test(xhr.getResponseHeader('Content-Type') || '')) {
+          const texto = await xhr.response?.text();
+          const parsed = JSON.parse(texto);
+          if (parsed?.mensaje) mensaje = parsed.mensaje;
+          if (parsed?.codigo) codigo = parsed.codigo;
+        }
+      } catch {
+        // Fallback
+      }
+
+      reject({
+        estado_http: xhr.status,
+        codigo,
+        mensaje
+      });
+    };
+
+    xhr.onerror = () => reject({
+      estado_http: 0,
+      codigo: 'sin_conexion',
+      mensaje: 'No se pudo conectar con el servidor para descargar el archivo.'
+    });
+
+    xhr.ontimeout = () => reject({
+      estado_http: 0,
+      codigo: 'tiempo_espera_agotado',
+      mensaje: 'Tiempo de espera agotado al descargar el archivo.'
+    });
+
+    xhr.send();
+  });
+}
+
 export const ajax_service = {
   get(endpoint, opciones = {}) {
     return ejecutar_fetch('GET', endpoint, null, opciones);
@@ -185,14 +282,16 @@ export const ajax_service = {
     return ejecutar_fetch('DELETE', endpoint, null, opciones);
   },
 
+  binario(configuracion = {}) {
+    return ajax_binario(configuracion);
+  },
+
   blob(endpoint, opciones = {}) {
-    return ejecutar_fetch('GET', endpoint, null, {
-      ...opciones,
-      es_blob: true,
-      headers: {
-        'Accept': '*/*',
-        ...(opciones.headers || {})
-      }
+    return ajax_binario({
+      endpoint,
+      metodo: 'GET',
+      headers: opciones.headers,
+      timeout: opciones.timeout
     });
   }
 };
