@@ -31,7 +31,7 @@ export const navegacion = [
     icono: cubeOutline,
     componente: () => import('@/views/productos_page.vue'),
     en_tabs: true,
-    roles: ['ADMIN', 'OPERARIO', 'CLIENTE']
+    roles: ['ADMIN', 'CLIENTE']
   },
   {
     id: 'clientes',
@@ -42,7 +42,7 @@ export const navegacion = [
     icono: businessOutline,
     componente: () => import('@/views/clientes_page.vue'),
     en_tabs: true,
-    roles: ['ADMIN', 'OPERARIO']
+    roles: ['ADMIN']
   },
   {
     id: 'pedidos',

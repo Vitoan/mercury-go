@@ -528,9 +528,23 @@ const escanearRemitoQr = async () => {
   const res = await escanear_qr();
   if (res.ok && res.contenido) {
     await vibrar_exito();
-    busqueda.value = res.contenido.trim();
-    alBuscar(busqueda.value);
-    mensajeToast.value = `Código QR detectado: ${res.contenido}`;
+    const codigo = res.contenido.trim();
+    busqueda.value = codigo;
+    estadoSeleccionado.value = '';
+    pedidos_store.filtros.estados = '';
+    await pedidos_store.establecer_busqueda(codigo);
+
+    // Si encontramos el pedido exacto, abrir automáticamente su acción/detalle
+    const encontrado = pedidos_store.pedidos.find(
+      (p) => p.numero?.toLowerCase() === codigo.toLowerCase()
+    ) || pedidos_store.pedidos[0];
+
+    if (encontrado) {
+      alTocarPedido(encontrado);
+      mensajeToast.value = `Orden ${encontrado.numero} localizada.`;
+    } else {
+      mensajeToast.value = `No se encontró la orden para el código: ${codigo}`;
+    }
     colorToast.value = 'success';
     mostrarToast.value = true;
   } else if (res.mensaje) {
