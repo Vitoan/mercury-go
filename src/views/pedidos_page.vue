@@ -228,7 +228,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import {
   IonItem,
   IonLabel,
@@ -237,7 +237,8 @@ import {
   IonIcon,
   IonButton,
   IonActionSheet,
-  IonToast
+  IonToast,
+  onIonViewWillEnter
 } from '@ionic/vue';
 import {
   layersOutline,
@@ -629,7 +630,27 @@ const compartirComprobante = async (pedido) => {
   }
 };
 
+onIonViewWillEnter(() => {
+  // Al entrar a la vista, sincronizar el input local de búsqueda con el filtro real del store
+  busqueda.value = pedidos_store.filtros.busqueda || '';
+  estadoSeleccionado.value = pedidos_store.filtros.estados || '';
+  pedidos_store.cargar(true);
+});
+
+// Si el usuario conectado cambia (cierre de sesión o login con otro rol/cuenta), resetear filtros
+watch(
+  () => sesion_store.usuario?.id,
+  () => {
+    busqueda.value = '';
+    estadoSeleccionado.value = '';
+    pedidos_store.limpiar_filtros();
+    pedidos_store.cargar(true);
+  }
+);
+
 onMounted(() => {
+  busqueda.value = pedidos_store.filtros.busqueda || '';
+  estadoSeleccionado.value = pedidos_store.filtros.estados || '';
   pedidos_store.cargar(true);
 });
 </script>

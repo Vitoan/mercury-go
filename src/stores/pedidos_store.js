@@ -112,6 +112,28 @@ async function actualizar_picking(id, items) {
   return res;
 }
 
+function limpiar_filtros() {
+  state.filtros.busqueda = '';
+  state.filtros.estados = '';
+  state.pagina.pagina = 1;
+}
+
+function resetear_store() {
+  state.cargando = false;
+  state.error = null;
+  state.pedidos = [];
+  state.conteos_por_estado = [];
+  state.total = 0;
+  state.pagina = {
+    pagina: 1,
+    tamano: 10,
+    total: 0,
+    hay_mas: false
+  };
+  state.filtros.busqueda = '';
+  state.filtros.estados = '';
+}
+
 export const pedidos_store = {
   get cargando() { return state.cargando; },
   get error() { return state.error; },
@@ -129,5 +151,7 @@ export const pedidos_store = {
   crear_orden,
   cambiar_estado,
   cancelar_orden,
-  actualizar_picking
+  actualizar_picking,
+  limpiar_filtros,
+  resetear_store
 };

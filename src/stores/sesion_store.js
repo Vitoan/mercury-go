@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { cerrar_sesion, iniciar_sesion, obtener_mi_usuario } from '@/services/sesion_service';
+import { pedidos_store } from '@/stores/pedidos_store';
 import {
   al_expirar,
   borrar_sesion,
@@ -111,6 +112,11 @@ export const sesion_store = {
   async limpiar() {
     state.usuario = null;
     state.error = null;
+    try {
+      pedidos_store.resetear_store();
+    } catch {
+      // Ignorar si aún no está inicializado
+    }
     await borrar_sesion();
   }
 };
