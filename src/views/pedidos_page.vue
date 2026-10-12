@@ -141,8 +141,14 @@
             <span v-else-if="p.observaciones?.includes('[Picking: COMPLETO')" class="mercury-sub-tag tag-success">
               ✔ Picking completo
             </span>
-            <span v-if="p.observaciones?.includes('[Comprobante de pago:')" class="mercury-sub-tag tag-info">
-              💳 Pago adjunto
+            <span v-if="p.observaciones?.includes('[Comprobante de pago: APROBADO')" class="mercury-sub-tag tag-success">
+              ✔ Pago aprobado
+            </span>
+            <span v-else-if="p.observaciones?.includes('[Comprobante de pago: RECHAZADO')" class="mercury-sub-tag tag-danger">
+              ✖ Pago rechazado
+            </span>
+            <span v-else-if="p.observaciones?.includes('[Comprobante de pago:')" class="mercury-sub-tag tag-warning">
+              ⏳ Comprobante por aprobar
             </span>
             <span v-if="p.observaciones?.includes('[Cobro Chofer:')" class="mercury-sub-tag tag-success">
               💵 Cobrado en destino

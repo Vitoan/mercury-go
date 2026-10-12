@@ -56,5 +56,17 @@ export const pedidos_service = {
 
   obtener_cuenta_corriente() {
     return ajax_service.get('api/pedidos/cuenta-corriente');
+  },
+
+  obtener_cuentas_corrientes_clientes() {
+    return ajax_service.get('api/pedidos/cuentas-corrientes-clientes');
+  },
+
+  aprobar_comprobante(id) {
+    return ajax_service.put(`api/pedidos/${id}/aprobar-comprobante`);
+  },
+
+  rechazar_comprobante(id, motivo = '') {
+    return ajax_service.put(`api/pedidos/${id}/rechazar-comprobante`, { motivo });
   }
 };

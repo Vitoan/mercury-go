@@ -40,6 +40,51 @@
             <p><strong>Cliente:</strong> {{ detalle.cliente?.razon_social }} (CUIT: {{ detalle.cliente?.cuit }})</p>
             <p v-if="detalle.observaciones"><strong>Observaciones:</strong> {{ detalle.observaciones }}</p>
 
+            <!-- Sección de Auditoría de Comprobante Bancario -->
+            <div v-if="comprobanteInfo" class="mercury-comprobante-seccion">
+              <div class="mercury-comprobante-header">
+                <strong>💳 Comprobante de Pago Adjunto</strong>
+                <ion-badge :color="comprobanteInfo.color">{{ comprobanteInfo.estadoTexto }}</ion-badge>
+              </div>
+
+              <div class="mercury-comprobante-acciones">
+                <ion-button
+                  v-if="comprobanteInfo.url"
+                  size="small"
+                  fill="outline"
+                  color="tertiary"
+                  @click="abrirComprobanteAdjunto"
+                >
+                  <ion-icon slot="start" :icon="documentAttachOutline" />
+                  Ver Comprobante
+                </ion-button>
+
+                <!-- Acciones de Aprobación para ADMIN cuando está pendiente -->
+                <template v-if="esAdmin && comprobanteInfo.esPendiente">
+                  <ion-button
+                    size="small"
+                    color="success"
+                    :disabled="procesandoPago"
+                    @click="aprobarComprobante"
+                  >
+                    <ion-icon slot="start" :icon="checkmarkCircleOutline" />
+                    Aprobar Pago
+                  </ion-button>
+
+                  <ion-button
+                    size="small"
+                    color="danger"
+                    fill="outline"
+                    :disabled="procesandoPago"
+                    @click="rechazarComprobante"
+                  >
+                    <ion-icon slot="start" :icon="closeCircleOutline" />
+                    Rechazar
+                  </ion-button>
+                </template>
+              </div>
+            </div>
+
             <div class="mercury-botones-pdf-fila">
               <ion-button
                 expand="block"
@@ -158,12 +203,16 @@ import {
   addCircleOutline,
   removeCircleOutline,
   trashOutline,
-  alertCircleOutline
+  alertCircleOutline,
+  documentAttachOutline,
+  checkmarkCircleOutline,
+  closeCircleOutline
 } from 'ionicons/icons';
 import { pedidos_service } from '@/services/pedidos_service';
 import { sesion_store } from '@/stores/sesion_store';
 import { compartir_archivo } from '@/services/compartir_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
+import { resolver_url_imagen } from '@/utils/imagenes';
 
 const props = defineProps({
   abierto: { type: Boolean, default: false },
@@ -177,10 +226,71 @@ const error = ref(null);
 const detalle = ref(null);
 const modoEdicion = ref(false);
 const guardandoEdicion = ref(false);
+const procesandoPago = ref(false);
 const itemsEdicion = ref([]);
 const observacionesEdicion = ref('');
 
 const esAdmin = computed(() => sesion_store.es_admin);
+
+const comprobanteInfo = computed(() => {
+  const obs = detalle.value?.observaciones || '';
+  if (!obs.includes('[Comprobante de pago:')) return null;
+
+  const matchUrl = obs.match(/\/uploads\/comprobantes\/[^\s\]]+/);
+  const url = matchUrl ? resolver_url_imagen(matchUrl[0]) : null;
+
+  if (obs.includes('[Comprobante de pago: APROBADO')) {
+    return { estadoTexto: 'Aprobado ✔', color: 'success', esPendiente: false, url };
+  }
+  if (obs.includes('[Comprobante de pago: RECHAZADO')) {
+    return { estadoTexto: 'Rechazado ✖', color: 'danger', esPendiente: false, url };
+  }
+  return { estadoTexto: 'Pendiente de Aprobación ⏳', color: 'warning', esPendiente: true, url };
+});
+
+const abrirComprobanteAdjunto = () => {
+  if (comprobanteInfo.value?.url) {
+    vibrar_toque();
+    window.open(comprobanteInfo.value.url, '_blank');
+  }
+};
+
+const aprobarComprobante = async () => {
+  if (!props.pedidoId) return;
+  procesandoPago.value = true;
+  try {
+    vibrar_toque();
+    await pedidos_service.aprobar_comprobante(props.pedidoId);
+    await vibrar_exito();
+    await cargarDetalle();
+    emit('pedido_actualizado');
+  } catch (err) {
+    await vibrar_error();
+    alert(err.mensaje || err.message || 'Error al aprobar el comprobante.');
+  } finally {
+    procesandoPago.value = false;
+  }
+};
+
+const rechazarComprobante = async () => {
+  if (!props.pedidoId) return;
+  const motivo = prompt('Ingresá el motivo del rechazo:', 'Comprobante no acreditado o ilegible');
+  if (motivo === null) return;
+
+  procesandoPago.value = true;
+  try {
+    vibrar_toque();
+    await pedidos_service.rechazar_comprobante(props.pedidoId, motivo);
+    await vibrar_exito();
+    await cargarDetalle();
+    emit('pedido_actualizado');
+  } catch (err) {
+    await vibrar_error();
+    alert(err.mensaje || err.message || 'Error al rechazar el comprobante.');
+  } finally {
+    procesandoPago.value = false;
+  }
+};
 
 const totalCalculado = computed(() => {
   return itemsEdicion.value.reduce((acc, i) => acc + (i.precio_unitario * i.cantidad), 0);
@@ -353,6 +463,27 @@ const cerrar = () => {
   font-size: 0.85rem;
   padding: 6px 10px;
   border-radius: 8px;
+}
+
+.mercury-comprobante-seccion {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--ion-color-step-50, rgba(0, 0, 0, 0.03));
+  border-radius: 8px;
+  border-left: 4px solid var(--ion-color-primary, #38bdf8);
+}
+
+.mercury-comprobante-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mercury-comprobante-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .mercury-botones-pdf-fila {

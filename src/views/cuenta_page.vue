@@ -78,6 +78,10 @@
                 <span>Comprobantes Acreditados:</span>
                 <span class="text-success">${{ (cuentaCorriente?.total_pagado || 0).toLocaleString('es-AR') }}</span>
               </div>
+              <div v-if="cuentaCorriente?.comprobantes_pendientes > 0" class="mercury-cc-fila">
+                <span>Comprobantes en Revisión ({{ cuentaCorriente.comprobantes_pendientes }}):</span>
+                <span class="text-warning">⏳ ${{ (cuentaCorriente?.comprobantes_pendientes_monto || 0).toLocaleString('es-AR') }}</span>
+              </div>
               <div class="mercury-cc-fila">
                 <span>Pedidos Pendientes de Entrega:</span>
                 <span>{{ cuentaCorriente?.pedidos_pendientes || 0 }}</span>

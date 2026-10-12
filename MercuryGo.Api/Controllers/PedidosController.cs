@@ -391,13 +391,21 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
         var totalFacturado = pedidosCliente.Sum(p => p.Total);
         var totalPagado = 0m;
+        var comprobantesPendientes = 0;
+        var comprobantesPendientesMonto = 0m;
 
-        // Sumar pagos registrados en etiquetas
+        // Sumar pagos aprobados y calcular pendientes de auditoría
         foreach (var p in pedidosCliente)
         {
-            if (!string.IsNullOrEmpty(p.Observaciones) && p.Observaciones.Contains("[Comprobante de pago:"))
+            var obs = p.Observaciones ?? string.Empty;
+            if (obs.Contains("[Comprobante de pago: APROBADO") || obs.Contains("[Cobro Chofer:"))
             {
-                totalPagado += p.Total; // Comprobante presentado
+                totalPagado += p.Total;
+            }
+            else if (obs.Contains("[Comprobante de pago: PENDIENTE") || obs.Contains("[Comprobante de pago: /uploads/"))
+            {
+                comprobantesPendientes++;
+                comprobantesPendientesMonto += p.Total;
             }
         }
 
@@ -411,7 +419,166 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
             total_facturado = totalFacturado,
             total_pagado = totalPagado,
             saldo_deudor = saldoDeudor,
+            comprobantes_pendientes = comprobantesPendientes,
+            comprobantes_pendientes_monto = comprobantesPendientesMonto,
             pedidos_pendientes = pedidosCliente.Count(p => p.Estado != EstadoPedido.Entregado)
+        });
+    }
+
+    // Listado consolidado de saldos comerciales y comprobantes a auditar (Exclusivo ADMIN)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpGet("cuentas-corrientes-clientes")]
+    public async Task<IActionResult> ListarCuentasCorrientesClientes(CancellationToken ct)
+    {
+        var clientes = await db.Clientes
+            .AsNoTracking()
+            .Where(c => c.Activo)
+            .OrderBy(c => c.RazonSocial)
+            .ToListAsync(ct);
+
+        var pedidos = await db.Pedidos
+            .AsNoTracking()
+            .Where(p => p.Activo && p.Estado != EstadoPedido.Cancelado)
+            .Select(p => new
+            {
+                p.Id,
+                p.Numero,
+                p.ClienteId,
+                p.Estado,
+                p.FechaPedido,
+                Total = db.DetallesPedido.Where(d => d.PedidoId == p.Id).Sum(d => (decimal?)d.Cantidad * d.PrecioUnitario) ?? 0m,
+                p.Observaciones
+            })
+            .ToListAsync(ct);
+
+        var resumenPorCliente = clientes.Select(c =>
+        {
+            var pedidosC = pedidos.Where(p => p.ClienteId == c.Id).ToList();
+            var totalFacturado = pedidosC.Sum(p => p.Total);
+            var totalPagado = 0m;
+            var pendientesRevision = 0;
+            var comprobantesPendientes = new List<object>();
+
+            foreach (var p in pedidosC)
+            {
+                var obs = p.Observaciones ?? string.Empty;
+                if (obs.Contains("[Comprobante de pago: APROBADO") || obs.Contains("[Cobro Chofer:"))
+                {
+                    totalPagado += p.Total;
+                }
+                else if (obs.Contains("[Comprobante de pago: PENDIENTE") || obs.Contains("[Comprobante de pago: /uploads/"))
+                {
+                    pendientesRevision++;
+                    var match = System.Text.RegularExpressions.Regex.Match(obs, @"/uploads/comprobantes/[^\s\]]+");
+                    var comprobanteUrl = match.Success ? match.Value : null;
+
+                    comprobantesPendientes.Add(new
+                    {
+                        pedido_id = p.Id,
+                        pedido_numero = p.Numero,
+                        fecha = p.FechaPedido,
+                        total = p.Total,
+                        comprobante_url = comprobanteUrl,
+                        observaciones = p.Observaciones
+                    });
+                }
+            }
+
+            var saldoDeudor = Math.Max(0m, totalFacturado - totalPagado);
+
+            return new
+            {
+                cliente_id = c.Id,
+                razon_social = c.RazonSocial,
+                cuit = c.Cuit,
+                telefono = c.Telefono,
+                email = c.Email,
+                localidad = c.Localidad,
+                total_facturado = totalFacturado,
+                total_pagado = totalPagado,
+                saldo_deudor = saldoDeudor,
+                comprobantes_pendientes_conteo = pendientesRevision,
+                comprobantes_pendientes = comprobantesPendientes
+            };
+        }).ToList();
+
+        var deudaTotalGeneral = resumenPorCliente.Sum(x => x.saldo_deudor);
+        var clientesConDeuda = resumenPorCliente.Count(x => x.saldo_deudor > 0);
+        var totalPendientesRevision = resumenPorCliente.Sum(x => x.comprobantes_pendientes_conteo);
+
+        return Ok(new
+        {
+            metricas = new
+            {
+                deuda_total = deudaTotalGeneral,
+                clientes_con_deuda = clientesConDeuda,
+                total_comprobantes_pendientes = totalPendientesRevision
+            },
+            clientes = resumenPorCliente
+        });
+    }
+
+    // Aprobación de comprobante bancario por el ADMIN (acredita el pago y reduce la deuda)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPut("{id:long}/aprobar-comprobante")]
+    public async Task<IActionResult> AprobarComprobante(long id, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var obs = pedido.Observaciones ?? string.Empty;
+        var match = System.Text.RegularExpressions.Regex.Match(obs, @"/uploads/comprobantes/[^\s\]]+");
+        var ruta = match.Success ? match.Value : string.Empty;
+
+        // Limpiar cualquier etiqueta previa de comprobante
+        var obsLimpia = System.Text.RegularExpressions.Regex.Replace(obs, @"\s*·?\s*\[Comprobante de pago:[^\]]+\]", string.Empty).Trim();
+        var nuevaEtiqueta = $"[Comprobante de pago: APROBADO · {DateTime.UtcNow:dd/MM/yyyy HH:mm} · {ruta}]";
+
+        pedido.Observaciones = string.IsNullOrWhiteSpace(obsLimpia)
+            ? nuevaEtiqueta
+            : $"{obsLimpia} · {nuevaEtiqueta}";
+
+        pedido.ActualizadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Comprobante de la orden {pedido.Numero} aprobado exitosamente. Pago acreditado.",
+            pedido_id = pedido.Id,
+            observaciones = pedido.Observaciones
+        });
+    }
+
+    // Rechazo de comprobante bancario por el ADMIN (no descuenta y almacena motivo)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPut("{id:long}/rechazar-comprobante")]
+    public async Task<IActionResult> RechazarComprobante(long id, [FromBody] RechazarComprobanteRequest request, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var obs = pedido.Observaciones ?? string.Empty;
+        var match = System.Text.RegularExpressions.Regex.Match(obs, @"/uploads/comprobantes/[^\s\]]+");
+        var ruta = match.Success ? match.Value : string.Empty;
+
+        var motivo = string.IsNullOrWhiteSpace(request?.Motivo) ? "No acreditado en cuenta bancaria" : request.Motivo.Trim();
+        var obsLimpia = System.Text.RegularExpressions.Regex.Replace(obs, @"\s*·?\s*\[Comprobante de pago:[^\]]+\]", string.Empty).Trim();
+        var nuevaEtiqueta = $"[Comprobante de pago: RECHAZADO - Motivo: {motivo} · {ruta}]";
+
+        pedido.Observaciones = string.IsNullOrWhiteSpace(obsLimpia)
+            ? nuevaEtiqueta
+            : $"{obsLimpia} · {nuevaEtiqueta}";
+
+        pedido.ActualizadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Comprobante de la orden {pedido.Numero} rechazado: {motivo}",
+            pedido_id = pedido.Id,
+            observaciones = pedido.Observaciones
         });
     }
 
@@ -515,12 +682,14 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         await using var stream = System.IO.File.Create(rutaFisica);
         await archivo.CopyToAsync(stream, ct);
 
-        // Guardamos la referencia en observaciones si no hay columna o para registro histórico
-        var etiquetaComprobante = $"[Comprobante de pago: /uploads/comprobantes/{nombreArchivo}]";
-        if (string.IsNullOrWhiteSpace(pedido.Observaciones))
-            pedido.Observaciones = etiquetaComprobante;
-        else if (!pedido.Observaciones.Contains("/uploads/comprobantes/"))
-            pedido.Observaciones = $"{pedido.Observaciones} · {etiquetaComprobante}";
+        // Guardamos la referencia en observaciones con estado PENDIENTE de revisión para el Administrador
+        var etiquetaComprobante = $"[Comprobante de pago: PENDIENTE · /uploads/comprobantes/{nombreArchivo}]";
+        var obsActual = pedido.Observaciones ?? string.Empty;
+        var obsLimpia = System.Text.RegularExpressions.Regex.Replace(obsActual, @"\s*·?\s*\[Comprobante de pago:[^\]]+\]", string.Empty).Trim();
+
+        pedido.Observaciones = string.IsNullOrWhiteSpace(obsLimpia)
+            ? etiquetaComprobante
+            : $"{obsLimpia} · {etiquetaComprobante}";
 
         pedido.ActualizadoEn = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -703,6 +872,7 @@ public sealed record CrearPedidoItemRequest(long ProductoId, int Cantidad);
 public sealed record CrearPedidoRequest(long ClienteId, string? Observaciones, List<CrearPedidoItemRequest> Items, string? Estado = null);
 public sealed record EditarPedidoRequest(List<CrearPedidoItemRequest>? Items, string? Observaciones);
 public sealed record CobroChoferRequest(decimal Monto, string? Metodo = "Efectivo");
+public sealed record RechazarComprobanteRequest(string? Motivo);
 public sealed record CambiarEstadoRequest(string Estado);
 public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);
 public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items);

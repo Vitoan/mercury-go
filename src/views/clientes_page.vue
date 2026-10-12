@@ -1,85 +1,206 @@
 <template>
   <comp-page titulo="Clientes Comerciales" :mostrar_actualizar="true" @actualizar="recargar">
-    <!-- Buscador con debounce en servidor -->
-    <comp-buscador
-      v-model="busqueda"
-      placeholder="Buscar por razón social, CUIT o teléfono…"
-      @buscar="alBuscar"
-    />
-
-    <!-- Estado 1: Cargando primera página -->
-    <comp-esqueleto v-if="clientes_store.cargando && !clientes_store.hay_clientes" />
-
-    <!-- Estado 2: Error al conectar -->
-    <comp-estado-error
-      v-else-if="clientes_store.error && !clientes_store.hay_clientes"
-      :mensaje="clientes_store.error"
-      @reintentar="recargar"
-    />
-
-    <!-- Estado 3: Sin resultados -->
-    <comp-estado-vacio
-      v-else-if="!clientes_store.hay_clientes"
-      mensaje="No se encontraron clientes o cuentas comerciales."
-    />
-
-    <!-- Estado 4: Lista paginada con acciones ABM -->
-    <comp-lista
-      v-else
-      :cargando="clientes_store.cargando"
-      :hay_mas="clientes_store.hay_mas"
-      :mostrados="clientes_store.mostrados"
-      :total="clientes_store.total"
-      @cargar_mas="clientes_store.cargar_mas"
-    >
-      <ion-item-sliding v-for="c in clientes_store.clientes" :key="c.id">
-        <ion-item class="mercury-cliente-card">
-          <ion-icon :icon="businessOutline" slot="start" class="mercury-icono-cliente" />
+    <!-- Segmentos para alternar entre Gestión de Clientes y Cuentas Corrientes/Deuda -->
+    <div class="mercury-segmento-contenedor">
+      <ion-segment v-model="vistaActiva" @ionChange="alCambiarVista">
+        <ion-segment-button value="clientes">
+          <ion-icon :icon="businessOutline" />
+          <ion-label>Clientes</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="finanzas">
+          <ion-icon :icon="walletOutline" />
           <ion-label>
-            <div class="mercury-cliente-cabecera">
-              <h3>{{ c.razon_social }}</h3>
-              <ion-badge color="primary" class="mercury-badge-cuit">CUIT {{ c.cuit }}</ion-badge>
-            </div>
-            <p v-if="c.localidad || c.direccion" class="mercury-cliente-direccion">
-              📍 {{ c.direccion ? c.direccion + ' · ' : '' }}{{ c.localidad || 'Zona Central' }}
-            </p>
-            <div class="mercury-cliente-contacto">
-              <span v-if="c.telefono">📞 {{ c.telefono }}</span>
-              <span v-if="c.email">✉️ {{ c.email }}</span>
-            </div>
+            Cuentas Corrientes
+            <ion-badge v-if="metricasFinanzas.total_comprobantes_pendientes > 0" color="warning" class="mercury-badge-seg">
+              {{ metricasFinanzas.total_comprobantes_pendientes }}
+            </ion-badge>
           </ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
 
-          <!-- Botones de acción directa -->
-          <ion-buttons slot="end" class="mercury-botones-accion">
-            <ion-button fill="clear" color="primary" @click.stop="abrirEditar(c)">
-              <ion-icon slot="icon-only" :icon="createOutline" />
-            </ion-button>
-            <ion-button fill="clear" color="danger" @click.stop="confirmarBaja(c)">
-              <ion-icon slot="icon-only" :icon="trashOutline" />
-            </ion-button>
-          </ion-buttons>
-        </ion-item>
+    <!-- VISTA 1: FINANZAS Y AUDITORÍA DE CUENTAS CORRIENTES -->
+    <div v-if="vistaActiva === 'finanzas'" class="mercury-finanzas-seccion">
+      <!-- Tarjeta Resumen General -->
+      <ion-card class="mercury-card-metricas">
+        <ion-card-content>
+          <div class="mercury-metricas-grid">
+            <div class="mercury-metrica-caja">
+              <span class="mercury-metrica-label">Deuda Total en Calle:</span>
+              <strong class="mercury-metrica-valor text-warning">
+                ${{ metricasFinanzas.deuda_total.toLocaleString('es-AR') }}
+              </strong>
+            </div>
+            <div class="mercury-metrica-caja">
+              <span class="mercury-metrica-label">Clientes con Saldo Deudor:</span>
+              <strong class="mercury-metrica-valor">{{ metricasFinanzas.clientes_con_deuda }}</strong>
+            </div>
+          </div>
+          <div v-if="metricasFinanzas.total_comprobantes_pendientes > 0" class="mercury-alerta-pendientes">
+            <ion-icon :icon="timeOutline" color="warning" />
+            <span>Hay <strong>{{ metricasFinanzas.total_comprobantes_pendientes }}</strong> comprobante(s) esperando tu aprobación.</span>
+          </div>
+        </ion-card-content>
+      </ion-card>
 
-        <!-- Opciones al deslizar (Mobile gesture) -->
-        <ion-item-options side="end">
-          <ion-item-option color="primary" @click="abrirEditar(c)">
-            <ion-icon slot="top" :icon="createOutline" />
-            Editar
-          </ion-item-option>
-          <ion-item-option color="danger" @click="confirmarBaja(c)">
-            <ion-icon slot="top" :icon="trashOutline" />
-            Baja
-          </ion-item-option>
-        </ion-item-options>
-      </ion-item-sliding>
-    </comp-lista>
+      <!-- Spinner cargando finanzas -->
+      <div v-if="cargandoFinanzas" class="mercury-finanzas-loading">
+        <ion-spinner name="crescent" color="primary" />
+        <p>Actualizando cuentas corrientes…</p>
+      </div>
 
-    <!-- Botón flotante para registrar un nuevo cliente B2B -->
-    <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-      <ion-fab-button color="primary" class="mercury-fab" @click="abrirNuevo">
-        <ion-icon :icon="addOutline" />
-      </ion-fab-button>
-    </ion-fab>
+      <!-- Lista de Clientes con Estado Financiero -->
+      <ion-list v-else class="mercury-finanzas-lista">
+        <ion-card v-for="item in cuentasClientes" :key="item.cliente_id" class="mercury-card-cliente-cc">
+          <ion-card-header>
+            <div class="mercury-cc-cabecera">
+              <div>
+                <ion-card-title class="mercury-cc-titulo">{{ item.razon_social }}</ion-card-title>
+                <ion-card-subtitle>CUIT: {{ item.cuit }} · {{ item.localidad || 'General' }}</ion-card-subtitle>
+              </div>
+              <ion-badge :color="item.saldo_deudor > 0 ? 'warning' : 'success'" class="mercury-badge-deuda">
+                {{ item.saldo_deudor > 0 ? 'Debe: $' + item.saldo_deudor.toLocaleString('es-AR') : 'Al Día' }}
+              </ion-badge>
+            </div>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="mercury-cc-totales-fila">
+              <span>Facturado: <strong>${{ item.total_facturado.toLocaleString('es-AR') }}</strong></span>
+              <span>Acreditado: <strong class="text-success">${{ item.total_pagado.toLocaleString('es-AR') }}</strong></span>
+            </div>
+
+            <!-- Comprobantes pendientes de auditar de este cliente -->
+            <div v-if="item.comprobantes_pendientes_conteo > 0" class="mercury-cc-comprobantes-box">
+              <div class="mercury-box-titulo">
+                <ion-icon :icon="cardOutline" color="warning" />
+                <span>Comprobantes esperando aprobación ({{ item.comprobantes_pendientes_conteo }}):</span>
+              </div>
+
+              <div
+                v-for="comp in item.comprobantes_pendientes"
+                :key="comp.pedido_id"
+                class="mercury-item-comprobante-fila"
+              >
+                <div class="mercury-comp-info">
+                  <strong>Orden {{ comp.pedido_numero }}</strong>
+                  <span>Monto: ${{ comp.total.toLocaleString('es-AR') }}</span>
+                </div>
+                <div class="mercury-comp-botones">
+                  <ion-button
+                    v-if="comp.comprobante_url"
+                    size="small"
+                    fill="outline"
+                    color="tertiary"
+                    @click="verArchivoComprobante(comp.comprobante_url)"
+                  >
+                    Ver Foto / PDF
+                  </ion-button>
+                  <ion-button
+                    size="small"
+                    color="success"
+                    @click="aprobarComprobanteDirecto(comp.pedido_id)"
+                  >
+                    ✔ Aprobar
+                  </ion-button>
+                  <ion-button
+                    size="small"
+                    color="danger"
+                    fill="outline"
+                    @click="rechazarComprobanteDirecto(comp.pedido_id)"
+                  >
+                    ✖ Rechazar
+                  </ion-button>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </ion-list>
+    </div>
+
+    <!-- VISTA 2: GESTIÓN DE CLIENTES COMERCIALES (ABM) -->
+    <div v-else>
+      <!-- Buscador con debounce en servidor -->
+      <comp-buscador
+        v-model="busqueda"
+        placeholder="Buscar por razón social, CUIT o teléfono…"
+        @buscar="alBuscar"
+      />
+
+      <!-- Estado 1: Cargando primera página -->
+      <comp-esqueleto v-if="clientes_store.cargando && !clientes_store.hay_clientes" />
+
+      <!-- Estado 2: Error al conectar -->
+      <comp-estado-error
+        v-else-if="clientes_store.error && !clientes_store.hay_clientes"
+        :mensaje="clientes_store.error"
+        @reintentar="recargar"
+      />
+
+      <!-- Estado 3: Sin resultados -->
+      <comp-estado-vacio
+        v-else-if="!clientes_store.hay_clientes"
+        mensaje="No se encontraron clientes o cuentas comerciales."
+      />
+
+      <!-- Estado 4: Lista paginada con acciones ABM -->
+      <comp-lista
+        v-else
+        :cargando="clientes_store.cargando"
+        :hay_mas="clientes_store.hay_mas"
+        :mostrados="clientes_store.mostrados"
+        :total="clientes_store.total"
+        @cargar_mas="clientes_store.cargar_mas"
+      >
+        <ion-item-sliding v-for="c in clientes_store.clientes" :key="c.id">
+          <ion-item class="mercury-cliente-card">
+            <ion-icon :icon="businessOutline" slot="start" class="mercury-icono-cliente" />
+            <ion-label>
+              <div class="mercury-cliente-cabecera">
+                <h3>{{ c.razon_social }}</h3>
+                <ion-badge color="primary" class="mercury-badge-cuit">CUIT {{ c.cuit }}</ion-badge>
+              </div>
+              <p v-if="c.localidad || c.direccion" class="mercury-cliente-direccion">
+                📍 {{ c.direccion ? c.direccion + ' · ' : '' }}{{ c.localidad || 'Zona Central' }}
+              </p>
+              <div class="mercury-cliente-contacto">
+                <span v-if="c.telefono">📞 {{ c.telefono }}</span>
+                <span v-if="c.email">✉️ {{ c.email }}</span>
+              </div>
+            </ion-label>
+
+            <!-- Botones de acción directa -->
+            <ion-buttons slot="end" class="mercury-botones-accion">
+              <ion-button fill="clear" color="primary" @click.stop="abrirEditar(c)">
+                <ion-icon slot="icon-only" :icon="createOutline" />
+              </ion-button>
+              <ion-button fill="clear" color="danger" @click.stop="confirmarBaja(c)">
+                <ion-icon slot="icon-only" :icon="trashOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-item>
+
+          <!-- Opciones al deslizar (Mobile gesture) -->
+          <ion-item-options side="end">
+            <ion-item-option color="primary" @click="abrirEditar(c)">
+              <ion-icon slot="top" :icon="createOutline" />
+              Editar
+            </ion-item-option>
+            <ion-item-option color="danger" @click="confirmarBaja(c)">
+              <ion-icon slot="top" :icon="trashOutline" />
+              Baja
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
+      </comp-lista>
+
+      <!-- Botón flotante para registrar un nuevo cliente B2B -->
+      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+        <ion-fab-button color="primary" class="mercury-fab" @click="abrirNuevo">
+          <ion-icon :icon="addOutline" />
+        </ion-fab-button>
+      </ion-fab>
+    </div>
 
     <!-- Modal de Formulario ABM -->
     <comp-cliente-modal
@@ -119,13 +240,25 @@ import {
   IonButton,
   IonFab,
   IonFabButton,
-  IonAlert
+  IonAlert,
+  IonSegment,
+  IonSegmentButton,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardSubtitle,
+  IonCardContent,
+  IonList,
+  IonSpinner
 } from '@ionic/vue';
 import {
   businessOutline,
   createOutline,
   trashOutline,
-  addOutline
+  addOutline,
+  walletOutline,
+  timeOutline,
+  cardOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -137,6 +270,18 @@ import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
 import CompClienteModal from '../components/dominio/clientes/comp_cliente_modal.vue';
 
 import { clientes_store } from '@/stores/clientes_store';
+import { pedidos_service } from '@/services/pedidos_service';
+import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
+import { resolver_url_imagen } from '@/utils/imagenes';
+
+const vistaActiva = ref('clientes');
+const cargandoFinanzas = ref(false);
+const cuentasClientes = ref([]);
+const metricasFinanzas = ref({
+  deuda_total: 0,
+  clientes_con_deuda: 0,
+  total_comprobantes_pendientes: 0
+});
 
 const busqueda = ref('');
 const modalAbierto = ref(false);
@@ -209,8 +354,66 @@ const ejecutarBaja = async () => {
   }
 };
 
+const cargarFinanzas = async () => {
+  cargandoFinanzas.value = true;
+  try {
+    const res = await pedidos_service.obtener_cuentas_corrientes_clientes();
+    cuentasClientes.value = res.clientes || [];
+    metricasFinanzas.value = res.metricas || {
+      deuda_total: 0,
+      clientes_con_deuda: 0,
+      total_comprobantes_pendientes: 0
+    };
+  } catch (err) {
+    console.error('Error al cargar cuentas corrientes:', err);
+  } finally {
+    cargandoFinanzas.value = false;
+  }
+};
+
+const alCambiarVista = () => {
+  vibrar_toque();
+  if (vistaActiva.value === 'finanzas') {
+    cargarFinanzas();
+  }
+};
+
+const verArchivoComprobante = (urlRelativa) => {
+  vibrar_toque();
+  const urlCompleta = resolver_url_imagen(urlRelativa);
+  if (urlCompleta) window.open(urlCompleta, '_blank');
+};
+
+const aprobarComprobanteDirecto = async (pedidoId) => {
+  try {
+    vibrar_toque();
+    await pedidos_service.aprobar_comprobante(pedidoId);
+    await vibrar_exito();
+    await cargarFinanzas();
+  } catch (err) {
+    await vibrar_error();
+    alert(err.mensaje || err.message || 'No se pudo aprobar el comprobante.');
+  }
+};
+
+const rechazarComprobanteDirecto = async (pedidoId) => {
+  const motivo = prompt('Ingresá el motivo del rechazo del comprobante:', 'Comprobante no acreditado en cuenta');
+  if (motivo === null) return;
+
+  try {
+    vibrar_toque();
+    await pedidos_service.rechazar_comprobante(pedidoId, motivo);
+    await vibrar_exito();
+    await cargarFinanzas();
+  } catch (err) {
+    await vibrar_error();
+    alert(err.mensaje || err.message || 'No se pudo rechazar el comprobante.');
+  }
+};
+
 onMounted(() => {
   clientes_store.cargar(true);
+  cargarFinanzas();
 });
 </script>
 
@@ -273,5 +476,133 @@ onMounted(() => {
 .mercury-fab {
   --box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
   font-size: 1.4rem;
+}
+
+/* Estilos de Finanzas y Auditoría de Cuentas Corrientes */
+.mercury-segmento-contenedor {
+  padding: 8px 12px;
+}
+
+.mercury-badge-seg {
+  margin-left: 6px;
+  font-size: 0.72rem;
+  padding: 2px 5px;
+}
+
+.mercury-finanzas-seccion {
+  padding: 0 12px 24px 12px;
+}
+
+.mercury-card-metricas {
+  margin: 0 0 16px 0;
+  border-radius: 12px;
+  background: var(--ion-color-step-50, #f8fafc);
+}
+
+.mercury-metricas-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mercury-metrica-caja {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mercury-metrica-label {
+  font-size: 0.8rem;
+  color: var(--ion-color-step-600, #64748b);
+}
+
+.mercury-metrica-valor {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.mercury-alerta-pendientes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--ion-color-step-200, #e2e8f0);
+  font-size: 0.88rem;
+}
+
+.mercury-finanzas-loading {
+  text-align: center;
+  padding: 30px;
+  color: var(--ion-color-medium, #64748b);
+}
+
+.mercury-card-cliente-cc {
+  margin: 0 0 14px 0;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.mercury-cc-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mercury-cc-titulo {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.mercury-badge-deuda {
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.mercury-cc-totales-fila {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.mercury-cc-comprobantes-box {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.04));
+  border-left: 3px solid var(--ion-color-warning, #f59e0b);
+}
+
+.mercury-box-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.mercury-item-comprobante-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px dashed var(--ion-color-step-200, rgba(0, 0, 0, 0.08));
+}
+
+.mercury-comp-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+}
+
+.mercury-comp-botones {
+  display: flex;
+  gap: 6px;
 }
 </style>
