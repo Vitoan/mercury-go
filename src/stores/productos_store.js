@@ -131,12 +131,12 @@ async function guardar_producto(datos, id = null) {
   } else {
     await productos_service.crear(datos);
   }
-  await cargar_listado(true);
+  await Promise.all([cargar_resumen(), cargar_listado(true)]);
 }
 
 async function eliminar_producto(id) {
   await productos_service.eliminar(id);
-  await cargar_listado(true);
+  await Promise.all([cargar_resumen(), cargar_listado(true)]);
 }
 
 export const productos_store = {

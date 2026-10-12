@@ -1,7 +1,10 @@
 <template>
   <comp-page titulo="Catálogo de Mercadería" :mostrar_actualizar="true" @actualizar="recargar">
-    <!-- Botón del Carrito en Toolbar con Badge de conteo -->
+    <!-- Botón del Carrito y Nuevo Producto en Toolbar -->
     <template #acciones>
+      <ion-button v-if="sesion_store.es_admin" title="Nuevo Producto" @click="abrirNuevoProducto">
+        <ion-icon slot="icon-only" :icon="addCircleOutline" />
+      </ion-button>
       <ion-button class="mercury-btn-carrito" @click="mostrarCarrito = true">
         <ion-icon slot="icon-only" :icon="cartOutline" />
         <ion-badge v-if="carrito_store.cantidad_total > 0" color="danger" class="mercury-badge-carrito">
@@ -137,17 +140,28 @@
               </ion-badge>
             </div>
 
-            <ion-button
-              v-if="sesion_store.es_admin"
-              size="small"
-              fill="solid"
-              color="light"
-              class="mercury-btn-foto-flotante"
-              title="Cambiar foto con cámara o galería"
-              @click="abrirOpcionesFoto(p)"
-            >
-              <ion-icon slot="icon-only" :icon="cameraOutline" />
-            </ion-button>
+            <div v-if="sesion_store.es_admin" class="mercury-acciones-admin-flotantes">
+              <ion-button
+                size="small"
+                fill="solid"
+                color="light"
+                class="mercury-btn-accion-flotante"
+                title="Editar Producto"
+                @click="abrirEditarProducto(p)"
+              >
+                <ion-icon slot="icon-only" :icon="createOutline" />
+              </ion-button>
+              <ion-button
+                size="small"
+                fill="solid"
+                color="light"
+                class="mercury-btn-accion-flotante"
+                title="Cambiar foto con cámara o galería"
+                @click="abrirOpcionesFoto(p)"
+              >
+                <ion-icon slot="icon-only" :icon="cameraOutline" />
+              </ion-button>
+            </div>
           </div>
 
           <!-- Bloque Inferior: Nombre, Descripción y Pie con Precio y Carrito -->
@@ -174,6 +188,14 @@
         </ion-card>
       </div>
     </comp-lista>
+
+    <!-- Modal para Agregar o Editar Producto (Admin) -->
+    <comp-producto-modal
+      :abierto="mostrarModalProducto"
+      :producto="productoSeleccionadoParaEditar"
+      @cerrar="mostrarModalProducto = false"
+      @producto_guardado="alGuardarProducto"
+    />
 
     <!-- Modal de Carrito -->
     <comp-carrito-modal
@@ -231,7 +253,9 @@ import {
   closeCircleOutline,
   cartOutline,
   cameraOutline,
-  flameOutline
+  flameOutline,
+  createOutline,
+  addCircleOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -241,6 +265,7 @@ import CompEsqueleto from '../components/base/comp_esqueleto.vue';
 import CompEstadoError from '../components/base/comp_estado_error.vue';
 import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
 import CompCarritoModal from '../components/dominio/pedidos/comp_carrito_modal.vue';
+import CompProductoModal from '../components/dominio/productos/comp_producto_modal.vue';
 
 import { productos_store } from '@/stores/productos_store';
 import { productos_service } from '@/services/productos_service';
@@ -256,9 +281,31 @@ const filtroDisponible = ref(null);
 const filtroOferta = ref(null);
 
 const mostrarCarrito = ref(false);
+const mostrarModalProducto = ref(false);
+const productoSeleccionadoParaEditar = ref(null);
+
 const mostrarActionSheetFoto = ref(false);
 const productoSeleccionadoParaFoto = ref(null);
 const inputFotoProducto = ref(null);
+
+const abrirNuevoProducto = () => {
+  vibrar_toque();
+  productoSeleccionadoParaEditar.value = null;
+  mostrarModalProducto.value = true;
+};
+
+const abrirEditarProducto = (producto) => {
+  vibrar_toque();
+  productoSeleccionadoParaEditar.value = producto;
+  mostrarModalProducto.value = true;
+};
+
+const alGuardarProducto = async () => {
+  await vibrar_exito();
+  mensajeToast.value = '¡Producto guardado exitosamente!';
+  colorToast.value = 'success';
+  mostrarToast.value = true;
+};
 
 const mostrarToast = ref(false);
 const mensajeToast = ref('');
@@ -503,14 +550,19 @@ onMounted(async () => {
   border-radius: 6px;
 }
 
-.mercury-btn-foto-flotante {
+.mercury-acciones-admin-flotantes {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.mercury-btn-accion-flotante {
   --border-radius: 50%;
   width: 34px;
   height: 34px;
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 .mercury-producto-cuerpo {
