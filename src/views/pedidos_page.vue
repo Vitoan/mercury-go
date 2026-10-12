@@ -333,7 +333,12 @@ const formatear_nombre_estado = (estado) => {
 
 const abrirOpcionesEstado = (pedido) => {
   pedidoSeleccionado.value = pedido;
-  mostrarActionSheet.value = true;
+  if (sesion_store.rol_activo === 'CLIENTE') {
+    // Para el cliente, tocar el badge abre directamente el detalle informativo del pedido
+    mostrarModalDetalle.value = true;
+  } else {
+    mostrarActionSheet.value = true;
+  }
 };
 
 const alTocarPedido = (pedido) => {
@@ -416,6 +421,24 @@ const botonesTransicion = computed(() => {
     });
   }
 
+  // Si el usuario es CLIENTE, no se le ofrecen transiciones logísticas (solo cancelar si está en etapa previa al despacho)
+  const esCliente = sesion_store.rol_activo === 'CLIENTE';
+  if (esCliente) {
+    if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
+      botones.push({
+        text: 'Cancelar mi Pedido (✖ Cancelar)',
+        role: 'destructive',
+        handler: () => ejecutarCambioEstado('Cancelado')
+      });
+    }
+    botones.push({
+      text: 'Cerrar',
+      role: 'cancel'
+    });
+    return botones;
+  }
+
+  // Transiciones logísticas operativas para ADMIN, OPERARIO o CHOFER:
   if (estadoActual === 'Pendiente') {
     botones.push({
       text: 'Confirmar Pedido (▶ Confirmado)',

@@ -244,6 +244,12 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
     [HttpPut("{id:long}/estado")]
     public async Task<IActionResult> CambiarEstado(long id, [FromBody] CambiarEstadoRequest request, CancellationToken ct)
     {
+        // Los clientes no pueden avanzar ni cambiar estados logísticos de la orden
+        if (User.EsCliente())
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "rol_no_autorizado", mensaje = "Los clientes solo pueden consultar o cancelar sus pedidos." });
+        }
+
         if (!Enum.TryParse<EstadoPedido>(request.Estado, true, out var nuevoEstado))
             return BadRequest(new { codigo = "estado_invalido", mensaje = $"El estado '{request.Estado}' no es un estado logístico reconocido." });
 
@@ -277,6 +283,24 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o ya fue cancelado." });
+
+        // Si es cliente, validar que sea su propio pedido y que esté en etapa inicial
+        if (User.EsCliente())
+        {
+            var emailUsuario = User.Email();
+            var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct)
+                       ?? await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == 1 && c.Activo, ct);
+
+            if (cliente is null || pedido.ClienteId != cliente.Id)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "pedido_ajeno", mensaje = "No tiene permiso para cancelar este pedido." });
+            }
+
+            if (pedido.Estado != EstadoPedido.Pendiente && pedido.Estado != EstadoPedido.Confirmado)
+            {
+                return BadRequest(new { codigo = "cancelacion_tardia", mensaje = "El pedido ya está en preparación o en ruta de despacho y no puede ser cancelado por el cliente." });
+            }
+        }
 
         if (pedido.Estado == EstadoPedido.Entregado)
             return BadRequest(new { codigo = "pedido_ya_entregado", mensaje = "Una orden entregada no puede cancelarse." });
