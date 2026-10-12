@@ -182,7 +182,10 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
         producto.Nombre = request.Nombre.Trim();
         producto.Descripcion = NormalizarTexto(request.Descripcion);
         producto.Precio = request.Precio;
-        producto.ImagenUrl = NormalizarTexto(request.ImagenUrl);
+        if (request.ImagenUrl is not null)
+        {
+            producto.ImagenUrl = NormalizarTexto(request.ImagenUrl);
+        }
         producto.Disponible = request.Disponible;
         producto.EnOferta = request.EnOferta;
         producto.ActualizadoEn = DateTime.UtcNow;

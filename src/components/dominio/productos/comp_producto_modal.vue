@@ -337,7 +337,8 @@ const guardar = async () => {
       descripcion: formulario.value.descripcion?.trim() || null,
       precio: Number(formulario.value.precio),
       disponible: Boolean(formulario.value.disponible),
-      en_oferta: Boolean(formulario.value.en_oferta)
+      en_oferta: Boolean(formulario.value.en_oferta),
+      imagen_url: imagenUrlActual.value || props.producto?.imagen_url || null
     };
 
     if (props.producto?.id) {
