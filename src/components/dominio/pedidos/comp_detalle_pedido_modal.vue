@@ -38,7 +38,7 @@
           <ion-card-content>
             <p><strong>Fecha:</strong> {{ formatear_fecha(detalle.fecha_pedido) }}</p>
             <p><strong>Cliente:</strong> {{ detalle.cliente?.razon_social }} (CUIT: {{ detalle.cliente?.cuit }})</p>
-            <p v-if="detalle.observaciones"><strong>Observaciones:</strong> {{ detalle.observaciones }}</p>
+            <p v-if="observacionesVisibles"><strong>Observaciones:</strong> {{ observacionesVisibles }}</p>
 
             <!-- Sección de Auditoría de Comprobante Bancario -->
             <div v-if="comprobanteInfo" class="mercury-comprobante-seccion">
@@ -231,6 +231,21 @@ const itemsEdicion = ref([]);
 const observacionesEdicion = ref('');
 
 const esAdmin = computed(() => sesion_store.es_admin);
+
+const observacionesVisibles = computed(() => {
+  const obs = detalle.value?.observaciones || '';
+  if (esAdmin.value) return obs;
+  // Para clientes, limpiar etiquetas internas entre corchetes
+  const limpia = obs
+    .replace(/\[Comprobante de pago:[^\]]+\]/g, '')
+    .replace(/\[Picking:[^\]]+\]/g, '')
+    .replace(/\[Cobro Chofer:[^\]]+\]/g, '')
+    .replace(/\s*·\s*·?\s*/g, ' · ')
+    .trim()
+    .replace(/^·\s*/, '')
+    .replace(/\s*·$/, '');
+  return limpia || null;
+});
 
 const comprobanteInfo = computed(() => {
   const obs = detalle.value?.observaciones || '';

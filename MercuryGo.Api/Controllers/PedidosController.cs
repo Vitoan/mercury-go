@@ -416,7 +416,6 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         var totalFacturado = pedidosCliente.Sum(p => p.Total);
         var totalPagado = 0m;
         var comprobantesPendientes = 0;
-        var comprobantesPendientesMonto = 0m;
 
         // Sumar pagos aprobados y calcular pendientes de auditoría
         foreach (var p in pedidosCliente)
@@ -449,7 +448,6 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
             else if (obs.Contains("[Comprobante de pago: PENDIENTE") || obs.Contains("[Comprobante de pago: /uploads/"))
             {
                 comprobantesPendientes++;
-                comprobantesPendientesMonto += p.Total;
             }
         }
 
@@ -464,7 +462,6 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
             total_pagado = totalPagado,
             saldo_deudor = saldoDeudor,
             comprobantes_pendientes = comprobantesPendientes,
-            comprobantes_pendientes_monto = comprobantesPendientesMonto,
             pedidos_pendientes = pedidosCliente.Count(p => p.Estado != EstadoPedido.Entregado)
         });
     }
