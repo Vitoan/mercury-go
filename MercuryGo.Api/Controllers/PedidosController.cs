@@ -422,9 +422,29 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         foreach (var p in pedidosCliente)
         {
             var obs = p.Observaciones ?? string.Empty;
-            if (obs.Contains("[Comprobante de pago: APROBADO") || obs.Contains("[Cobro Chofer:"))
+            if (obs.Contains("[Comprobante de pago: APROBADO"))
             {
-                totalPagado += p.Total;
+                var matchMonto = System.Text.RegularExpressions.Regex.Match(obs, @"\[Comprobante de pago:\s*APROBADO\s*·\s*\$([\d\.,]+)");
+                if (matchMonto.Success && decimal.TryParse(matchMonto.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var montoAprob))
+                {
+                    totalPagado += montoAprob;
+                }
+                else
+                {
+                    totalPagado += p.Total;
+                }
+            }
+            else if (obs.Contains("[Cobro Chofer:"))
+            {
+                var matchCobro = System.Text.RegularExpressions.Regex.Match(obs, @"\[Cobro Chofer:\s*\$([\d\.,]+)");
+                if (matchCobro.Success && decimal.TryParse(matchCobro.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var montoCobro))
+                {
+                    totalPagado += montoCobro;
+                }
+                else
+                {
+                    totalPagado += p.Total;
+                }
             }
             else if (obs.Contains("[Comprobante de pago: PENDIENTE") || obs.Contains("[Comprobante de pago: /uploads/"))
             {
@@ -486,9 +506,29 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
             foreach (var p in pedidosC)
             {
                 var obs = p.Observaciones ?? string.Empty;
-                if (obs.Contains("[Comprobante de pago: APROBADO") || obs.Contains("[Cobro Chofer:"))
+                if (obs.Contains("[Comprobante de pago: APROBADO"))
                 {
-                    totalPagado += p.Total;
+                    var matchMonto = System.Text.RegularExpressions.Regex.Match(obs, @"\[Comprobante de pago:\s*APROBADO\s*·\s*\$([\d\.,]+)");
+                    if (matchMonto.Success && decimal.TryParse(matchMonto.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var montoAprob))
+                    {
+                        totalPagado += montoAprob;
+                    }
+                    else
+                    {
+                        totalPagado += p.Total;
+                    }
+                }
+                else if (obs.Contains("[Cobro Chofer:"))
+                {
+                    var matchCobro = System.Text.RegularExpressions.Regex.Match(obs, @"\[Cobro Chofer:\s*\$([\d\.,]+)");
+                    if (matchCobro.Success && decimal.TryParse(matchCobro.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var montoCobro))
+                    {
+                        totalPagado += montoCobro;
+                    }
+                    else
+                    {
+                        totalPagado += p.Total;
+                    }
                 }
                 else if (obs.Contains("[Comprobante de pago: PENDIENTE") || obs.Contains("[Comprobante de pago: /uploads/"))
                 {
@@ -542,14 +582,22 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         });
     }
 
-    // Aprobación de comprobante bancario por el ADMIN (acredita el pago y reduce la deuda)
+    // Aprobación de comprobante bancario por el ADMIN (acredita el pago y reduce la deuda con el monto verificado)
     [Authorize(Roles = RolCodigos.Admin)]
     [HttpPut("{id:long}/aprobar-comprobante")]
-    public async Task<IActionResult> AprobarComprobante(long id, CancellationToken ct)
+    public async Task<IActionResult> AprobarComprobante(long id, [FromBody] AprobarComprobanteRequest? request, CancellationToken ct)
     {
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var totalPedido = await db.DetallesPedido
+            .Where(d => d.PedidoId == id)
+            .SumAsync(d => (decimal?)d.Cantidad * d.PrecioUnitario, ct) ?? 0m;
+
+        var montoAprobado = request?.Monto.HasValue == true && request.Monto.Value > 0
+            ? request.Monto.Value
+            : totalPedido;
 
         var obs = pedido.Observaciones ?? string.Empty;
         var match = System.Text.RegularExpressions.Regex.Match(obs, @"/uploads/comprobantes/[^\s\]]+");
@@ -557,7 +605,7 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
         // Limpiar cualquier etiqueta previa de comprobante
         var obsLimpia = System.Text.RegularExpressions.Regex.Replace(obs, @"\s*·?\s*\[Comprobante de pago:[^\]]+\]", string.Empty).Trim();
-        var nuevaEtiqueta = $"[Comprobante de pago: APROBADO · {DateTime.UtcNow:dd/MM/yyyy HH:mm} · {ruta}]";
+        var nuevaEtiqueta = $"[Comprobante de pago: APROBADO · ${montoAprobado:N2} · {DateTime.UtcNow:dd/MM/yyyy HH:mm} · {ruta}]";
 
         pedido.Observaciones = string.IsNullOrWhiteSpace(obsLimpia)
             ? nuevaEtiqueta
@@ -568,8 +616,9 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
         return Ok(new
         {
-            mensaje = $"Comprobante de la orden {pedido.Numero} aprobado exitosamente. Pago acreditado.",
+            mensaje = $"Comprobante de la orden {pedido.Numero} aprobado por ${montoAprobado:N2}. Pago acreditado exitosamente.",
             pedido_id = pedido.Id,
+            monto_acreditado = montoAprobado,
             observaciones = pedido.Observaciones
         });
     }
@@ -896,6 +945,7 @@ public sealed record CrearPedidoItemRequest(long ProductoId, int Cantidad);
 public sealed record CrearPedidoRequest(long ClienteId, string? Observaciones, List<CrearPedidoItemRequest> Items, string? Estado = null);
 public sealed record EditarPedidoRequest(List<CrearPedidoItemRequest>? Items, string? Observaciones);
 public sealed record CobroChoferRequest(decimal Monto, string? Metodo = "Efectivo");
+public sealed record AprobarComprobanteRequest(decimal? Monto);
 public sealed record RechazarComprobanteRequest(string? Motivo);
 public sealed record CambiarEstadoRequest(string Estado);
 public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);

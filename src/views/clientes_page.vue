@@ -98,7 +98,7 @@
                   <ion-button
                     size="small"
                     color="success"
-                    @click="aprobarComprobanteDirecto(comp.pedido_id)"
+                    @click="aprobarComprobanteDirecto(comp)"
                   >
                     ✔ Aprobar
                   </ion-button>
@@ -384,10 +384,26 @@ const verArchivoComprobante = (urlRelativa) => {
   if (urlCompleta) window.open(urlCompleta, '_blank');
 };
 
-const aprobarComprobanteDirecto = async (pedidoId) => {
+const aprobarComprobanteDirecto = async (comp) => {
+  const pedidoId = comp?.pedido_id || comp;
+  const montoSugerido = comp?.total || 0;
+
+  const input = prompt(
+    `Auditoría Bancaria - Orden ${comp?.pedido_numero || pedidoId}:\nIngresá el monto exacto acreditado en la cuenta de la empresa:`,
+    montoSugerido.toString()
+  );
+
+  if (input === null) return; // Cancelado por el admin
+
+  const monto = parseFloat(input.replace(/\./g, '').replace(',', '.'));
+  if (isNaN(monto) || monto <= 0) {
+    alert('Por favor ingresá un monto válido mayor a 0.');
+    return;
+  }
+
   try {
     vibrar_toque();
-    await pedidos_service.aprobar_comprobante(pedidoId);
+    await pedidos_service.aprobar_comprobante(pedidoId, monto);
     await vibrar_exito();
     await cargarFinanzas();
   } catch (err) {

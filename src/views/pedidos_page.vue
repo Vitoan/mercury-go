@@ -148,7 +148,7 @@
               ✖ Pago rechazado
             </span>
             <span v-else-if="p.observaciones?.includes('[Comprobante de pago:')" class="mercury-sub-tag tag-warning">
-              ⏳ Comprobante por aprobar
+              ⏳ Comprobante subido (esperando aprobación)
             </span>
             <span v-if="p.observaciones?.includes('[Cobro Chofer:')" class="mercury-sub-tag tag-success">
               💵 Cobrado en destino

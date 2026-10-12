@@ -62,8 +62,9 @@ export const pedidos_service = {
     return ajax_service.get('api/pedidos/cuentas-corrientes-clientes');
   },
 
-  aprobar_comprobante(id) {
-    return ajax_service.put(`api/pedidos/${id}/aprobar-comprobante`);
+  aprobar_comprobante(id, monto = null) {
+    const cuerpo = monto !== null && monto !== undefined ? { monto: Number(monto) } : null;
+    return ajax_service.put(`api/pedidos/${id}/aprobar-comprobante`, cuerpo);
   },
 
   rechazar_comprobante(id, motivo = '') {

@@ -240,12 +240,24 @@ const comprobanteInfo = computed(() => {
   const url = matchUrl ? resolver_url_imagen(matchUrl[0]) : null;
 
   if (obs.includes('[Comprobante de pago: APROBADO')) {
-    return { estadoTexto: 'Aprobado ✔', color: 'success', esPendiente: false, url };
+    const matchMonto = obs.match(/\[Comprobante de pago:\s*APROBADO\s*·\s*(\$[\d\.,]+)/);
+    const montoTexto = matchMonto ? ` (${matchMonto[1]})` : '';
+    return {
+      estadoTexto: `Pago Acreditado ✔${esAdmin.value ? montoTexto : ''}`,
+      color: 'success',
+      esPendiente: false,
+      url
+    };
   }
   if (obs.includes('[Comprobante de pago: RECHAZADO')) {
     return { estadoTexto: 'Rechazado ✖', color: 'danger', esPendiente: false, url };
   }
-  return { estadoTexto: 'Pendiente de Aprobación ⏳', color: 'warning', esPendiente: true, url };
+  return {
+    estadoTexto: 'Comprobante subido · En espera de aprobación ⏳',
+    color: 'warning',
+    esPendiente: true,
+    url
+  };
 });
 
 const abrirComprobanteAdjunto = () => {
@@ -257,10 +269,25 @@ const abrirComprobanteAdjunto = () => {
 
 const aprobarComprobante = async () => {
   if (!props.pedidoId) return;
+
+  const totalSugerido = totalCalculado.value || detalle.value?.total || 0;
+  const input = prompt(
+    `Revisión de Comprobante:\nVerificá el extracto bancario e ingresá el monto exacto acreditado en cuenta:`,
+    totalSugerido.toString()
+  );
+
+  if (input === null) return; // Cancelado por el usuario
+
+  const monto = parseFloat(input.replace(/\./g, '').replace(',', '.'));
+  if (isNaN(monto) || monto <= 0) {
+    alert('Por favor ingresá un monto válido mayor a 0.');
+    return;
+  }
+
   procesandoPago.value = true;
   try {
     vibrar_toque();
-    await pedidos_service.aprobar_comprobante(props.pedidoId);
+    await pedidos_service.aprobar_comprobante(props.pedidoId, monto);
     await vibrar_exito();
     await cargarDetalle();
     emit('pedido_actualizado');
