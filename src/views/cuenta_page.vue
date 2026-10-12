@@ -43,8 +43,8 @@
         </ion-card-content>
       </ion-card>
 
-      <!-- Tarjeta de Cuenta Corriente y Saldo Deudor (Exclusivo para CLIENTE o ADMIN) -->
-      <ion-card v-if="sesion_store.rol_activo === 'CLIENTE' || sesion_store.es_admin" class="mercury-card-cuenta-corriente">
+      <!-- Tarjeta de Cuenta Corriente y Saldo Deudor (Exclusivo para CLIENTE) -->
+      <ion-card v-if="sesion_store.rol_activo === 'CLIENTE'" class="mercury-card-cuenta-corriente">
         <ion-card-header>
           <div class="mercury-cc-cabecera">
             <div>
@@ -199,7 +199,7 @@ const cargandoCC = ref(false);
 const mostrarModalComprobante = ref(false);
 
 const cargarCuentaCorriente = async () => {
-  if (sesion_store.rol_activo !== 'CLIENTE' && !sesion_store.es_admin) return;
+  if (sesion_store.rol_activo !== 'CLIENTE') return;
   cargandoCC.value = true;
   try {
     const res = await pedidos_service.obtener_cuenta_corriente();
