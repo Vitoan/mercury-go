@@ -43,3 +43,6 @@ _ReSharper*/
 # Environment
 .env.local
 .env.*.local
+
+# CodeGraph
+.codegraph/

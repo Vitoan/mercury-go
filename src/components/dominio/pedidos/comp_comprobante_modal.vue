@@ -129,7 +129,7 @@ import {
   trashOutline,
   alertCircleOutline
 } from 'ionicons/icons';
-import { camara_disponible, tomar_foto } from '@/services/camara_service';
+import { camara_disponible, tomar_foto, comprimir_imagen } from '@/services/camara_service';
 import { pedidos_service } from '@/services/pedidos_service';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 
@@ -160,11 +160,12 @@ const activarInput = () => {
   inputArchivo.value?.click();
 };
 
-const alSeleccionarArchivoWeb = (event) => {
+const alSeleccionarArchivoWeb = async (event) => {
   const files = event.target?.files;
   if (files && files[0]) {
-    archivoSeleccionado.value = files[0];
     errorMensaje.value = '';
+    const archivoOptimizado = await comprimir_imagen(files[0]);
+    archivoSeleccionado.value = archivoOptimizado;
   }
 };
 
