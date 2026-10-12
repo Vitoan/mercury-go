@@ -30,7 +30,7 @@ const cantidad_total = computed(() =>
 );
 
 const subtotal_total = computed(() =>
-  state.items.reduce((acc, item) => acc + (item.precio * item.cantidad), 0)
+  state.items.reduce((acc, item) => acc + ((Number(item.precio) || 0) * (Number(item.cantidad) || 0)), 0)
 );
 
 const hay_items = computed(() => state.items.length > 0);
@@ -115,8 +115,8 @@ export const carrito_store = {
   get error() { return state.error; },
   get observaciones() { return state.observaciones; },
   set observaciones(val) { state.observaciones = val; },
-  cantidad_total,
-  subtotal_total,
+  get cantidad_total() { return cantidad_total.value; },
+  get subtotal_total() { return subtotal_total.value; },
   hay_items,
   agregar_producto,
   cambiar_cantidad,

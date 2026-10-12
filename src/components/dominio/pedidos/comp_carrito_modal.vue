@@ -59,7 +59,7 @@
             </div>
             <div class="mercury-fila-resumen mercury-total-destacado">
               <span>Total Estimado:</span>
-              <span class="mercury-monto-total">${{ carrito_store.subtotal_total.toLocaleString('es-AR') }}</span>
+              <span class="mercury-monto-total">${{ totalEstimado }}</span>
             </div>
           </ion-card-content>
         </ion-card>
@@ -92,7 +92,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import {
   IonModal,
   IonHeader,
@@ -118,6 +118,11 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['cerrar', 'pedido_creado']);
+
+const totalEstimado = computed(() => {
+  const monto = Number(carrito_store.subtotal_total) || 0;
+  return monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+});
 
 const observaciones = ref(carrito_store.observaciones);
 
