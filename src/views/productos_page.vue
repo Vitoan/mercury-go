@@ -122,6 +122,7 @@
           <div class="mercury-producto-img-bloque">
             <img
               v-if="p.imagen_url && !imagenesConError[p.id]"
+              :key="p.imagen_url"
               :src="resolver_url_imagen(p.imagen_url)"
               :alt="p.nombre"
               class="mercury-producto-foto-portada"
@@ -302,6 +303,12 @@ const abrirEditarProducto = (producto) => {
 
 const alGuardarProducto = async () => {
   await vibrar_exito();
+  // Limpiar el mapa de errores para que la nueva imagen cargue de inmediato
+  imagenesConError.value = {};
+  await Promise.all([
+    productos_store.cargar_resumen(),
+    productos_store.cargar_listado(true)
+  ]);
   mensajeToast.value = '¡Producto guardado exitosamente!';
   colorToast.value = 'success';
   mostrarToast.value = true;
@@ -378,6 +385,13 @@ const subirFotoProducto = async (producto, archivo) => {
 
     const res = await productos_service.subir_imagen(producto.id, archivo);
     producto.imagen_url = res.imagen_url;
+
+    // Desbloquear inmediatamente la imagen en la tarjeta del catálogo
+    delete imagenesConError.value[producto.id];
+
+    // Sincronizar también la vitrina y ofertas
+    await productos_store.cargar_resumen();
+
     await vibrar_exito();
     mensajeToast.value = `¡Foto de '${producto.nombre}' actualizada exitosamente!`;
     colorToast.value = 'success';
