@@ -10,9 +10,9 @@ export const geolocalizacion_service = {
     try {
       if (Capacitor.isNativePlatform()) {
         const permisos = await Geolocation.checkPermissions();
-        if (permisos.location !== 'granted') {
+        if (permisos.location !== 'granted' && permisos.coarseLocation !== 'granted') {
           const solicitud = await Geolocation.requestPermissions();
-          if (solicitud.location !== 'granted') {
+          if (solicitud.location !== 'granted' && solicitud.coarseLocation !== 'granted') {
             throw new Error('Permiso de geolocalización no concedido por el usuario.');
           }
         }
