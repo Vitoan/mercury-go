@@ -285,7 +285,7 @@ watch(
 const capturarFoto = async (origen) => {
   mostrarActionSheetFoto.value = false;
   vibrar_toque();
-  const res = await tomar_foto(origen);
+  const res = await tomar_foto(origen, { prefijo: 'producto', width: 900, quality: 65 });
   if (res.ok && res.archivo) {
     await procesarArchivoFoto(res.archivo);
   } else if (res.mensaje && !res.cancelado) {

@@ -358,7 +358,7 @@ const abrirOpcionesFoto = (producto) => {
 const capturarFotoProducto = async (origen) => {
   mostrarActionSheetFoto.value = false;
   vibrar_toque();
-  const res = await tomar_foto(origen);
+  const res = await tomar_foto(origen, { prefijo: 'producto', width: 900, quality: 65 });
   if (res.ok && res.archivo && productoSeleccionadoParaFoto.value) {
     await subirFotoProducto(productoSeleccionadoParaFoto.value, res.archivo);
   } else if (res.mensaje && !res.cancelado) {

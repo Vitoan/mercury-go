@@ -18,7 +18,7 @@ export function camara_disponible() {
   return Capacitor.isNativePlatform();
 }
 
-export async function tomar_foto(origen = 'camara') {
+export async function tomar_foto(origen = 'camara', opciones = {}) {
   if (!camara_disponible()) {
     return {
       ok: false,
@@ -28,6 +28,10 @@ export async function tomar_foto(origen = 'camara') {
     };
   }
 
+  const anchoDeseado = opciones.width || (opciones.prefijo === 'producto' ? 900 : 1200);
+  const calidadDeseada = opciones.quality || (opciones.prefijo === 'producto' ? 65 : 70);
+  const prefijoNombre = opciones.prefijo || 'foto';
+
   try {
     const permiso = await asegurar_permiso(origen);
     if (!permiso.ok) return permiso;
@@ -35,15 +39,15 @@ export async function tomar_foto(origen = 'camara') {
     const foto = await Camera.getPhoto({
       source: origenes[origen] || CameraSource.Camera,
       resultType: CameraResultType.Uri,
-      quality: 70,
-      width: 1200,
+      quality: calidadDeseada,
+      width: anchoDeseado,
       correctOrientation: true,
       allowEditing: false,
       saveToGallery: false
     });
 
-    const archivo = await foto_a_archivo(foto);
-    const archivoOptimizado = await comprimir_imagen(archivo);
+    const archivo = await foto_a_archivo(foto, prefijoNombre);
+    const archivoOptimizado = await comprimir_imagen(archivo, anchoDeseado, anchoDeseado, calidadDeseada / 100);
     return { ok: true, archivo: archivoOptimizado, mensaje: null, cancelado: false };
   } catch (error) {
     if (es_cancelacion(error)) {
@@ -84,13 +88,13 @@ function permiso_concedido(estado) {
   return estado === 'granted' || estado === 'limited';
 }
 
-async function foto_a_archivo(foto) {
+async function foto_a_archivo(foto, prefijo = 'foto') {
   const ruta = (foto && foto.webPath) || (foto && foto.path);
   if (!ruta) throw new Error('La cámara no devolvió ninguna imagen.');
   const respuesta = await fetch(ruta);
   const blob = await respuesta.blob();
   const extension = foto.format || 'jpeg';
-  return new File([blob], `comprobante_${Date.now()}.${extension}`, {
+  return new File([blob], `${prefijo}_${Date.now()}.${extension}`, {
     type: blob.type || `image/${extension}`,
     lastModified: Date.now()
   });
