@@ -94,8 +94,8 @@ async function crear_orden(datos) {
   return res;
 }
 
-async function cambiar_estado(id, nuevoEstado) {
-  const res = await pedidos_service.cambiar_estado(id, nuevoEstado);
+async function cambiar_estado(id, nuevoEstado, latitud = null, longitud = null) {
+  const res = await pedidos_service.cambiar_estado(id, nuevoEstado, latitud, longitud);
   await cargar(true);
   return res;
 }

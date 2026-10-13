@@ -40,6 +40,23 @@
             <p><strong>Cliente:</strong> {{ detalle.cliente?.razon_social }} (CUIT: {{ detalle.cliente?.cuit }})</p>
             <p v-if="observacionesVisibles"><strong>Observaciones:</strong> {{ observacionesVisibles }}</p>
 
+            <!-- Sección de Geolocalización de Entrega (Semana 7) -->
+            <div v-if="detalle.latitud_entrega && detalle.longitud_entrega" class="mercury-gps-seccion">
+              <div class="mercury-gps-info">
+                <span>📍 <strong>Ubicación registrada:</strong> {{ detalle.latitud_entrega?.toFixed(5) }}, {{ detalle.longitud_entrega?.toFixed(5) }}</span>
+                <span v-if="detalle.fecha_en_puerta" class="mercury-gps-fecha">({{ formatear_fecha(detalle.fecha_en_puerta) }})</span>
+              </div>
+              <ion-button
+                size="small"
+                fill="outline"
+                color="secondary"
+                @click="abrirEnMaps(detalle.latitud_entrega, detalle.longitud_entrega)"
+              >
+                <ion-icon slot="start" :icon="navigateOutline" />
+                Ver en Google Maps
+              </ion-button>
+            </div>
+
             <!-- Sección de Auditoría de Comprobante Bancario -->
             <div v-if="comprobanteInfo" class="mercury-comprobante-seccion">
               <div class="mercury-comprobante-header">
@@ -206,11 +223,13 @@ import {
   alertCircleOutline,
   documentAttachOutline,
   checkmarkCircleOutline,
-  closeCircleOutline
+  closeCircleOutline,
+  navigateOutline
 } from 'ionicons/icons';
 import { pedidos_service } from '@/services/pedidos_service';
 import { sesion_store } from '@/stores/sesion_store';
 import { compartir_archivo } from '@/services/compartir_service';
+import { geolocalizacion_service } from '@/services/geolocalizacion_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
 
@@ -280,6 +299,11 @@ const abrirComprobanteAdjunto = () => {
     vibrar_toque();
     window.open(comprobanteInfo.value.url, '_blank');
   }
+};
+
+const abrirEnMaps = (lat, lng) => {
+  vibrar_toque();
+  geolocalizacion_service.abrir_en_google_maps(lat, lng);
 };
 
 const aprobarComprobante = async () => {
@@ -513,6 +537,27 @@ const cerrar = () => {
   background: var(--ion-color-step-50, rgba(0, 0, 0, 0.03));
   border-radius: 8px;
   border-left: 4px solid var(--ion-color-primary, #38bdf8);
+}
+
+.mercury-gps-seccion {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(var(--ion-color-secondary-rgb), 0.08);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mercury-gps-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+}
+
+.mercury-gps-fecha {
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
 }
 
 .mercury-comprobante-header {

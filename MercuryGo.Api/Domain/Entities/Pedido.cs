@@ -27,5 +27,10 @@ public sealed class Pedido : EntityBase
     public string? Observaciones { get; set; }
     public bool Activo { get; set; } = true;
 
+    // Coordenadas GPS y fecha de llegada capturadas por el chofer al llegar al destino (Semana 7)
+    public double? LatitudEntrega { get; set; }
+    public double? LongitudEntrega { get; set; }
+    public DateTime? FechaEnPuerta { get; set; }
+
     public ICollection<DetallePedido> Detalles { get; set; } = new List<DetallePedido>();
 }

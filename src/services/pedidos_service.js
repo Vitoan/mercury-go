@@ -20,8 +20,13 @@ export const pedidos_service = {
     return ajax_service.post('api/pedidos', pedido);
   },
 
-  cambiar_estado(id, estado) {
-    return ajax_service.put(`api/pedidos/${id}/estado`, { estado });
+  cambiar_estado(id, estado, latitud = null, longitud = null) {
+    const payload = { estado };
+    if (latitud !== null && longitud !== null) {
+      payload.latitud = latitud;
+      payload.longitud = longitud;
+    }
+    return ajax_service.put(`api/pedidos/${id}/estado`, payload);
   },
 
   cancelar(id) {

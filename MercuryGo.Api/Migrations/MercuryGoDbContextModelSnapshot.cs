@@ -340,6 +340,66 @@ namespace MercuryGo.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Notificacion", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("actualizado_en");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("creado_en");
+
+                    b.Property<bool>("Leida")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("leida");
+
+                    b.Property<string>("Mensaje")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("mensaje");
+
+                    b.Property<long?>("ReferenciaId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("referencia_id");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("INFO")
+                        .HasColumnName("tipo");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("titulo");
+
+                    b.Property<long>("UsuarioId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notificaciones");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("ix_notificaciones_usuario_id");
+
+                    b.ToTable("notificaciones", (string)null);
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Pedido", b =>
                 {
                     b.Property<long>("Id")
@@ -373,9 +433,21 @@ namespace MercuryGo.Api.Migrations
                         .HasColumnType("varchar(30)")
                         .HasColumnName("estado");
 
+                    b.Property<DateTime?>("FechaEnPuerta")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("fecha_en_puerta");
+
                     b.Property<DateTime>("FechaPedido")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("fecha_pedido");
+
+                    b.Property<double?>("LatitudEntrega")
+                        .HasColumnType("double")
+                        .HasColumnName("latitud_entrega");
+
+                    b.Property<double?>("LongitudEntrega")
+                        .HasColumnType("double")
+                        .HasColumnName("longitud_entrega");
 
                     b.Property<string>("Numero")
                         .IsRequired()
@@ -872,6 +944,18 @@ namespace MercuryGo.Api.Migrations
                     b.Navigation("Pedido");
 
                     b.Navigation("Producto");
+                });
+
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Notificacion", b =>
+                {
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notificaciones_usuarios_usuario_id");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Pedido", b =>

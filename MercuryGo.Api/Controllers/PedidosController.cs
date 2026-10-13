@@ -163,7 +163,10 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
             pedido.p.Observaciones,
             new ClientePedidoResponse(pedido.c.Id, pedido.c.RazonSocial, pedido.c.Cuit),
             detalles,
-            total
+            total,
+            pedido.p.LatitudEntrega,
+            pedido.p.LongitudEntrega,
+            pedido.p.FechaEnPuerta
         );
 
         return Ok(new { pedido = resultado });
@@ -271,9 +274,74 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
         pedido.Estado = nuevoEstado;
         pedido.ActualizadoEn = DateTime.UtcNow;
+
+        // Si el chofer llega a puerta o entrega con GPS (Semana 7)
+        if (nuevoEstado == EstadoPedido.EnPuerta || nuevoEstado == EstadoPedido.Entregado)
+        {
+            if (request.Latitud.HasValue && request.Longitud.HasValue)
+            {
+                pedido.LatitudEntrega = request.Latitud.Value;
+                pedido.LongitudEntrega = request.Longitud.Value;
+            }
+            if (nuevoEstado == EstadoPedido.EnPuerta)
+            {
+                pedido.FechaEnPuerta = DateTime.UtcNow;
+            }
+        }
+
+        // Crear notificación in-app para el cliente (Semana 7)
+        var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == pedido.ClienteId, ct);
+        if (cliente is not null && !string.IsNullOrWhiteSpace(cliente.Email))
+        {
+            var usuarioCliente = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Email == cliente.Email, ct);
+            if (usuarioCliente is not null)
+            {
+                string tituloNotif;
+                string mensajeNotif;
+                string tipoNotif = "PEDIDO";
+
+                if (nuevoEstado == EstadoPedido.EnPuerta)
+                {
+                    tituloNotif = $"🚚 ¡Chofer en puerta! ({pedido.Numero})";
+                    mensajeNotif = $"El repartidor acaba de arribar a tu domicilio con el pedido {pedido.Numero}.";
+                    tipoNotif = "GPS";
+                }
+                else if (nuevoEstado == EstadoPedido.Despachado)
+                {
+                    tituloNotif = $"📦 Pedido despachado ({pedido.Numero})";
+                    mensajeNotif = $"Tu pedido {pedido.Numero} ha salido del depósito en camino a tu destino.";
+                }
+                else if (nuevoEstado == EstadoPedido.Entregado)
+                {
+                    tituloNotif = $"✅ Pedido entregado ({pedido.Numero})";
+                    mensajeNotif = $"El pedido {pedido.Numero} fue marcado como entregado satisfactoriamente.";
+                }
+                else
+                {
+                    tituloNotif = $"Actualización de Pedido ({pedido.Numero})";
+                    mensajeNotif = $"El pedido {pedido.Numero} cambió su estado a: {nuevoEstado}.";
+                }
+
+                db.Notificaciones.Add(new Notificacion
+                {
+                    UsuarioId = usuarioCliente.Id,
+                    Titulo = tituloNotif,
+                    Mensaje = mensajeNotif,
+                    Tipo = tipoNotif,
+                    ReferenciaId = pedido.Id,
+                    CreadoEn = DateTime.UtcNow
+                });
+            }
+        }
+
         await db.SaveChangesAsync(ct);
 
-        return Ok(new { estado = pedido.Estado.ToString() });
+        return Ok(new
+        {
+            estado = pedido.Estado.ToString(),
+            latitud = pedido.LatitudEntrega,
+            longitud = pedido.LongitudEntrega
+        });
     }
 
     // Cancelación lógica de una orden de carga
@@ -944,7 +1012,7 @@ public sealed record EditarPedidoRequest(List<CrearPedidoItemRequest>? Items, st
 public sealed record CobroChoferRequest(decimal Monto, string? Metodo = "Efectivo");
 public sealed record AprobarComprobanteRequest(decimal? Monto);
 public sealed record RechazarComprobanteRequest(string? Motivo);
-public sealed record CambiarEstadoRequest(string Estado);
+public sealed record CambiarEstadoRequest(string Estado, double? Latitud = null, double? Longitud = null);
 public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);
 public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items);
 
@@ -967,7 +1035,10 @@ public sealed record PedidoDetalleResponse(
     string? Observaciones,
     ClientePedidoResponse Cliente,
     IEnumerable<DetallePedidoResponse> Detalles,
-    decimal Total
+    decimal Total,
+    double? LatitudEntrega = null,
+    double? LongitudEntrega = null,
+    DateTime? FechaEnPuerta = null
 );
 
 public sealed record ClientePedidoResponse(long Id, string RazonSocial, string Cuit);

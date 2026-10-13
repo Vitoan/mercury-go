@@ -271,6 +271,8 @@ import { pedidos_service } from '@/services/pedidos_service';
 import { compartir_archivo } from '@/services/compartir_service';
 import { escanear_qr } from '@/services/qr_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
+import { geolocalizacion_service } from '@/services/geolocalizacion_service';
+import { notificaciones_service } from '@/services/notificaciones_service';
 
 const busqueda = ref('');
 const estadoSeleccionado = ref('');
@@ -507,11 +509,53 @@ const botonesTransicion = computed(() => {
 const ejecutarCambioEstado = async (nuevoEstado) => {
   if (!pedidoSeleccionado.value) return;
   try {
-    await pedidos_store.cambiar_estado(pedidoSeleccionado.value.id, nuevoEstado);
-    mensajeToast.value = `Orden ${pedidoSeleccionado.value.numero} actualizada a '${formatear_nombre_estado(nuevoEstado)}'.`;
+    let lat = null;
+    let lng = null;
+
+    // Caso de uso Semana 7: Al pasar a EnPuerta o Entregado, capturar GPS del chofer
+    if (nuevoEstado === 'EnPuerta' || nuevoEstado === 'Entregado') {
+      try {
+        mensajeToast.value = '📍 Obteniendo ubicación GPS del repartidor...';
+        colorToast.value = 'primary';
+        mostrarToast.value = true;
+
+        const pos = await geolocalizacion_service.obtener_posicion_actual();
+        lat = pos.latitud;
+        lng = pos.longitud;
+      } catch (gpsError) {
+        console.warn('No se pudo obtener GPS, procediendo sin coordenadas:', gpsError);
+      }
+    }
+
+    await pedidos_store.cambiar_estado(pedidoSeleccionado.value.id, nuevoEstado, lat, lng);
+    vibrar_exito();
+
+    // Disparar notificación local en el dispositivo (Semana 7)
+    if (nuevoEstado === 'EnPuerta') {
+      await notificaciones_service.disparar_notificacion_local(
+        `🚚 En Puerta (${pedidoSeleccionado.value.numero})`,
+        `Ubicación registrada. Chofer arribó al domicilio.`
+      );
+    } else if (nuevoEstado === 'Despachado') {
+      await notificaciones_service.disparar_notificacion_local(
+        `📦 En Ruta (${pedidoSeleccionado.value.numero})`,
+        `Pedido despachado hacia el cliente.`
+      );
+    }
+
+    mensajeToast.value = `Orden ${pedidoSeleccionado.value.numero} actualizada a '${formatear_nombre_estado(nuevoEstado)}'.` +
+      (lat ? ' (Ubicación GPS guardada)' : '');
     colorToast.value = 'success';
     mostrarToast.value = true;
+
+    // Si pasó a EnPuerta y se obtuvo ubicación, abrir Google Maps externo (Semana 7)
+    if (nuevoEstado === 'EnPuerta' && lat && lng) {
+      setTimeout(() => {
+        geolocalizacion_service.abrir_en_google_maps(lat, lng);
+      }, 700);
+    }
   } catch (err) {
+    vibrar_error();
     mensajeToast.value = err.message || 'La API rechazó el cambio de estado.';
     colorToast.value = 'danger';
     mostrarToast.value = true;

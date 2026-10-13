@@ -17,6 +17,7 @@ public class MercuryGoDbContext : DbContext
     public DbSet<Rol> Roles => Set<Rol>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Notificacion> Notificaciones => Set<Notificacion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -214,6 +215,22 @@ public class MercuryGoDbContext : DbContext
             entity.HasOne(r => r.Usuario)
                   .WithMany()
                   .HasForeignKey(r => r.UsuarioId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Notificacion (Semana 7) ──────────────────────────────────────────
+        modelBuilder.Entity<Notificacion>(entity =>
+        {
+            entity.ToTable("notificaciones");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Titulo).HasMaxLength(150).IsRequired();
+            entity.Property(e => e.Mensaje).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Tipo).HasMaxLength(30).HasDefaultValue("INFO");
+            entity.Property(e => e.Leida).HasDefaultValue(false);
+
+            entity.HasOne(n => n.Usuario)
+                  .WithMany()
+                  .HasForeignKey(n => n.UsuarioId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

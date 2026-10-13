@@ -36,6 +36,7 @@ import './theme/variables.css';
 
 import { aplicar_tema_guardado } from './config/tema';
 import { sesion_store } from './stores/sesion_store';
+import { notificaciones_service } from './services/notificaciones_service';
 
 // Aplicar tema guardado antes de montar para evitar parpadeos
 aplicar_tema_guardado();
@@ -51,5 +52,7 @@ const app = createApp(App)
 sesion_store.preparar().finally(() => {
   router.isReady().then(() => {
     app.mount('#app');
+    // Inicialización defensiva de notificaciones locales y push (Semana 7)
+    notificaciones_service.inicializar();
   });
 });
