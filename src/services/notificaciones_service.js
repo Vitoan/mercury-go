@@ -26,6 +26,18 @@ export const notificaciones_service = {
       if (permisos.display !== 'granted') {
         await LocalNotifications.requestPermissions();
       }
+
+      // En Android 8+ (Oreo en adelante) es obligatorio un Notification Channel para no silenciar los avisos
+      if (Capacitor.isNativePlatform()) {
+        await LocalNotifications.createChannel({
+          id: 'mercurygo_pedidos',
+          name: 'Avisos y Pedidos MercuryGO',
+          description: 'Canal de notificaciones locales para logística y pedidos',
+          importance: 5,
+          visibility: 1,
+          vibration: true
+        });
+      }
     } catch (err) {
       console.warn('[Notificaciones] Error al preparar locales:', err);
     }
@@ -68,7 +80,7 @@ export const notificaciones_service = {
 
   /**
    * Dispara una notificación local en el dispositivo.
-   * Utiliza el cálculo de ID seguro (int32) de la cátedra para Android.
+   * Utiliza el cálculo de ID seguro (int32) de la cátedra para Android y canal predeterminado.
    */
   async disparar_notificacion_local(titulo, cuerpo) {
     if (!Capacitor.isPluginAvailable('LocalNotifications')) {
@@ -81,7 +93,7 @@ export const notificaciones_service = {
       if (permisos.display !== 'granted') {
         const solicitados = await LocalNotifications.requestPermissions();
         if (solicitados.display !== 'granted') {
-          return { ok: false, mensaje: 'Sin permiso de notificaciones.' };
+          return { ok: false, mensaje: 'Sin permiso de notificaciones: no vas a recibir los avisos del teléfono. Habilitalo en los ajustes.' };
         }
       }
 
@@ -91,7 +103,8 @@ export const notificaciones_service = {
             id: Date.now() % 2147483647,
             title: titulo,
             body: cuerpo,
-            schedule: { at: new Date(Date.now() + 300) },
+            channelId: 'mercurygo_pedidos',
+            schedule: { at: new Date(Date.now() + 250) },
             sound: undefined,
             extra: null
           }

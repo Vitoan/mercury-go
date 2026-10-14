@@ -1,6 +1,7 @@
 import { reactive, computed } from 'vue';
 import { pedidos_service } from '@/services/pedidos_service';
 import { vibrar_exito, vibrar_toque } from '@/services/vibracion_service';
+import { notificaciones_service } from '@/services/notificaciones_service';
 
 const CLAVE_CARRITO = 'mercurygo_carrito';
 
@@ -100,6 +101,18 @@ async function confirmar_pedido(cliente_id_custom = null) {
     const res = await pedidos_service.crear(payload);
     vaciar_carrito();
     vibrar_exito();
+
+    try {
+      const pedidoInfo = res?.pedido || res || {};
+      const numPedido = pedidoInfo.numero || 'Nuevo';
+      await notificaciones_service.disparar_notificacion_local(
+        'Pedido Confirmado 📦',
+        `Orden ${numPedido} creada exitosamente en el sistema.`
+      );
+    } catch (notifErr) {
+      console.warn('[Carrito] Error al emitir notificacion:', notifErr);
+    }
+
     return res;
   } catch (err) {
     state.error = err.message || 'No se pudo confirmar el pedido.';

@@ -122,11 +122,11 @@
           <div class="mercury-producto-img-bloque">
             <img
               v-if="p.imagen_url && !imagenesConError[p.id]"
-              :key="p.imagen_url"
-              :src="resolver_url_imagen(p.imagen_url)"
+              :key="obtenerSrcImagen(p)"
+              :src="obtenerSrcImagen(p)"
               :alt="p.nombre"
               class="mercury-producto-foto-portada"
-              @error="marcarErrorImagen(p.id)"
+              @error="marcarErrorImagen(p)"
             />
             <div v-else class="mercury-producto-sin-foto">
               <ion-icon :icon="cubeOutline" />
@@ -319,8 +319,22 @@ const mensajeToast = ref('');
 const colorToast = ref('success');
 
 const imagenesConError = ref({});
-const marcarErrorImagen = (id) => {
-  imagenesConError.value[id] = true;
+const fallbackIntentado = ref({});
+
+function obtenerSrcImagen(p) {
+  if (fallbackIntentado.value[p.id]) {
+    return fallbackIntentado.value[p.id];
+  }
+  return resolver_url_imagen(p.imagen_url);
+}
+
+const marcarErrorImagen = (p) => {
+  if (p.imagen_url && p.imagen_url.startsWith('/seed/productos/') && !fallbackIntentado.value[p.id]) {
+    const nombre = p.imagen_url.split('/').pop();
+    fallbackIntentado.value[p.id] = `/assets/productos/${nombre}`;
+    return;
+  }
+  imagenesConError.value[p.id] = true;
 };
 
 const botonesFoto = computed(() => {

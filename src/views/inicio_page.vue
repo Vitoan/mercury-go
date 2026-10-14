@@ -1,6 +1,10 @@
 <template>
   <comp-page titulo="Ofertas MercuryGO" :mostrar_actualizar="true" @actualizar="alActualizar">
     <template #acciones>
+      <ion-button title="Notificaciones" @click="abrirNotificaciones">
+        <ion-icon slot="icon-only" :icon="notificationsOutline" />
+        <ion-badge v-if="noLeidas > 0" color="danger" class="mercury-badge-notif-btn">{{ noLeidas }}</ion-badge>
+      </ion-button>
       <ion-button v-if="sesion_store.es_admin" title="Agregar Nuevo Producto" @click="abrirNuevoProducto">
         <ion-icon slot="icon-only" :icon="addCircleOutline" />
       </ion-button>
@@ -38,10 +42,10 @@
           <div class="mercury-oferta-img-bloque">
             <img
               v-if="oferta.imagen_url"
-              :src="resolver_url_imagen(oferta.imagen_url)"
+              :src="obtenerSrcOferta(oferta)"
               :alt="oferta.nombre"
               class="mercury-oferta-foto"
-              @error="oferta.imagen_url = null"
+              @error="alErrorImagenOferta(oferta)"
             />
             <div v-else class="mercury-oferta-sin-foto">
               <ion-icon :icon="cubeOutline" />
@@ -94,6 +98,13 @@
       @cerrar="mostrarModalProducto = false"
       @producto_guardado="alGuardarProducto"
     />
+
+    <!-- Modal Centro de Notificaciones In-App (Semana 7 / Cátedra) -->
+    <comp-notificaciones-modal
+      :abierto="mostrarModalNotificaciones"
+      @cerrar="mostrarModalNotificaciones = false"
+      @actualizado="alActualizarNotificaciones"
+    />
   </comp-page>
 </template>
 
@@ -111,20 +122,60 @@ import {
   cubeOutline,
   cartOutline,
   createOutline,
-  addCircleOutline
+  addCircleOutline,
+  notificationsOutline
 } from 'ionicons/icons';
 import CompPage from '../components/estructura/comp_page.vue';
 import CompProductoModal from '../components/dominio/productos/comp_producto_modal.vue';
+import CompNotificacionesModal from '../components/modales/comp_notificaciones_modal.vue';
 import { productos_store } from '@/stores/productos_store';
 import { carrito_store } from '@/stores/carrito_store';
 import { sesion_store } from '@/stores/sesion_store';
+import { notificaciones_service } from '@/services/notificaciones_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
 import { vibrar_toque, vibrar_exito } from '@/services/vibracion_service';
 
 const mostrarModalProducto = ref(false);
 const productoSeleccionadoParaEditar = ref(null);
+const mostrarModalNotificaciones = ref(false);
+const noLeidas = ref(0);
+const fallbacksOferta = ref({});
 
 const ofertas = computed(() => productos_store.ofertas);
+
+const obtenerSrcOferta = (oferta) => {
+  if (fallbacksOferta.value[oferta.id]) {
+    return fallbacksOferta.value[oferta.id];
+  }
+  return resolver_url_imagen(oferta.imagen_url);
+};
+
+const alErrorImagenOferta = (oferta) => {
+  if (oferta.imagen_url && oferta.imagen_url.startsWith('/seed/productos/') && !fallbacksOferta.value[oferta.id]) {
+    const nombre = oferta.imagen_url.split('/').pop();
+    fallbacksOferta.value[oferta.id] = `/assets/productos/${nombre}`;
+    return;
+  }
+  oferta.imagen_url = null;
+};
+
+const abrirNotificaciones = () => {
+  vibrar_toque();
+  mostrarModalNotificaciones.value = true;
+};
+
+const alActualizarNotificaciones = (cantidad) => {
+  noLeidas.value = cantidad;
+};
+
+const consultarNoLeidas = async () => {
+  try {
+    const res = await notificaciones_service.obtener_bandeja(1);
+    noLeidas.value = res?.no_leidas || 0;
+  } catch {
+    // Silencioso si la API está fuera de línea
+  }
+};
 
 const sumarAlCarrito = (producto) => {
   vibrar_toque();
@@ -149,11 +200,15 @@ const alGuardarProducto = async () => {
 };
 
 const alActualizar = async (event) => {
-  await productos_store.cargar_resumen(event);
+  await Promise.all([
+    productos_store.cargar_resumen(event),
+    consultarNoLeidas()
+  ]);
 };
 
 onMounted(() => {
   productos_store.cargar_resumen();
+  consultarNoLeidas();
 });
 </script>
 
@@ -306,5 +361,14 @@ onMounted(() => {
 .mercury-btn-sumar {
   --border-radius: 8px;
   font-weight: 600;
+}
+
+.mercury-badge-notif-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.65rem;
+  border-radius: 10px;
+  padding: 2px 5px;
 }
 </style>

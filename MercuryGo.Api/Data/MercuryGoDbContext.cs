@@ -58,12 +58,12 @@ public class MercuryGoDbContext : DbContext
                   .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasData(
-                new Producto { Id = 1, CategoriaId = 1, Nombre = "Aceite de Girasol 1.5L", Descripcion = "Caja x 12 unidades", Precio = 2400.00m, Disponible = true, EnOferta = true, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
-                new Producto { Id = 2, CategoriaId = 2, Nombre = "Harina 000 1kg", Descripcion = "Pack x 10 unidades", Precio = 950.00m, Disponible = true, EnOferta = false, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
-                new Producto { Id = 3, CategoriaId = 1, Nombre = "Arroz Largo Fino 1kg", Descripcion = "Bolsa x 10 unidades", Precio = 1800.00m, Disponible = false, EnOferta = false, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
-                new Producto { Id = 4, CategoriaId = 2, Nombre = "Fideos Guiseros 500g", Descripcion = "Caja x 20 paquetes", Precio = 1100.00m, Disponible = true, EnOferta = false, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
-                new Producto { Id = 5, CategoriaId = 1, Nombre = "Azúcar Común 1kg", Descripcion = "Fardo x 10 unidades", Precio = 1250.00m, Disponible = true, EnOferta = false, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
-                new Producto { Id = 6, CategoriaId = 3, Nombre = "Yerba Mate 1kg", Descripcion = "Pack x 6 unidades", Precio = 3400.00m, Disponible = true, EnOferta = true, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) }
+                new Producto { Id = 1, CategoriaId = 1, Nombre = "Aceite de Girasol 1.5L", Descripcion = "Caja x 12 unidades", Precio = 2400.00m, ImagenUrl = "/seed/productos/aceite.jpg", Disponible = true, EnOferta = true, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
+                new Producto { Id = 2, CategoriaId = 2, Nombre = "Harina 000 1kg", Descripcion = "Pack x 10 unidades", Precio = 950.00m, ImagenUrl = "/seed/productos/harina.jpg", Disponible = true, EnOferta = false, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
+                new Producto { Id = 3, CategoriaId = 1, Nombre = "Arroz Largo Fino 1kg", Descripcion = "Bolsa x 10 unidades", Precio = 1800.00m, ImagenUrl = "/seed/productos/arroz.jpg", Disponible = false, EnOferta = false, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
+                new Producto { Id = 4, CategoriaId = 2, Nombre = "Fideos Guiseros 500g", Descripcion = "Caja x 20 paquetes", Precio = 1100.00m, ImagenUrl = "/seed/productos/fideos.jpg", Disponible = true, EnOferta = false, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
+                new Producto { Id = 5, CategoriaId = 1, Nombre = "Azúcar Común 1kg", Descripcion = "Fardo x 10 unidades", Precio = 1250.00m, ImagenUrl = "/seed/productos/azucar.jpg", Disponible = true, EnOferta = false, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
+                new Producto { Id = 6, CategoriaId = 3, Nombre = "Yerba Mate 1kg", Descripcion = "Pack x 6 unidades", Precio = 3400.00m, ImagenUrl = "/seed/productos/yerba.jpg", Disponible = true, EnOferta = true, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) }
             );
         });
 

@@ -134,6 +134,7 @@ if (app.Environment.IsDevelopment() || corsAllowedOrigins.Length > 0)
 var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "productos"));
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "comprobantes"));
+Directory.CreateDirectory(Path.Combine(webRootPath, "seed", "productos"));
 
 // Las imágenes del catálogo y archivos se sirven desde wwwroot con cabeceras CORS para WebView/Android
 app.UseStaticFiles(new StaticFileOptions

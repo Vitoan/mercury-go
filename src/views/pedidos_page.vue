@@ -541,6 +541,11 @@ const ejecutarCambioEstado = async (nuevoEstado) => {
         `📦 En Ruta (${pedidoSeleccionado.value.numero})`,
         `Pedido despachado hacia el cliente.`
       );
+    } else {
+      await notificaciones_service.disparar_notificacion_local(
+        `📋 Pedido ${pedidoSeleccionado.value.numero}`,
+        `Estado actualizado a: ${formatear_nombre_estado(nuevoEstado)}`
+      );
     }
 
     mensajeToast.value = `Orden ${pedidoSeleccionado.value.numero} actualizada a '${formatear_nombre_estado(nuevoEstado)}'.` +
