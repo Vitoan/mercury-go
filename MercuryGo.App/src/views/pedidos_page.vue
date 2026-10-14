@@ -4,7 +4,7 @@
       <ion-button title="Escanear Código QR de Remito" @click="escanearRemitoQr">
         <ion-icon slot="icon-only" :icon="qrCodeOutline" />
       </ion-button>
-      <ion-button v-if="sesion_store.es_admin" title="Nuevo Pedido Asistido" @click="mostrarModalNuevoPedido = true">
+      <ion-button v-if="sesion_store.es_admin" title="Nuevo Pedido Asistido" @click="workflow.mostrarModalNuevoPedido.value = true">
         <ion-icon slot="icon-only" :icon="addCircleOutline" />
       </ion-button>
     </template>
@@ -122,7 +122,7 @@
         :key="p.id"
         class="mercury-pedido-item"
         button
-        @click="alTocarPedido(p)"
+        @click="workflow.alTocarPedido(p)"
       >
         <ion-icon :icon="documentTextOutline" slot="start" class="mercury-icono-pedido" />
         <ion-label>
@@ -161,74 +161,74 @@
           slot="end"
           :color="obtener_color_estado(p.estado)"
           class="mercury-badge-estado"
-          @click.stop="abrirOpcionesEstado(p)"
+          @click.stop="workflow.abrirOpcionesEstado(p)"
         >
-          {{ formatear_nombre_estado(p.estado) }}
+          {{ workflow.formatear_nombre_estado(p.estado) }}
         </ion-badge>
       </ion-item>
     </comp-lista>
 
     <!-- Modal de Detalle Completo de Pedido (Ver, PDF y Edición Admin) -->
     <comp-detalle-pedido-modal
-      :abierto="mostrarModalDetalle"
-      :pedido-id="pedidoSeleccionado?.id"
-      @cerrar="mostrarModalDetalle = false"
-      @pedido_actualizado="alActualizarPedidoDetalle"
+      :abierto="workflow.mostrarModalDetalle.value"
+      :pedido-id="workflow.pedidoSeleccionado.value?.id"
+      @cerrar="workflow.mostrarModalDetalle.value = false"
+      @pedido_actualizado="workflow.alActualizarPedidoDetalle"
     />
 
     <!-- Action Sheet para transiciones válidas de la máquina de estados -->
     <ion-action-sheet
-      :is-open="mostrarActionSheet"
+      :is-open="workflow.mostrarActionSheet.value"
       header="Actualizar Estado Logístico de la Orden"
-      :sub-header="pedidoSeleccionado ? `${pedidoSeleccionado.numero} · Estado actual: ${pedidoSeleccionado.estado}` : ''"
-      :buttons="botonesTransicion"
-      @didDismiss="mostrarActionSheet = false"
+      :sub-header="workflow.pedidoSeleccionado.value ? `${workflow.pedidoSeleccionado.value.numero} · Estado actual: ${workflow.pedidoSeleccionado.value.estado}` : ''"
+      :buttons="workflow.botonesTransicion.value"
+      @didDismiss="workflow.mostrarActionSheet.value = false"
     />
 
     <!-- Modal de Carga de Comprobante de Pago (Cámara / PDF) -->
     <comp-comprobante-modal
-      :abierto="mostrarModalComprobante"
-      :pedido="pedidoSeleccionado"
-      @cerrar="mostrarModalComprobante = false"
-      @comprobante_subido="alSubirComprobante"
+      :abierto="workflow.mostrarModalComprobante.value"
+      :pedido="workflow.pedidoSeleccionado.value"
+      @cerrar="workflow.mostrarModalComprobante.value = false"
+      @comprobante_subido="workflow.alSubirComprobante"
     />
 
     <!-- Modal de Cobro en Destino para Chofer -->
     <comp-cobro-chofer-modal
-      :abierto="mostrarModalCobro"
-      :pedido="pedidoSeleccionado"
-      @cerrar="mostrarModalCobro = false"
-      @cobro_registrado="alRegistrarCobro"
+      :abierto="workflow.mostrarModalCobro.value"
+      :pedido="workflow.pedidoSeleccionado.value"
+      @cerrar="workflow.mostrarModalCobro.value = false"
+      @cobro_registrado="workflow.alRegistrarCobro"
     />
 
     <!-- Modal de Picking en Depósito (Operario / Admin) -->
     <comp-picking-modal
-      :abierto="mostrarModalPicking"
-      :pedido="pedidoSeleccionado"
-      @cerrar="mostrarModalPicking = false"
-      @picking_completado="alCompletarPicking"
+      :abierto="workflow.mostrarModalPicking.value"
+      :pedido="workflow.pedidoSeleccionado.value"
+      @cerrar="workflow.mostrarModalPicking.value = false"
+      @picking_completado="workflow.alCompletarPicking"
     />
 
     <!-- Modal de Creación de Pedido Asistido / Teléfono (Admin) -->
     <comp-pedido-admin-modal
-      :abierto="mostrarModalNuevoPedido"
-      @cerrar="mostrarModalNuevoPedido = false"
-      @pedido_creado="alCrearPedidoAdmin"
+      :abierto="workflow.mostrarModalNuevoPedido.value"
+      @cerrar="workflow.mostrarModalNuevoPedido.value = false"
+      @pedido_creado="workflow.alCrearPedidoAdmin"
     />
 
     <!-- Toast para feedback de transiciones y errores -->
     <ion-toast
-      :is-open="mostrarToast"
-      :message="mensajeToast"
-      :color="colorToast"
+      :is-open="toast.visible.value"
+      :message="toast.mensaje.value"
+      :color="toast.color.value"
       duration="3000"
-      @didDismiss="mostrarToast = false"
+      @didDismiss="toast.ocultar"
     />
   </comp-page>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, watch } from 'vue';
 import {
   IonItem,
   IonLabel,
@@ -265,29 +265,26 @@ import CompPedidoAdminModal from '../components/dominio/pedidos/comp_pedido_admi
 import CompDetallePedidoModal from '../components/dominio/pedidos/comp_detalle_pedido_modal.vue';
 import CompCobroChoferModal from '../components/dominio/pedidos/comp_cobro_chofer_modal.vue';
 
-import { pedidos_store } from '@/stores/pedidos_store';
-import { sesion_store } from '@/stores/sesion_store';
-import { pedidos_service } from '@/services/pedidos_service';
-import { compartir_archivo } from '@/services/compartir_service';
-import { escanear_qr } from '@/services/qr_service';
-import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
-import { geolocalizacion_service } from '@/services/geolocalizacion_service';
-import { notificaciones_service } from '@/services/notificaciones_service';
+import { usePedidosStore } from '@/stores/pedidos_store';
+import { useSesionStore } from '@/stores/sesion_store';
+import { useToast } from '@/composables/useToast';
+import { usePedidosWorkflow } from '@/composables/usePedidosWorkflow';
+import { useEscaneoQr } from '@/composables/useEscaneoQr';
+
+const pedidos_store = usePedidosStore();
+const sesion_store = useSesionStore();
+const toast = useToast();
+const workflow = usePedidosWorkflow(toast);
 
 const busqueda = ref('');
 const estadoSeleccionado = ref('');
 
-const mostrarActionSheet = ref(false);
-const mostrarModalComprobante = ref(false);
-const mostrarModalPicking = ref(false);
-const mostrarModalNuevoPedido = ref(false);
-const mostrarModalDetalle = ref(false);
-const mostrarModalCobro = ref(false);
-const pedidoSeleccionado = ref(null);
-
-const mostrarToast = ref(false);
-const mensajeToast = ref('');
-const colorToast = ref('success');
+const { escanearRemitoQr } = useEscaneoQr({
+  busquedaRef: busqueda,
+  estadoSeleccionadoRef: estadoSeleccionado,
+  alEncontrarPedido: workflow.alTocarPedido,
+  toast
+});
 
 const alBuscar = (texto) => {
   pedidos_store.establecer_busqueda(texto);
@@ -326,275 +323,6 @@ const obtener_color_estado = (estado) => {
   }
 };
 
-const formatear_nombre_estado = (estado) => {
-  switch (estado) {
-    case 'EnPreparacion': return 'En Depósito';
-    case 'Despachado': return 'En Ruta';
-    default: return estado;
-  }
-};
-
-const abrirOpcionesEstado = (pedido) => {
-  pedidoSeleccionado.value = pedido;
-  if (sesion_store.rol_activo === 'CLIENTE') {
-    // Para el cliente, tocar el badge abre directamente el detalle informativo del pedido
-    mostrarModalDetalle.value = true;
-  } else {
-    mostrarActionSheet.value = true;
-  }
-};
-
-const alTocarPedido = (pedido) => {
-  pedidoSeleccionado.value = pedido;
-  vibrar_toque();
-
-  if (sesion_store.rol_activo === 'OPERARIO') {
-    // Para operario de depósito, click abre directo la lista de picking
-    mostrarModalPicking.value = true;
-  } else if (sesion_store.rol_activo === 'CHOFER') {
-    // Para chofer, si está en ruta ofrece opciones directas de En Puerta / Cobrar / Entregar
-    mostrarActionSheet.value = true;
-  } else {
-    // Para Admin o Cliente: abre la vista completa de pedido
-    mostrarModalDetalle.value = true;
-  }
-};
-
-const alActualizarPedidoDetalle = () => {
-  mensajeToast.value = '¡Pedido actualizado exitosamente!';
-  colorToast.value = 'success';
-  mostrarToast.value = true;
-  pedidos_store.cargar(true);
-};
-
-const alRegistrarCobro = (res) => {
-  mensajeToast.value = res?.mensaje || '¡Cobro registrado exitosamente!';
-  colorToast.value = 'success';
-  mostrarToast.value = true;
-  pedidos_store.cargar(true);
-};
-
-// Genera botones de transición válidos según el estado actual (máquina de estados):
-const botonesTransicion = computed(() => {
-  if (!pedidoSeleccionado.value) return [];
-  const estadoActual = pedidoSeleccionado.value.estado;
-  const botones = [];
-
-  // Ver detalles completos (solo admin o cliente)
-  botones.push({
-    text: '🔍 Ver Detalle Completo de la Orden',
-    handler: () => {
-      mostrarActionSheet.value = false;
-      mostrarModalDetalle.value = true;
-    }
-  });
-
-  // Opción siempre disponible: Descargar o compartir Comprobante PDF
-  botones.push({
-    text: '📄 Ver / Compartir Comprobante PDF (con QR)',
-    handler: () => compartirComprobante(pedidoSeleccionado.value)
-  });
-
-  // Si el chofer está en ruta o en puerta, puede cobrar en destino
-  const esChoferOAdmin = sesion_store.rol_activo === 'CHOFER' || sesion_store.es_admin;
-  if (esChoferOAdmin && (estadoActual === 'Despachado' || estadoActual === 'EnPuerta')) {
-    botones.push({
-      text: '💵 Registrar Cobro en Destino (Efectivo / QR)',
-      handler: () => {
-        mostrarActionSheet.value = false;
-        mostrarModalCobro.value = true;
-      }
-    });
-  }
-
-  // Si está en Pendiente o Confirmado, el cliente o admin puede adjuntar comprobante de pago
-  if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
-    botones.push({
-      text: '💳 Adjuntar Comprobante de Pago (Foto / PDF)',
-      handler: () => abrirModalComprobante(pedidoSeleccionado.value)
-    });
-  }
-
-  // Operario o Admin: opción de realizar picking en depósito
-  const puedePicking = !sesion_store.rol_activo || sesion_store.rol_activo === 'ADMIN' || sesion_store.rol_activo === 'OPERARIO';
-  if (puedePicking && (estadoActual === 'Confirmado' || estadoActual === 'EnPreparacion')) {
-    botones.push({
-      text: '📦 Realizar Picking / Preparación en Depósito',
-      handler: () => abrirModalPicking(pedidoSeleccionado.value)
-    });
-  }
-
-  // Si el usuario es CLIENTE, no se le ofrecen transiciones logísticas (solo cancelar si está en etapa previa al despacho)
-  const esCliente = sesion_store.rol_activo === 'CLIENTE';
-  if (esCliente) {
-    if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
-      botones.push({
-        text: 'Cancelar mi Pedido (✖ Cancelar)',
-        role: 'destructive',
-        handler: () => ejecutarCambioEstado('Cancelado')
-      });
-    }
-    botones.push({
-      text: 'Cerrar',
-      role: 'cancel'
-    });
-    return botones;
-  }
-
-  // Transiciones logísticas operativas para ADMIN, OPERARIO o CHOFER:
-  if (estadoActual === 'Pendiente') {
-    botones.push({
-      text: 'Confirmar Pedido (▶ Confirmado)',
-      handler: () => ejecutarCambioEstado('Confirmado')
-    });
-    botones.push({
-      text: 'Cancelar Pedido (✖ Cancelado)',
-      role: 'destructive',
-      handler: () => ejecutarCambioEstado('Cancelado')
-    });
-  } else if (estadoActual === 'Confirmado') {
-    botones.push({
-      text: 'Iniciar Carga en Depósito (▶ En Preparación)',
-      handler: () => ejecutarCambioEstado('EnPreparacion')
-    });
-    botones.push({
-      text: 'Cancelar Pedido (✖ Cancelado)',
-      role: 'destructive',
-      handler: () => ejecutarCambioEstado('Cancelado')
-    });
-  } else if (estadoActual === 'EnPreparacion') {
-    botones.push({
-      text: 'Despachar al Camión (▶ En Ruta)',
-      handler: () => ejecutarCambioEstado('Despachado')
-    });
-    botones.push({
-      text: 'Cancelar Pedido (✖ Cancelado)',
-      role: 'destructive',
-      handler: () => ejecutarCambioEstado('Cancelado')
-    });
-  } else if (estadoActual === 'Despachado') {
-    botones.push({
-      text: 'Llegando al Destino (▶ En Puerta)',
-      handler: () => ejecutarCambioEstado('EnPuerta')
-    });
-    botones.push({
-      text: 'Confirmar Entrega Directa (✔ Entregado)',
-      handler: () => ejecutarCambioEstado('Entregado')
-    });
-    botones.push({
-      text: 'Devolución / Cancelación (✖ Cancelado)',
-      role: 'destructive',
-      handler: () => ejecutarCambioEstado('Cancelado')
-    });
-  } else if (estadoActual === 'EnPuerta') {
-    botones.push({
-      text: 'Confirmar Entrega Final (✔ Entregado)',
-      handler: () => ejecutarCambioEstado('Entregado')
-    });
-    botones.push({
-      text: 'Devolución / Cancelación (✖ Cancelado)',
-      role: 'destructive',
-      handler: () => ejecutarCambioEstado('Cancelado')
-    });
-  }
-
-  botones.push({
-    text: 'Cerrar',
-    role: 'cancel'
-  });
-
-  return botones;
-});
-
-const ejecutarCambioEstado = async (nuevoEstado) => {
-  if (!pedidoSeleccionado.value) return;
-  try {
-    let lat = null;
-    let lng = null;
-
-    // Caso de uso Semana 7: Al pasar a EnPuerta o Entregado, capturar GPS del chofer
-    if (nuevoEstado === 'EnPuerta' || nuevoEstado === 'Entregado') {
-      try {
-        mensajeToast.value = '📍 Obteniendo ubicación GPS del repartidor...';
-        colorToast.value = 'primary';
-        mostrarToast.value = true;
-
-        const pos = await geolocalizacion_service.obtener_posicion_actual();
-        lat = pos.latitud;
-        lng = pos.longitud;
-      } catch (gpsError) {
-        console.warn('No se pudo obtener GPS, procediendo sin coordenadas:', gpsError);
-      }
-    }
-
-    await pedidos_store.cambiar_estado(pedidoSeleccionado.value.id, nuevoEstado, lat, lng);
-    vibrar_exito();
-
-    // Disparar notificación local en el dispositivo (Semana 7)
-    if (nuevoEstado === 'EnPuerta') {
-      await notificaciones_service.disparar_notificacion_local(
-        `🚚 En Puerta (${pedidoSeleccionado.value.numero})`,
-        `Ubicación registrada. Chofer arribó al domicilio.`
-      );
-    } else if (nuevoEstado === 'Despachado') {
-      await notificaciones_service.disparar_notificacion_local(
-        `📦 En Ruta (${pedidoSeleccionado.value.numero})`,
-        `Pedido despachado hacia el cliente.`
-      );
-    } else {
-      await notificaciones_service.disparar_notificacion_local(
-        `📋 Pedido ${pedidoSeleccionado.value.numero}`,
-        `Estado actualizado a: ${formatear_nombre_estado(nuevoEstado)}`
-      );
-    }
-
-    mensajeToast.value = `Orden ${pedidoSeleccionado.value.numero} actualizada a '${formatear_nombre_estado(nuevoEstado)}'.` +
-      (lat ? ' (Ubicación GPS guardada)' : '');
-    colorToast.value = 'success';
-    mostrarToast.value = true;
-
-    // Si pasó a EnPuerta y se obtuvo ubicación, abrir Google Maps externo (Semana 7)
-    if (nuevoEstado === 'EnPuerta' && lat && lng) {
-      setTimeout(() => {
-        geolocalizacion_service.abrir_en_google_maps(lat, lng);
-      }, 700);
-    }
-  } catch (err) {
-    vibrar_error();
-    mensajeToast.value = err.message || 'La API rechazó el cambio de estado.';
-    colorToast.value = 'danger';
-    mostrarToast.value = true;
-  } finally {
-    mostrarActionSheet.value = false;
-  }
-};
-
-const abrirModalComprobante = (pedido) => {
-  pedidoSeleccionado.value = pedido;
-  mostrarActionSheet.value = false;
-  mostrarModalComprobante.value = true;
-};
-
-const alSubirComprobante = () => {
-  mensajeToast.value = '¡Comprobante adjuntado con éxito!';
-  colorToast.value = 'success';
-  mostrarToast.value = true;
-  pedidos_store.cargar(true);
-};
-
-const abrirModalPicking = (pedido) => {
-  pedidoSeleccionado.value = pedido;
-  mostrarActionSheet.value = false;
-  mostrarModalPicking.value = true;
-};
-
-const alCompletarPicking = (res) => {
-  mensajeToast.value = res?.mensaje || 'Picking registrado con éxito.';
-  colorToast.value = res?.completo ? 'success' : 'warning';
-  mostrarToast.value = true;
-  pedidos_store.cargar(true);
-};
-
 const tieneSubEtiquetas = (pedido) => {
   return pedido?.observaciones && (
     pedido.observaciones.includes('[Picking:') ||
@@ -602,91 +330,12 @@ const tieneSubEtiquetas = (pedido) => {
   );
 };
 
-const escanearRemitoQr = async () => {
-  vibrar_toque();
-  const res = await escanear_qr();
-  if (res.ok && res.contenido) {
-    await vibrar_exito();
-    const codigo = res.contenido.trim();
-    busqueda.value = codigo;
-    estadoSeleccionado.value = '';
-    pedidos_store.filtros.estados = '';
-    await pedidos_store.establecer_busqueda(codigo);
-
-    // Si encontramos el pedido exacto, abrir automáticamente su acción/detalle
-    const encontrado = pedidos_store.pedidos.find(
-      (p) => p.numero?.toLowerCase() === codigo.toLowerCase()
-    ) || pedidos_store.pedidos[0];
-
-    if (encontrado) {
-      alTocarPedido(encontrado);
-      mensajeToast.value = `Orden ${encontrado.numero} localizada.`;
-    } else {
-      mensajeToast.value = `No se encontró la orden para el código: ${codigo}`;
-    }
-    colorToast.value = 'success';
-    mostrarToast.value = true;
-  } else if (res.mensaje) {
-    await vibrar_error();
-    mensajeToast.value = res.mensaje;
-    colorToast.value = 'warning';
-    mostrarToast.value = true;
-  }
-};
-
-const alCrearPedidoAdmin = (res) => {
-  mensajeToast.value = `¡Pedido ${res?.numero || ''} creado con éxito!`;
-  colorToast.value = 'success';
-  mostrarToast.value = true;
-  pedidos_store.cargar(true);
-};
-
-const compartirComprobante = async (pedido) => {
-  mostrarActionSheet.value = false;
-  if (!pedido) return;
-
-  try {
-    mensajeToast.value = 'Generando comprobante oficial PDF con QR…';
-    colorToast.value = 'primary';
-    mostrarToast.value = true;
-
-    const blob = await pedidos_service.descargar_comprobante(pedido.id);
-    const resultado = await compartir_archivo({
-      nombre_archivo: `${pedido.numero}.pdf`,
-      blob: blob,
-      titulo: `Comprobante ${pedido.numero}`,
-      texto: `Comprobante oficial de orden ${pedido.numero} de MercuryGO.`
-    });
-
-    if (resultado.ok) {
-      vibrar_exito();
-      if (resultado.mensaje) {
-        mensajeToast.value = resultado.mensaje;
-        colorToast.value = 'success';
-        mostrarToast.value = true;
-      }
-    } else {
-      vibrar_error();
-      mensajeToast.value = resultado.mensaje || 'No se pudo compartir el archivo.';
-      colorToast.value = 'warning';
-      mostrarToast.value = true;
-    }
-  } catch (err) {
-    vibrar_error();
-    mensajeToast.value = err.message || 'Error al generar el comprobante PDF.';
-    colorToast.value = 'danger';
-    mostrarToast.value = true;
-  }
-};
-
 onIonViewWillEnter(() => {
-  // Al entrar a la vista, sincronizar el input local de búsqueda con el filtro real del store
   busqueda.value = pedidos_store.filtros.busqueda || '';
   estadoSeleccionado.value = pedidos_store.filtros.estados || '';
   pedidos_store.cargar(true);
 });
 
-// Si el usuario conectado cambia (cierre de sesión o login con otro rol/cuenta), resetear filtros
 watch(
   () => sesion_store.usuario?.id,
   () => {
@@ -696,41 +345,9 @@ watch(
     pedidos_store.cargar(true);
   }
 );
-
-onMounted(() => {
-  busqueda.value = pedidos_store.filtros.busqueda || '';
-  estadoSeleccionado.value = pedidos_store.filtros.estados || '';
-  pedidos_store.cargar(true);
-});
 </script>
 
 <style scoped>
-.mercury-seccion-chips {
-  padding-bottom: 8px;
-}
-
-.mercury-chips-scroll {
-  display: flex;
-  overflow-x: auto;
-  padding: 0 12px;
-  gap: 6px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.mercury-chips-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.mercury-chip {
-  font-size: 0.82rem;
-  font-weight: 600;
-  margin: 0;
-  flex-shrink: 0;
-  --border-radius: 8px;
-  cursor: pointer;
-}
-
 .mercury-pedido-item {
   --padding-start: 12px;
   --padding-end: 12px;

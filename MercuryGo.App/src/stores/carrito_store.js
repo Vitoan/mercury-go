@@ -1,4 +1,5 @@
-import { reactive, computed } from 'vue';
+import { ref, computed } from 'vue';
+import { defineStore } from 'pinia';
 import { pedidos_service } from '@/services/pedidos_service';
 import { vibrar_exito, vibrar_toque } from '@/services/vibracion_service';
 import { notificaciones_service } from '@/services/notificaciones_service';
@@ -14,126 +15,139 @@ function cargar_carrito_inicial() {
   }
 }
 
-const state = reactive({
-  items: cargar_carrito_inicial(),
-  cliente_id: 1, // Por defecto cliente principal o se sincroniza con el usuario
-  observaciones: '',
-  enviando: false,
-  error: null
-});
+export const useCarritoStore = defineStore('carrito', () => {
+  const items = ref(cargar_carrito_inicial());
+  const cliente_id = ref(1); // Por defecto cliente principal o se sincroniza con el usuario
+  const observaciones = ref('');
+  const enviando = ref(false);
+  const error = ref(null);
 
-function guardar_en_storage() {
-  localStorage.setItem(CLAVE_CARRITO, JSON.stringify(state.items));
-}
-
-const cantidad_total = computed(() =>
-  state.items.reduce((acc, item) => acc + item.cantidad, 0)
-);
-
-const subtotal_total = computed(() =>
-  state.items.reduce((acc, item) => acc + ((Number(item.precio) || 0) * (Number(item.cantidad) || 0)), 0)
-);
-
-const hay_items = computed(() => state.items.length > 0);
-
-function agregar_producto(producto, cantidad = 1) {
-  const index = state.items.findIndex(i => i.producto_id === producto.id);
-  if (index >= 0) {
-    state.items[index].cantidad += cantidad;
-  } else {
-    state.items.push({
-      producto_id: producto.id,
-      nombre: producto.nombre,
-      precio: producto.precio,
-      imagen_url: producto.imagen_url || null,
-      cantidad: cantidad
-    });
+  function guardar_en_storage() {
+    localStorage.setItem(CLAVE_CARRITO, JSON.stringify(items.value));
   }
-  guardar_en_storage();
-  vibrar_toque();
-}
 
-function cambiar_cantidad(producto_id, nueva_cantidad) {
-  const item = state.items.find(i => i.producto_id === producto_id);
-  if (!item) return;
+  const cantidad_total = computed(() =>
+    items.value.reduce((acc, item) => acc + item.cantidad, 0)
+  );
 
-  if (nueva_cantidad <= 0) {
-    quitar_producto(producto_id);
-  } else {
-    item.cantidad = nueva_cantidad;
+  const subtotal_total = computed(() =>
+    items.value.reduce((acc, item) => acc + ((Number(item.precio) || 0) * (Number(item.cantidad) || 0)), 0)
+  );
+
+  const hay_items = computed(() => items.value.length > 0);
+
+  function agregar_producto(producto, cantidad = 1) {
+    const index = items.value.findIndex(i => i.producto_id === producto.id);
+    if (index >= 0) {
+      items.value[index].cantidad += cantidad;
+    } else {
+      items.value.push({
+        producto_id: producto.id,
+        nombre: producto.nombre,
+        precio: producto.precio,
+        imagen_url: producto.imagen_url || null,
+        cantidad: cantidad
+      });
+    }
     guardar_en_storage();
     vibrar_toque();
   }
-}
 
-function quitar_producto(producto_id) {
-  state.items = state.items.filter(i => i.producto_id !== producto_id);
-  guardar_en_storage();
-  vibrar_toque();
-}
+  function cambiar_cantidad(producto_id, nueva_cantidad) {
+    const item = items.value.find(i => i.producto_id === producto_id);
+    if (!item) return;
 
-function vaciar_carrito() {
-  state.items = [];
-  state.observaciones = '';
-  state.error = null;
-  guardar_en_storage();
-  vibrar_toque();
-}
-
-async function confirmar_pedido(cliente_id_custom = null) {
-  if (state.items.length === 0) {
-    throw new Error('El carrito está vacío.');
+    if (nueva_cantidad <= 0) {
+      quitar_producto(producto_id);
+    } else {
+      item.cantidad = nueva_cantidad;
+      guardar_en_storage();
+      vibrar_toque();
+    }
   }
 
-  state.enviando = true;
-  state.error = null;
+  function quitar_producto(producto_id) {
+    items.value = items.value.filter(i => i.producto_id !== producto_id);
+    guardar_en_storage();
+    vibrar_toque();
+  }
 
-  try {
-    const payload = {
-      cliente_id: cliente_id_custom || state.cliente_id,
-      observaciones: state.observaciones || null,
-      items: state.items.map(i => ({
-        producto_id: i.producto_id,
-        cantidad: i.cantidad
-      }))
-    };
+  function vaciar_carrito() {
+    items.value = [];
+    observaciones.value = '';
+    error.value = null;
+    guardar_en_storage();
+    vibrar_toque();
+  }
 
-    const res = await pedidos_service.crear(payload);
-    vaciar_carrito();
-    vibrar_exito();
-
-    try {
-      const pedidoInfo = res?.pedido || res || {};
-      const numPedido = pedidoInfo.numero || 'Nuevo';
-      await notificaciones_service.disparar_notificacion_local(
-        'Pedido Confirmado 📦',
-        `Orden ${numPedido} creada exitosamente en el sistema.`
-      );
-    } catch (notifErr) {
-      console.warn('[Carrito] Error al emitir notificacion:', notifErr);
+  async function confirmar_pedido(cliente_id_custom = null) {
+    if (items.value.length === 0) {
+      throw new Error('El carrito está vacío.');
     }
 
-    return res;
-  } catch (err) {
-    state.error = err.message || 'No se pudo confirmar el pedido.';
-    throw err;
-  } finally {
-    state.enviando = false;
-  }
-}
+    enviando.value = true;
+    error.value = null;
 
-export const carrito_store = {
-  get items() { return state.items; },
-  get enviando() { return state.enviando; },
-  get error() { return state.error; },
-  get observaciones() { return state.observaciones; },
-  set observaciones(val) { state.observaciones = val; },
-  get cantidad_total() { return cantidad_total.value; },
-  get subtotal_total() { return subtotal_total.value; },
-  hay_items,
-  agregar_producto,
-  cambiar_cantidad,
-  quitar_producto,
-  vaciar_carrito,
-  confirmar_pedido
-};
+    try {
+      const payload = {
+        cliente_id: cliente_id_custom || cliente_id.value,
+        observaciones: observaciones.value || null,
+        items: items.value.map(i => ({
+          producto_id: i.producto_id,
+          cantidad: i.cantidad
+        }))
+      };
+
+      const res = await pedidos_service.crear(payload);
+      vaciar_carrito();
+      vibrar_exito();
+
+      try {
+        const pedidoInfo = res?.pedido || res || {};
+        const numPedido = pedidoInfo.numero || 'Nuevo';
+        await notificaciones_service.disparar_notificacion_local(
+          'Pedido Confirmado 📦',
+          `Orden ${numPedido} creada exitosamente en el sistema.`
+        );
+      } catch (notifErr) {
+        console.warn('[Carrito] Error al emitir notificacion:', notifErr);
+      }
+
+      return res;
+    } catch (err) {
+      error.value = err.message || 'No se pudo confirmar el pedido.';
+      throw err;
+    } finally {
+      enviando.value = false;
+    }
+  }
+
+  return {
+    items,
+    cliente_id,
+    observaciones,
+    enviando,
+    error,
+    cantidad_total,
+    subtotal_total,
+    hay_items,
+    agregar_producto,
+    cambiar_cantidad,
+    quitar_producto,
+    vaciar_carrito,
+    confirmar_pedido
+  };
+});
+
+// Proxy retrocompatible
+export const carrito_store = new Proxy({}, {
+  get(_, prop) {
+    const store = useCarritoStore();
+    return store[prop];
+  },
+  set(_, prop, val) {
+    const store = useCarritoStore();
+    store[prop] = val;
+    return true;
+  }
+});

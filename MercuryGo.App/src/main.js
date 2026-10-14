@@ -33,7 +33,9 @@ import '@ionic/vue/css/palettes/dark.class.css';
 
 /* Theme variables */
 import './theme/variables.css';
+import './theme/mercury-chips.css';
 
+import { createPinia } from 'pinia';
 import { aplicar_tema_guardado } from './config/tema';
 import { sesion_store } from './stores/sesion_store';
 import { notificaciones_service } from './services/notificaciones_service';
@@ -41,7 +43,10 @@ import { notificaciones_service } from './services/notificaciones_service';
 // Aplicar tema guardado antes de montar para evitar parpadeos
 aplicar_tema_guardado();
 
+const pinia = createPinia();
+
 const app = createApp(App)
+  .use(pinia)
   .use(IonicVue)
   .use(router);
 

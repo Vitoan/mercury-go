@@ -1,0 +1,35 @@
+/* Estilos compartidos para barras de chips de filtros horizontales */
+.mercury-seccion-chips {
+  padding-bottom: 8px;
+}
+
+.mercury-chips-secundarios {
+  padding-bottom: 8px;
+}
+
+.mercury-chips-scroll {
+  display: flex;
+  overflow-x: auto;
+  padding: 0 12px;
+  gap: 6px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mercury-chips-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.mercury-chip {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0;
+  flex-shrink: 0;
+  --border-radius: 8px;
+  cursor: pointer;
+}
+
+.mercury-chip-sm {
+  font-size: 0.76rem;
+  height: 28px;
+}

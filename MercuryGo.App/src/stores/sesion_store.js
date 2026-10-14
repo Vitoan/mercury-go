@@ -1,6 +1,7 @@
-import { reactive } from 'vue';
+import { ref, computed } from 'vue';
+import { defineStore } from 'pinia';
 import { cerrar_sesion, iniciar_sesion, obtener_mi_usuario } from '@/services/sesion_service';
-import { pedidos_store } from '@/stores/pedidos_store';
+import { usePedidosStore } from '@/stores/pedidos_store';
 import {
   al_expirar,
   borrar_sesion,
@@ -9,95 +10,73 @@ import {
   restaurar_sesion
 } from '@/services/token_service';
 
-const state = reactive({
-  usuario: null,
-  cargando: false,
-  restaurando: true,
-  error: null
-});
+export const useSesionStore = defineStore('sesion', () => {
+  const usuario = ref(null);
+  const cargando = ref(false);
+  const restaurando = ref(true);
+  const error = ref(null);
 
-// Registrar callback para limpiar el estado si el token caduca de forma irrecuperable
-al_expirar(() => {
-  sesion_store.limpiar();
-});
+  const autenticado = computed(() => Boolean(usuario.value));
+  const rol_activo = computed(() => usuario.value?.rol_codigo || null);
+  const pendiente_de_habilitacion = computed(() => Boolean(usuario.value) && !usuario.value?.rol_codigo);
+  const es_admin = computed(() => usuario.value?.rol_codigo === 'ADMIN');
 
-export const sesion_store = {
-  // Estado reactivo
-  state,
-
-  // Getters computados
-  get usuario() { return state.usuario; },
-  get cargando() { return state.cargando; },
-  get restaurando() { return state.restaurando; },
-  get error() { return state.error; },
-
-  get autenticado() { return Boolean(state.usuario); },
-  get rol_activo() { return state.usuario?.rol_codigo || null; },
-  get pendiente_de_habilitacion() { return Boolean(state.usuario) && !state.usuario.rol_codigo; },
-  get es_admin() { return state.usuario?.rol_codigo === 'ADMIN'; },
-
-  // Acciones
-  // Se llama una vez al arrancar la app: NO entra automáticamente,
-  // solo verifica si hay un token guardado en SecureStorage para que el Login sepa
-  // si corresponde mostrar el botón de desbloqueo biométrico.
-  async preparar() {
-    state.restaurando = true;
+  async function preparar() {
+    restaurando.value = true;
     try {
       return Boolean(await restaurar_sesion());
     } finally {
-      state.restaurando = false;
+      restaurando.value = false;
     }
-  },
+  }
 
-  // Desbloquea la sesión guardada mediante biometría:
-  // consulta a la API (/yo) para garantizar que el token siga siendo válido y que el rol esté actualizado.
-  async iniciar() {
-    state.cargando = true;
-    state.error = null;
+  async function iniciar() {
+    cargando.value = true;
+    error.value = null;
     try {
       const token = await restaurar_sesion();
       if (!token) {
-        state.usuario = null;
+        usuario.value = null;
         return null;
       }
       const respuesta = await obtener_mi_usuario();
-      state.usuario = respuesta?.usuario || null;
-      return state.usuario;
-    } catch (error) {
-      const revocada = error?.estado_http === 401;
+      usuario.value = respuesta?.usuario || null;
+      return usuario.value;
+    } catch (err) {
+      const revocada = err?.estado_http === 401;
       if (revocada) await borrar_sesion();
-      state.error = revocada
+      error.value = revocada
         ? 'La sesión guardada expiró. Ingresá con tu correo y contraseña.'
-        : error?.mensaje || 'No se pudo reanudar la sesión.';
-      state.usuario = null;
+        : err?.mensaje || 'No se pudo reanudar la sesión.';
+      usuario.value = null;
       return null;
     } finally {
-      state.cargando = false;
+      cargando.value = false;
     }
-  },
+  }
 
-  async entrar(email, password) {
-    state.cargando = true;
-    state.error = null;
+  async function entrar(email, password) {
+    cargando.value = true;
+    error.value = null;
     try {
       const respuesta = await iniciar_sesion(email, password);
       const sesion = respuesta?.sesion || null;
       if (!sesion?.token) {
-        state.error = 'No se pudo iniciar sesión.';
+        error.value = 'No se pudo iniciar sesión.';
         return false;
       }
       await guardar_sesion(sesion.token, sesion.expira_en, sesion.refresh_token, sesion.refresh_expira_en);
-      state.usuario = sesion.usuario;
+      usuario.value = sesion.usuario;
       return true;
-    } catch (error) {
-      state.error = error.mensaje || 'Credenciales inválidas.';
+    } catch (err) {
+      error.value = err.mensaje || 'Credenciales inválidas.';
       return false;
     } finally {
-      state.cargando = false;
+      cargando.value = false;
     }
-  },
+  }
 
-  async salir(todos = false) {
+  async function salir(todos = false) {
     try {
       const refresh_token = await obtener_refresh_token();
       if (refresh_token) {
@@ -106,17 +85,57 @@ export const sesion_store = {
     } catch {
       // Ignorar fallo de red al cerrar sesión
     }
-    await this.limpiar();
-  },
+    await limpiar();
+  }
 
-  async limpiar() {
-    state.usuario = null;
-    state.error = null;
+  async function limpiar() {
+    usuario.value = null;
+    error.value = null;
     try {
-      pedidos_store.resetear_store();
+      const pedidosStore = usePedidosStore();
+      pedidosStore.resetear_store();
     } catch {
       // Ignorar si aún no está inicializado
     }
     await borrar_sesion();
   }
-};
+
+  return {
+    usuario,
+    cargando,
+    restaurando,
+    error,
+    autenticado,
+    rol_activo,
+    pendiente_de_habilitacion,
+    es_admin,
+    preparar,
+    iniciar,
+    entrar,
+    salir,
+    limpiar
+  };
+});
+
+// Registrar callback para limpiar el estado si el token caduca
+al_expirar(() => {
+  try {
+    const store = useSesionStore();
+    store.limpiar();
+  } catch {
+    // Si pinia aún no está montado
+  }
+});
+
+// Proxy retrocompatible
+export const sesion_store = new Proxy({}, {
+  get(_, prop) {
+    const store = useSesionStore();
+    return store[prop];
+  },
+  set(_, prop, val) {
+    const store = useSesionStore();
+    store[prop] = val;
+    return true;
+  }
+});

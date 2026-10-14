@@ -1,4 +1,5 @@
-import { reactive, computed } from 'vue';
+import { ref, computed } from 'vue';
+import { defineStore } from 'pinia';
 import {
   cambiar_rol_usuario,
   crear_usuario,
@@ -6,114 +7,133 @@ import {
   obtener_usuarios
 } from '@/services/usuarios_service';
 
-const state = reactive({
-  usuarios: [],
-  roles: [],
-  pagina: null,
-  filtros: { busqueda: '' },
-  cargando: false,
-  guardando: false,
-  error: null
-});
+export const useUsuariosStore = defineStore('usuarios', () => {
+  const usuarios = ref([]);
+  const roles = ref([]);
+  const pagina = ref(null);
+  const filtros = ref({ busqueda: '' });
+  const cargando = ref(false);
+  const guardando = ref(false);
+  const error = ref(null);
 
-export const usuarios_store = {
-  state,
+  const hay_usuarios = computed(() => usuarios.value.length > 0);
+  const hay_mas = computed(() => Boolean(pagina.value?.hay_mas));
+  const total = computed(() => pagina.value?.total || 0);
 
-  // Getters
-  get usuarios() { return state.usuarios; },
-  get roles() { return state.roles; },
-  get cargando() { return state.cargando; },
-  get guardando() { return state.guardando; },
-  get error() { return state.error; },
-
-  hay_usuarios: computed(() => state.usuarios.length > 0),
-  hay_mas: computed(() => Boolean(state.pagina?.hay_mas)),
-  total: computed(() => state.pagina?.total || 0),
-
-  // Acciones
-  async cargar(filtros = null) {
-    state.cargando = true;
-    state.error = null;
-    if (filtros) state.filtros = { ...state.filtros, ...filtros };
+  async function cargar(nuevosFiltros = null) {
+    cargando.value = true;
+    error.value = null;
+    if (nuevosFiltros) filtros.value = { ...filtros.value, ...nuevosFiltros };
 
     try {
-      const respuesta = await obtener_usuarios({ ...state.filtros, pagina: 1 });
-      state.usuarios = respuesta?.usuarios || [];
-      state.roles = respuesta?.roles || [];
-      state.pagina = respuesta?.pagina || null;
-      return state.usuarios;
-    } catch (error) {
-      state.error = error.mensaje || 'No se pudieron cargar los usuarios.';
-      state.usuarios = [];
-      state.pagina = null;
+      const respuesta = await obtener_usuarios({ ...filtros.value, pagina: 1 });
+      usuarios.value = respuesta?.usuarios || [];
+      roles.value = respuesta?.roles || [];
+      pagina.value = respuesta?.pagina || null;
+      return usuarios.value;
+    } catch (err) {
+      error.value = err.mensaje || 'No se pudieron cargar los usuarios.';
+      usuarios.value = [];
+      pagina.value = null;
       return [];
     } finally {
-      state.cargando = false;
-    }
-  },
-
-  async cargar_mas() {
-    if (state.cargando || !this.hay_mas.value) return state.usuarios;
-    state.cargando = true;
-
-    try {
-      const siguientePagina = (state.pagina?.pagina || 1) + 1;
-      const respuesta = await obtener_usuarios({ ...state.filtros, pagina: siguientePagina });
-      const conocidos = state.usuarios.map(u => u.id);
-      const nuevos = (respuesta?.usuarios || []).filter(u => !conocidos.includes(u.id));
-      state.usuarios = [...state.usuarios, ...nuevos];
-      state.pagina = respuesta?.pagina || null;
-      return state.usuarios;
-    } catch (error) {
-      state.error = error.mensaje || 'No se pudieron cargar más usuarios.';
-      return state.usuarios;
-    } finally {
-      state.cargando = false;
-    }
-  },
-
-  async crear(datos) {
-    state.guardando = true;
-    state.error = null;
-    try {
-      await crear_usuario(datos);
-      await this.cargar();
-      return true;
-    } catch (error) {
-      state.error = error.mensaje || 'No se pudo crear el usuario.';
-      return false;
-    } finally {
-      state.guardando = false;
-    }
-  },
-
-  async cambiar_rol(id, rol_id) {
-    state.guardando = true;
-    state.error = null;
-    try {
-      await cambiar_rol_usuario(id, rol_id);
-      await this.cargar();
-      return true;
-    } catch (error) {
-      state.error = error.mensaje || 'No se pudo actualizar el rol.';
-      return false;
-    } finally {
-      state.guardando = false;
-    }
-  },
-
-  async eliminar(id) {
-    state.guardando = true;
-    state.error = null;
-    try {
-      await eliminar_usuario(id);
-      await this.cargar();
-      return true;
-    } catch (error) {
-      state.error = error.mensaje || 'No se pudo dar de baja al usuario.';
-      return false;
-    } finally {
-      state.guardando = false;
+      cargando.value = false;
     }
   }
-};
+
+  async function cargar_mas() {
+    if (cargando.value || !hay_mas.value) return usuarios.value;
+    cargando.value = true;
+
+    try {
+      const siguientePagina = (pagina.value?.pagina || 1) + 1;
+      const respuesta = await obtener_usuarios({ ...filtros.value, pagina: siguientePagina });
+      const conocidos = usuarios.value.map(u => u.id);
+      const nuevos = (respuesta?.usuarios || []).filter(u => !conocidos.includes(u.id));
+      usuarios.value = [...usuarios.value, ...nuevos];
+      pagina.value = respuesta?.pagina || null;
+      return usuarios.value;
+    } catch (err) {
+      error.value = err.mensaje || 'No se pudieron cargar más usuarios.';
+      return usuarios.value;
+    } finally {
+      cargando.value = false;
+    }
+  }
+
+  async function crear(datos) {
+    guardando.value = true;
+    error.value = null;
+    try {
+      await crear_usuario(datos);
+      await cargar();
+      return true;
+    } catch (err) {
+      error.value = err.mensaje || 'No se pudo crear el usuario.';
+      return false;
+    } finally {
+      guardando.value = false;
+    }
+  }
+
+  async function cambiar_rol(id, rol_id) {
+    guardando.value = true;
+    error.value = null;
+    try {
+      await cambiar_rol_usuario(id, rol_id);
+      await cargar();
+      return true;
+    } catch (err) {
+      error.value = err.mensaje || 'No se pudo actualizar el rol.';
+      return false;
+    } finally {
+      guardando.value = false;
+    }
+  }
+
+  async function eliminar(id) {
+    guardando.value = true;
+    error.value = null;
+    try {
+      await eliminar_usuario(id);
+      await cargar();
+      return true;
+    } catch (err) {
+      error.value = err.mensaje || 'No se pudo dar de baja al usuario.';
+      return false;
+    } finally {
+      guardando.value = false;
+    }
+  }
+
+  return {
+    usuarios,
+    roles,
+    pagina,
+    filtros,
+    cargando,
+    guardando,
+    error,
+    hay_usuarios,
+    hay_mas,
+    total,
+    cargar,
+    cargar_mas,
+    crear,
+    cambiar_rol,
+    eliminar
+  };
+});
+
+// Proxy retrocompatible
+export const usuarios_store = new Proxy({}, {
+  get(_, prop) {
+    const store = useUsuariosStore();
+    return store[prop];
+  },
+  set(_, prop, val) {
+    const store = useUsuariosStore();
+    store[prop] = val;
+    return true;
+  }
+});

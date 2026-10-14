@@ -223,6 +223,15 @@
       ]"
       @didDismiss="mostrarAlertaBaja = false"
     />
+
+    <!-- Toast para feedback de operaciones y errores -->
+    <ion-toast
+      :is-open="toast.visible.value"
+      :message="toast.mensaje.value"
+      :color="toast.color.value"
+      duration="3000"
+      @didDismiss="toast.ocultar"
+    />
   </comp-page>
 </template>
 
@@ -249,7 +258,9 @@ import {
   IonCardSubtitle,
   IonCardContent,
   IonList,
-  IonSpinner
+  IonSpinner,
+  IonToast,
+  alertController
 } from '@ionic/vue';
 import {
   businessOutline,
@@ -273,6 +284,9 @@ import { clientes_store } from '@/stores/clientes_store';
 import { pedidos_service } from '@/services/pedidos_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 const vistaActiva = ref('clientes');
 const cargandoFinanzas = ref(false);
@@ -346,8 +360,9 @@ const ejecutarBaja = async () => {
   if (!clienteAEliminar.value) return;
   try {
     await clientes_store.eliminar_cliente(clienteAEliminar.value.id);
+    toast.mostrarExito('Cliente dado de baja exitosamente.');
   } catch (err) {
-    alert(err.message || 'No se pudo dar de baja al cliente.');
+    toast.mostrarError(err.message || 'No se pudo dar de baja al cliente.');
   } finally {
     clienteAEliminar.value = null;
     mostrarAlertaBaja.value = false;
@@ -388,43 +403,104 @@ const aprobarComprobanteDirecto = async (comp) => {
   const pedidoId = comp?.pedido_id || comp;
   const montoSugerido = comp?.total || 0;
 
-  const input = prompt(
-    `Auditoría Bancaria - Orden ${comp?.pedido_numero || pedidoId}:\nIngresá el monto exacto acreditado en la cuenta de la empresa:`,
-    montoSugerido.toString()
-  );
+  const alert = await alertController.create({
+    header: 'Auditoría Bancaria',
+    subHeader: `Orden ${comp?.pedido_numero || pedidoId}`,
+    message: 'Ingresá el monto exacto acreditado en la cuenta de la empresa:',
+    inputs: [
+      {
+        name: 'monto',
+        type: 'number',
+        placeholder: 'Monto acreditado',
+        value: montoSugerido.toString(),
+        min: 1
+      }
+    ],
+    buttons: [
+      {
+        text: 'Cancelar',
+        role: 'cancel'
+      },
+      {
+        text: 'Aprobar Pago',
+        handler: async (data) => {
+          const rawMonto = data?.monto;
+          if (!rawMonto) {
+            toast.mostrarError('Por favor ingresá un monto válido mayor a 0.');
+            return false;
+          }
 
-  if (input === null) return; // Cancelado por el admin
+          const monto = parseFloat(String(rawMonto).replace(/\./g, '').replace(',', '.'));
+          if (isNaN(monto) || monto <= 0) {
+            toast.mostrarError('Por favor ingresá un monto válido mayor a 0.');
+            return false;
+          }
 
-  const monto = parseFloat(input.replace(/\./g, '').replace(',', '.'));
-  if (isNaN(monto) || monto <= 0) {
-    alert('Por favor ingresá un monto válido mayor a 0.');
-    return;
-  }
+          try {
+            vibrar_toque();
+            await pedidos_service.aprobar_comprobante(pedidoId, monto);
+            await vibrar_exito();
+            toast.mostrarExito('¡Comprobante aprobado exitosamente!');
+            await cargarFinanzas();
+            return true;
+          } catch (err) {
+            await vibrar_error();
+            toast.mostrarError(err.mensaje || err.message || 'No se pudo aprobar el comprobante.');
+            return false;
+          }
+        }
+      }
+    ]
+  });
 
-  try {
-    vibrar_toque();
-    await pedidos_service.aprobar_comprobante(pedidoId, monto);
-    await vibrar_exito();
-    await cargarFinanzas();
-  } catch (err) {
-    await vibrar_error();
-    alert(err.mensaje || err.message || 'No se pudo aprobar el comprobante.');
-  }
+  await alert.present();
 };
 
 const rechazarComprobanteDirecto = async (pedidoId) => {
-  const motivo = prompt('Ingresá el motivo del rechazo del comprobante:', 'Comprobante no acreditado en cuenta');
-  if (motivo === null) return;
+  const alert = await alertController.create({
+    header: 'Rechazar Comprobante',
+    message: 'Ingresá el motivo del rechazo del comprobante de pago:',
+    inputs: [
+      {
+        name: 'motivo',
+        type: 'text',
+        placeholder: 'Motivo de rechazo',
+        value: 'Comprobante no acreditado en cuenta'
+      }
+    ],
+    buttons: [
+      {
+        text: 'Cancelar',
+        role: 'cancel'
+      },
+      {
+        text: 'Rechazar Pago',
+        role: 'destructive',
+        handler: async (data) => {
+          const motivo = data?.motivo?.trim();
+          if (!motivo) {
+            toast.mostrarError('Por favor especificá el motivo del rechazo.');
+            return false;
+          }
 
-  try {
-    vibrar_toque();
-    await pedidos_service.rechazar_comprobante(pedidoId, motivo);
-    await vibrar_exito();
-    await cargarFinanzas();
-  } catch (err) {
-    await vibrar_error();
-    alert(err.mensaje || err.message || 'No se pudo rechazar el comprobante.');
-  }
+          try {
+            vibrar_toque();
+            await pedidos_service.rechazar_comprobante(pedidoId, motivo);
+            await vibrar_exito();
+            toast.mostrarExito('Comprobante rechazado correctamente.');
+            await cargarFinanzas();
+            return true;
+          } catch (err) {
+            await vibrar_error();
+            toast.mostrarError(err.mensaje || err.message || 'No se pudo rechazar el comprobante.');
+            return false;
+          }
+        }
+      }
+    ]
+  });
+
+  await alert.present();
 };
 
 onMounted(() => {

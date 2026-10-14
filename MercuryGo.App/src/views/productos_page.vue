@@ -225,11 +225,11 @@
 
     <!-- Toast de Notificación -->
     <ion-toast
-      :is-open="mostrarToast"
-      :message="mensajeToast"
-      :color="colorToast"
+      :is-open="toast.visible.value"
+      :message="toast.mensaje.value"
+      :color="toast.color.value"
       duration="2500"
-      @didDismiss="mostrarToast = false"
+      @didDismiss="toast.ocultar"
     />
   </comp-page>
 </template>
@@ -276,6 +276,7 @@ import { sesion_store } from '@/stores/sesion_store';
 import { tomar_foto, camara_disponible } from '@/services/camara_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
+import { useToast } from '@/composables/useToast';
 
 const busqueda = ref('');
 const categoriaSeleccionada = ref(null);
@@ -290,6 +291,8 @@ const productoSeleccionadoParaEditar = ref(null);
 const mostrarActionSheetFoto = ref(false);
 const productoSeleccionadoParaFoto = ref(null);
 const inputFotoProducto = ref(null);
+
+const toast = useToast();
 
 const abrirNuevoProducto = () => {
   vibrar_toque();
@@ -311,14 +314,8 @@ const alGuardarProducto = async () => {
     productos_store.cargar_resumen(),
     productos_store.cargar_listado(true)
   ]);
-  mensajeToast.value = '¡Producto guardado exitosamente!';
-  colorToast.value = 'success';
-  mostrarToast.value = true;
+  toast.mostrarExito('¡Producto guardado exitosamente!');
 };
-
-const mostrarToast = ref(false);
-const mensajeToast = ref('');
-const colorToast = ref('success');
 
 const imagenesConError = ref({});
 const fallbackIntentado = ref({});
@@ -379,9 +376,7 @@ const capturarFotoProducto = async (origen) => {
     await subirFotoProducto(productoSeleccionadoParaFoto.value, res.archivo);
   } else if (res.mensaje && !res.cancelado) {
     await vibrar_error();
-    mensajeToast.value = res.mensaje;
-    colorToast.value = 'warning';
-    mostrarToast.value = true;
+    toast.mostrarAdvertencia(res.mensaje);
   }
 };
 
@@ -395,9 +390,7 @@ const alSeleccionarFotoWeb = async (event) => {
 
 const subirFotoProducto = async (producto, archivo) => {
   try {
-    mensajeToast.value = 'Subiendo imagen del producto…';
-    colorToast.value = 'primary';
-    mostrarToast.value = true;
+    toast.mostrarInfo('Subiendo imagen del producto…');
 
     const res = await productos_service.subir_imagen(producto.id, archivo);
     producto.imagen_url = res.imagen_url;
@@ -409,14 +402,10 @@ const subirFotoProducto = async (producto, archivo) => {
     await productos_store.cargar_resumen();
 
     await vibrar_exito();
-    mensajeToast.value = `¡Foto de '${producto.nombre}' actualizada exitosamente!`;
-    colorToast.value = 'success';
-    mostrarToast.value = true;
+    toast.mostrarExito(`¡Foto de '${producto.nombre}' actualizada exitosamente!`);
   } catch (err) {
     await vibrar_error();
-    mensajeToast.value = err.mensaje || 'Error al subir la imagen del producto.';
-    colorToast.value = 'danger';
-    mostrarToast.value = true;
+    toast.mostrarError(err.mensaje || 'Error al subir la imagen del producto.');
   }
 };
 
@@ -457,15 +446,11 @@ const agregarAlCarrito = (producto) => {
     return;
   }
   carrito_store.agregar_producto(producto, 1);
-  mensajeToast.value = `¡${producto.nombre} agregado al carrito!`;
-  colorToast.value = 'success';
-  mostrarToast.value = true;
+  toast.mostrarExito(`¡${producto.nombre} agregado al carrito!`);
 };
 
 const alCrearPedido = (pedidoCreado) => {
-  mensajeToast.value = `¡Orden ${pedidoCreado.numero} confirmada como Pendiente!`;
-  colorToast.value = 'success';
-  mostrarToast.value = true;
+  toast.mostrarExito(`¡Orden ${pedidoCreado.numero} confirmada como Pendiente!`);
 };
 
 const recargar = (event = null) => {
@@ -480,41 +465,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.mercury-seccion-chips {
-  padding-bottom: 2px;
-}
-
-.mercury-chips-secundarios {
-  padding-bottom: 8px;
-}
-
-.mercury-chips-scroll {
-  display: flex;
-  overflow-x: auto;
-  padding: 0 12px;
-  gap: 6px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.mercury-chips-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.mercury-chip {
-  font-size: 0.82rem;
-  font-weight: 600;
-  margin: 0;
-  flex-shrink: 0;
-  --border-radius: 8px;
-  cursor: pointer;
-}
-
-.mercury-chip-sm {
-  font-size: 0.76rem;
-  height: 28px;
-}
-
 .mercury-btn-carrito {
   position: relative;
   --padding-start: 8px;
