@@ -236,6 +236,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   IonItem,
   IonLabel,
@@ -281,6 +282,7 @@ const categoriaSeleccionada = ref(null);
 const filtroDisponible = ref(null);
 const filtroOferta = ref(null);
 
+const router = useRouter();
 const mostrarCarrito = ref(false);
 const mostrarModalProducto = ref(false);
 const productoSeleccionadoParaEditar = ref(null);
@@ -450,6 +452,10 @@ const limpiarFiltrosSecundarios = () => {
 
 const agregarAlCarrito = (producto) => {
   vibrar_toque();
+  if (!sesion_store.autenticado) {
+    router.push('/login');
+    return;
+  }
   carrito_store.agregar_producto(producto, 1);
   mensajeToast.value = `¡${producto.nombre} agregado al carrito!`;
   colorToast.value = 'success';

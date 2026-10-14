@@ -1,10 +1,6 @@
 <template>
   <comp-page titulo="Ofertas MercuryGO" :mostrar_actualizar="true" @actualizar="alActualizar">
     <template #acciones>
-      <ion-button title="Notificaciones" @click="abrirNotificaciones">
-        <ion-icon slot="icon-only" :icon="notificationsOutline" />
-        <ion-badge v-if="noLeidas > 0" color="danger" class="mercury-badge-notif-btn">{{ noLeidas }}</ion-badge>
-      </ion-button>
       <ion-button v-if="sesion_store.es_admin" title="Agregar Nuevo Producto" @click="abrirNuevoProducto">
         <ion-icon slot="icon-only" :icon="addCircleOutline" />
       </ion-button>
@@ -98,18 +94,12 @@
       @cerrar="mostrarModalProducto = false"
       @producto_guardado="alGuardarProducto"
     />
-
-    <!-- Modal Centro de Notificaciones In-App (Semana 7 / Cátedra) -->
-    <comp-notificaciones-modal
-      :abierto="mostrarModalNotificaciones"
-      @cerrar="mostrarModalNotificaciones = false"
-      @actualizado="alActualizarNotificaciones"
-    />
   </comp-page>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   IonCard,
   IonCardContent,
@@ -122,23 +112,20 @@ import {
   cubeOutline,
   cartOutline,
   createOutline,
-  addCircleOutline,
-  notificationsOutline
+  addCircleOutline
 } from 'ionicons/icons';
 import CompPage from '../components/estructura/comp_page.vue';
 import CompProductoModal from '../components/dominio/productos/comp_producto_modal.vue';
-import CompNotificacionesModal from '../components/modales/comp_notificaciones_modal.vue';
 import { productos_store } from '@/stores/productos_store';
 import { carrito_store } from '@/stores/carrito_store';
 import { sesion_store } from '@/stores/sesion_store';
-import { notificaciones_service } from '@/services/notificaciones_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
 import { vibrar_toque, vibrar_exito } from '@/services/vibracion_service';
 
+const router = useRouter();
+
 const mostrarModalProducto = ref(false);
 const productoSeleccionadoParaEditar = ref(null);
-const mostrarModalNotificaciones = ref(false);
-const noLeidas = ref(0);
 const fallbacksOferta = ref({});
 
 const ofertas = computed(() => productos_store.ofertas);
@@ -159,26 +146,12 @@ const alErrorImagenOferta = (oferta) => {
   oferta.imagen_url = null;
 };
 
-const abrirNotificaciones = () => {
-  vibrar_toque();
-  mostrarModalNotificaciones.value = true;
-};
-
-const alActualizarNotificaciones = (cantidad) => {
-  noLeidas.value = cantidad;
-};
-
-const consultarNoLeidas = async () => {
-  try {
-    const res = await notificaciones_service.obtener_bandeja(1);
-    noLeidas.value = res?.no_leidas || 0;
-  } catch {
-    // Silencioso si la API está fuera de línea
-  }
-};
-
 const sumarAlCarrito = (producto) => {
   vibrar_toque();
+  if (!sesion_store.autenticado) {
+    router.push('/login');
+    return;
+  }
   carrito_store.agregar_producto(producto, 1);
 };
 
@@ -200,15 +173,11 @@ const alGuardarProducto = async () => {
 };
 
 const alActualizar = async (event) => {
-  await Promise.all([
-    productos_store.cargar_resumen(event),
-    consultarNoLeidas()
-  ]);
+  await productos_store.cargar_resumen(event);
 };
 
 onMounted(() => {
   productos_store.cargar_resumen();
-  consultarNoLeidas();
 });
 </script>
 
@@ -361,14 +330,5 @@ onMounted(() => {
 .mercury-btn-sumar {
   --border-radius: 8px;
   font-weight: 600;
-}
-
-.mercury-badge-notif-btn {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 0.65rem;
-  border-radius: 10px;
-  padding: 2px 5px;
 }
 </style>

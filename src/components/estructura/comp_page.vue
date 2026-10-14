@@ -7,8 +7,13 @@
         </ion-buttons>
         <ion-title>{{ titulo }}</ion-title>
         <ion-buttons slot="end">
-          <!-- Campana de Notificaciones (Semana 7) -->
-          <ion-button title="Notificaciones" @click="mostrarModalNotif = true" class="btn-notificaciones">
+          <!-- Campana de Notificaciones (Semana 7) - Solo visible si hay sesión activa -->
+          <ion-button
+            v-if="sesion_store.autenticado"
+            title="Notificaciones"
+            @click="mostrarModalNotif = true"
+            class="btn-notificaciones"
+          >
             <ion-icon slot="icon-only" :icon="notificationsOutline" />
             <ion-badge v-if="noLeidas > 0" color="danger" class="badge-notif">
               {{ noLeidas > 99 ? '99+' : noLeidas }}
@@ -36,7 +41,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { 
   IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonMenuButton, IonContent, IonRefresher, IonRefresherContent,
@@ -45,6 +50,7 @@ import {
 import { notificationsOutline } from 'ionicons/icons';
 import CompNotificacionesModal from '@/components/modales/comp_notificaciones_modal.vue';
 import { notificaciones_service } from '@/services/notificaciones_service';
+import { sesion_store } from '@/stores/sesion_store';
 
 defineProps({
   titulo: { type: String, required: true },
@@ -61,6 +67,7 @@ const actualizarConteo = (total) => {
 };
 
 const consultarNoLeidas = async () => {
+  if (!sesion_store.autenticado) return;
   try {
     const res = await notificaciones_service.obtener_bandeja(1);
     if (res && typeof res.no_leidas === 'number') {
@@ -73,6 +80,14 @@ const consultarNoLeidas = async () => {
 
 onMounted(() => {
   consultarNoLeidas();
+});
+
+watch(() => sesion_store.autenticado, (activo) => {
+  if (activo) {
+    consultarNoLeidas();
+  } else {
+    noLeidas.value = 0;
+  }
 });
 
 const ejecutar_actualizar = (event) => {
