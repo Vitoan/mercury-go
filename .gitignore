@@ -24,12 +24,12 @@ npm-debug.log*
 /.versions
 /.vscode/*
 !/.vscode/extensions.json
-/coverage
-/dist
-/node_modules
-/platforms
-/plugins
-/www
+coverage/
+dist/
+node_modules/
+platforms/
+plugins/
+www/
 
 # .NET / C#
 bin/
@@ -40,9 +40,12 @@ obj/
 .vs/
 _ReSharper*/
 
-# Environment
-.env.local
-.env.*.local
+# Environment & Sensitive
+.env
+.env.*
+!.env.development
+*.local
+google-services.json
 
 # CodeGraph
 .codegraph/
