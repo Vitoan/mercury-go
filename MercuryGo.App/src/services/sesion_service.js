@@ -14,5 +14,5 @@ export function cerrar_sesion(refresh_token, todos = false) {
 
 // Obtiene los datos del usuario logueado (/api/sesion/yo)
 export function obtener_mi_usuario() {
-  return ajax_service.get('/api/sesion/yo');
+  return ajax_service.get('/api/sesion/yo', { guardable: true });
 }

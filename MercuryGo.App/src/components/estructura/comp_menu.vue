@@ -48,12 +48,16 @@ import {
 } from '@ionic/vue';
 import { navegacion } from '../../config/navegacion';
 import { sesion_store } from '@/stores/sesion_store';
+import { use_offline_store } from '@/stores/offline_store';
 
 defineProps({
   content_id: { type: String, required: true }
 });
 
+const offline_store = use_offline_store();
+
 const puede_ver = (item) => {
+  if (offline_store.sin_conexion && !item.sin_red) return false;
   const rol = sesion_store.rol_activo;
   if (!rol) return item.id === 'inicio' || item.id === 'cuenta';
   return !item.roles || item.roles.includes(rol);

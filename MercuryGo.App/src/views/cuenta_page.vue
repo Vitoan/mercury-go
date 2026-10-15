@@ -132,39 +132,6 @@
           </ion-item>
         </ion-card-content>
       </ion-card>
-
-      <!-- Tarjeta de Diagnóstico de Red y API -->
-      <ion-card>
-        <ion-card-header>
-          <ion-card-subtitle>Conexión</ion-card-subtitle>
-          <ion-card-title>Diagnóstico de Red</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-          <ion-item lines="none">
-            <ion-icon slot="start" :icon="cloudOutline" />
-            <ion-label>
-              <p>Esta app le pide los datos a</p>
-              <h3 class="mercury-url-api">{{ api_url }}</h3>
-            </ion-label>
-          </ion-item>
-
-          <div v-if="estado_diagnostico !== 'inicial'" class="diagnostico-resultado" :class="estado_diagnostico">
-            <ion-spinner v-if="estado_diagnostico === 'probando'" name="dots" />
-            <ion-icon v-else :icon="estado_diagnostico === 'ok' ? checkmarkCircleOutline : alertCircleOutline" />
-            <span>{{ mensaje_diagnostico }}</span>
-          </div>
-
-          <ion-button
-            expand="block"
-            fill="outline"
-            style="margin-top: 14px;"
-            :disabled="estado_diagnostico === 'probando'"
-            @click="probar_conexion"
-          >
-            Probar conexión
-          </ion-button>
-        </ion-card-content>
-      </ion-card>
     </div>
   </comp-page>
 </template>
@@ -177,16 +144,14 @@ import {
   IonItem, IonLabel, IonIcon, IonToggle, IonButton, IonSpinner, IonBadge 
 } from '@ionic/vue';
 import { 
-  personCircleOutline, contrastOutline, cloudOutline, 
-  checkmarkCircleOutline, alertCircleOutline, logOutOutline,
+  personCircleOutline, contrastOutline, 
+  alertCircleOutline, logOutOutline,
   phonePortraitOutline, cardOutline
 } from 'ionicons/icons';
 import CompPage from '../components/estructura/comp_page.vue';
 import CompComprobanteModal from '../components/dominio/pedidos/comp_comprobante_modal.vue';
 import { alternar_tema, es_tema_oscuro } from '../config/tema';
 import { alternar_vibracion, es_vibracion_activa, vibrar_toque } from '../services/vibracion_service';
-import { obtener_api_url } from '../config/debug';
-import { consultar_health } from '../services/health_service';
 import { sesion_store } from '@/stores/sesion_store';
 import { pedidos_service } from '@/services/pedidos_service';
 
@@ -194,9 +159,6 @@ const router = useRouter();
 
 const modoOscuro = ref(false);
 const vibracionActiva = ref(true);
-const api_url = ref(obtener_api_url());
-const estado_diagnostico = ref('inicial');
-const mensaje_diagnostico = ref('');
 
 const cuentaCorriente = ref(null);
 const cargandoCC = ref(false);
@@ -242,20 +204,6 @@ const toggleTema = () => {
 
 const toggleVibracion = () => {
   vibracionActiva.value = alternar_vibracion();
-};
-
-const probar_conexion = async () => {
-  estado_diagnostico.value = 'probando';
-  mensaje_diagnostico.value = 'Probando conexión con la API…';
-  try {
-    const res = await consultar_health();
-    estado_diagnostico.value = 'ok';
-    const hora = res.utc ? new Date(res.utc).toLocaleTimeString('es-AR') : '';
-    mensaje_diagnostico.value = `La API respondió: ${res.status || 'ok'} ${hora ? '· ' + hora : ''}`;
-  } catch (error) {
-    estado_diagnostico.value = 'error';
-    mensaje_diagnostico.value = error.message || 'No se pudo conectar con la API.';
-  }
 };
 
 const confirmarCerrarSesion = async () => {
@@ -398,11 +346,6 @@ onMounted(() => {
   color: var(--mercury-text-hint);
 }
 
-.mercury-url-api {
-  font-weight: 600;
-  color: var(--mercury-accent);
-}
-
 .mercury-aviso-pendiente {
   display: flex;
   align-items: flex-start;
@@ -420,30 +363,5 @@ onMounted(() => {
   font-size: 22px;
   flex-shrink: 0;
   margin-top: 2px;
-}
-
-.diagnostico-resultado {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  margin-top: 10px;
-  font-size: 0.9rem;
-}
-
-.diagnostico-resultado.ok {
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--ion-color-success, #22c55e);
-}
-
-.diagnostico-resultado.error {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--ion-color-danger, #ef4444);
-}
-
-.diagnostico-resultado.probando {
-  background: rgba(56, 189, 248, 0.12);
-  color: var(--ion-color-primary, #38bdf8);
 }
 </style>

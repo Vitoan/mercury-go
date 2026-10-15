@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using QuestPDF.Infrastructure;
+using Microsoft.AspNetCore.Identity;
 using MercuryGo.Api.Auth;
 using MercuryGo.Api.Data;
+using MercuryGo.Api.Domain.Entities;
 
 // QuestPDF exige declarar la licencia Community
 QuestPDF.Settings.License = LicenseType.Community;
@@ -16,19 +18,19 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("Default") 
     ?? "Server=localhost;Port=3306;Database=mercurygo_app;User=mercurygo_app;Password=MercuryGO_2026!;";
 
-const string corsPolicy = "IonicDevelopment";
-var corsAllowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-
-if (builder.Environment.IsDevelopment() && corsAllowedOrigins.Length == 0)
+const string corsPolicy = "MercuryGoCors";
+var corsConfigurados = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var origenesProduccion = new List<string>
 {
-    corsAllowedOrigins = [
-        "http://localhost:8100",
-        "http://127.0.0.1:8100",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "capacitor://localhost",
-        "ionic://localhost"
-    ];
+    "http://localhost",
+    "https://localhost",
+    "http://localhost:8100",
+    "capacitor://localhost",
+    "ionic://localhost"
+};
+if (corsConfigurados.Length > 0)
+{
+    origenesProduccion.AddRange(corsConfigurados);
 }
 
 var jwtOpciones = builder.Configuration.GetSection(JwtOpciones.Seccion).Get<JwtOpciones>() ?? new JwtOpciones();
@@ -104,31 +106,30 @@ builder.Services.AddDbContext<MercuryGoDbContext>(options =>
     options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)))
            .UseSnakeCaseNamingConvention());
 
-if (builder.Environment.IsDevelopment())
+builder.Services.AddCors(options => 
 {
-    builder.Services.AddCors(options => 
-        options.AddPolicy(corsPolicy, policy => 
+    options.AddPolicy(corsPolicy, policy => 
+    {
+        if (builder.Environment.IsDevelopment())
+        {
             policy.SetIsOriginAllowed(EsOrigenDesarrolloPermitido)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .SetPreflightMaxAge(TimeSpan.FromHours(1))));
-}
-else if (corsAllowedOrigins.Length > 0)
-{
-    builder.Services.AddCors(options => 
-        options.AddPolicy(corsPolicy, policy => 
-            policy.WithOrigins(corsAllowedOrigins)
+                  .SetPreflightMaxAge(TimeSpan.FromHours(1));
+        }
+        else
+        {
+            policy.WithOrigins(origenesProduccion.Distinct().ToArray())
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .SetPreflightMaxAge(TimeSpan.FromHours(1))));
-}
+                  .SetPreflightMaxAge(TimeSpan.FromHours(1));
+        }
+    });
+});
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment() || corsAllowedOrigins.Length > 0)
-{
-    app.UseCors(corsPolicy);
-}
+app.UseCors(corsPolicy);
 
 // Asegurar directorios de uploads de archivos y fotos
 var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
@@ -151,11 +152,29 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseAuthentication();
 app.UseAuthorization();
 
-if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
+// Aplicar migraciones de base de datos automáticamente al arrancar
+await using (var scope = app.Services.CreateAsyncScope())
 {
-    await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<MercuryGoDbContext>();
     await db.Database.MigrateAsync();
+
+    // Sincronizar o validar contraseña de Admin en producción
+    var adminPassword = app.Configuration["Admin:Password"];
+    if (!string.IsNullOrWhiteSpace(adminPassword))
+    {
+        if (!app.Environment.IsDevelopment() && adminPassword.Length < 8)
+        {
+            throw new InvalidOperationException("La contraseña configurada en Admin:Password debe tener al menos 8 caracteres en entornos productivos.");
+        }
+
+        var adminUser = await db.Usuarios.FirstOrDefaultAsync(u => u.Email == "admin@mercurygo.local");
+        if (adminUser != null)
+        {
+            var hasher = new PasswordHasher<Usuario>();
+            adminUser.PasswordHash = hasher.HashPassword(adminUser, adminPassword);
+            await db.SaveChangesAsync();
+        }
+    }
 }
 
 app.MapControllers();

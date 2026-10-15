@@ -44,8 +44,12 @@ _ReSharper*/
 .env
 .env.*
 !.env.development
+!.env.release
 *.local
 google-services.json
+keystore.properties
+*.jks
+*.keystore
 
 # CodeGraph
 .codegraph/

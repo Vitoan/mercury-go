@@ -1,23 +1,31 @@
 <template>
   <comp-page titulo="Órdenes de Carga y Despacho" :mostrar_actualizar="true" @actualizar="recargar">
     <template #acciones>
-      <ion-button title="Escanear Código QR de Remito" @click="escanearRemitoQr">
+      <ion-button v-if="!offline_store.sin_conexion" title="Escanear Código QR de Remito" @click="escanearRemitoQr">
         <ion-icon slot="icon-only" :icon="qrCodeOutline" />
       </ion-button>
-      <ion-button v-if="sesion_store.es_admin" title="Nuevo Pedido Asistido" @click="workflow.mostrarModalNuevoPedido.value = true">
+      <ion-button v-if="sesion_store.es_admin && !offline_store.sin_conexion" title="Nuevo Pedido Asistido" @click="workflow.mostrarModalNuevoPedido.value = true">
         <ion-icon slot="icon-only" :icon="addCircleOutline" />
       </ion-button>
     </template>
 
+    <!-- Aviso de modo sin conexión (Semana 8) -->
+    <div v-if="offline_store.sin_conexion" class="ion-padding-horizontal ion-padding-top">
+      <ion-note color="warning" class="mercury-offline-banner">
+        📡 <strong>Sin conexión:</strong> estás viendo los datos guardados en tu teléfono. Podés cambiar el estado de un pedido (por ejemplo, registrar entrega en destino); se enviará solo cuando vuelva la red.
+      </ion-note>
+    </div>
+
     <!-- Buscador con debounce en servidor -->
     <comp-buscador
+      v-if="!offline_store.sin_conexion"
       v-model="busqueda"
       placeholder="Buscar por remito (PED-...) o cliente…"
       @buscar="alBuscar"
     />
 
     <!-- Fila de Chips de Estado Logístico con Conteo Real e Iconos -->
-    <div class="mercury-seccion-chips">
+    <div v-if="!offline_store.sin_conexion" class="mercury-seccion-chips">
       <div class="mercury-chips-scroll">
         <ion-chip
           :color="estadoSeleccionado === '' ? 'primary' : 'medium'"
@@ -156,15 +164,19 @@
           </div>
         </ion-label>
 
-        <!-- Badge de estado clickeable para abrir opciones de transición -->
-        <ion-badge
-          slot="end"
-          :color="obtener_color_estado(p.estado)"
-          class="mercury-badge-estado"
-          @click.stop="workflow.abrirOpcionesEstado(p)"
-        >
-          {{ workflow.formatear_nombre_estado(p.estado) }}
-        </ion-badge>
+        <!-- Badge de estado clickeable para abrir opciones de transición y badge offline -->
+        <div slot="end" class="mercury-pedido-estado-columna">
+          <ion-badge
+            :color="obtener_color_estado(p.estado)"
+            class="mercury-badge-estado"
+            @click.stop="workflow.abrirOpcionesEstado(p)"
+          >
+            {{ workflow.formatear_nombre_estado(p.estado) }}
+          </ion-badge>
+          <ion-badge v-if="p.sin_enviar" color="warning" class="mercury-badge-sin-enviar">
+            Sin enviar
+          </ion-badge>
+        </div>
       </ion-item>
     </comp-lista>
 
@@ -238,6 +250,7 @@ import {
   IonButton,
   IonActionSheet,
   IonToast,
+  IonNote,
   onIonViewWillEnter
 } from '@ionic/vue';
 import {
@@ -267,12 +280,14 @@ import CompCobroChoferModal from '../components/dominio/pedidos/comp_cobro_chofe
 
 import { usePedidosStore } from '@/stores/pedidos_store';
 import { useSesionStore } from '@/stores/sesion_store';
+import { use_offline_store } from '@/stores/offline_store';
 import { useToast } from '@/composables/useToast';
 import { usePedidosWorkflow } from '@/composables/usePedidosWorkflow';
 import { useEscaneoQr } from '@/composables/useEscaneoQr';
 
 const pedidos_store = usePedidosStore();
 const sesion_store = useSesionStore();
+const offline_store = use_offline_store();
 const toast = useToast();
 const workflow = usePedidosWorkflow(toast);
 

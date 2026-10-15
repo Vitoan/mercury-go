@@ -20,6 +20,7 @@ export const navegacion = [
     icono: homeOutline,
     componente: () => import('@/views/inicio_page.vue'),
     en_tabs: true,
+    sin_red: true,
     roles: ['ADMIN', 'OPERARIO', 'CHOFER', 'CLIENTE']
   },
   {
@@ -31,6 +32,7 @@ export const navegacion = [
     icono: cubeOutline,
     componente: () => import('@/views/productos_page.vue'),
     en_tabs: true,
+    sin_red: false,
     roles: ['ADMIN', 'CLIENTE']
   },
   {
@@ -42,6 +44,7 @@ export const navegacion = [
     icono: businessOutline,
     componente: () => import('@/views/clientes_page.vue'),
     en_tabs: true,
+    sin_red: false,
     roles: ['ADMIN']
   },
   {
@@ -53,6 +56,7 @@ export const navegacion = [
     icono: receiptOutline,
     componente: () => import('@/views/pedidos_page.vue'),
     en_tabs: true,
+    sin_red: true,
     roles: ['ADMIN', 'OPERARIO', 'CHOFER', 'CLIENTE']
   },
   {
@@ -64,6 +68,7 @@ export const navegacion = [
     icono: peopleOutline,
     componente: () => import('@/views/usuarios_page.vue'),
     en_tabs: false, // Accesible desde menú lateral para ADMIN
+    sin_red: false,
     roles: ['ADMIN']
   },
   {
@@ -75,6 +80,7 @@ export const navegacion = [
     icono: personCircleOutline,
     componente: () => import('@/views/cuenta_page.vue'),
     en_tabs: true,
+    sin_red: true,
     roles: ['ADMIN', 'OPERARIO', 'CHOFER', 'CLIENTE']
   }
 ];

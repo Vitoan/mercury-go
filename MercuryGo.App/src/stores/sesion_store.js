@@ -2,6 +2,8 @@ import { ref, computed } from 'vue';
 import { defineStore } from 'pinia';
 import { cerrar_sesion, iniciar_sesion, obtener_mi_usuario } from '@/services/sesion_service';
 import { usePedidosStore } from '@/stores/pedidos_store';
+import { borrar_copias } from '@/services/copia_local_service';
+import { use_offline_store } from '@/stores/offline_store';
 import {
   al_expirar,
   borrar_sesion,
@@ -94,6 +96,13 @@ export const useSesionStore = defineStore('sesion', () => {
     try {
       const pedidosStore = usePedidosStore();
       pedidosStore.resetear_store();
+    } catch {
+      // Ignorar si aún no está inicializado
+    }
+    await borrar_copias();
+    try {
+      const offlineStore = use_offline_store();
+      offlineStore.guardar_cola([]);
     } catch {
       // Ignorar si aún no está inicializado
     }

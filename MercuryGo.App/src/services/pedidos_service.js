@@ -3,16 +3,16 @@ import { construir_query } from '@/utils/consulta';
 
 export const pedidos_service = {
   obtener_resumen() {
-    return ajax_service.get('api/pedidos/resumen');
+    return ajax_service.get('api/pedidos/resumen', { guardable: true });
   },
 
   obtener_pedidos(parametros = {}) {
     const query = construir_query(parametros);
-    return ajax_service.get(`api/pedidos${query}`);
+    return ajax_service.get(`api/pedidos${query}`, { guardable: true });
   },
 
   obtener_por_id(id) {
-    return ajax_service.get(`api/pedidos/${id}`);
+    return ajax_service.get(`api/pedidos/${id}`, { guardable: true });
   },
 
   crear(pedido) {

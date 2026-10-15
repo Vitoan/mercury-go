@@ -1,6 +1,20 @@
 import { ref, computed } from 'vue';
 import { defineStore } from 'pinia';
 import { pedidos_service } from '@/services/pedidos_service';
+import { use_offline_store } from '@/stores/offline_store';
+
+export function con_cambios_sin_enviar(pedido) {
+  if (!pedido) return pedido;
+  const offline = use_offline_store();
+  const cambios = (offline.cola || []).filter((c) => c.pedido_id === pedido.id);
+  if (cambios.length === 0) return pedido;
+  const ultimo = cambios[cambios.length - 1];
+  return {
+    ...pedido,
+    estado: ultimo.estado,
+    sin_enviar: true
+  };
+}
 
 export const usePedidosStore = defineStore('pedidos', () => {
   const cargando = ref(false);
@@ -50,7 +64,7 @@ export const usePedidosStore = defineStore('pedidos', () => {
         tamano: pagina.value.tamano
       });
 
-      const nuevos = res.pedidos || [];
+      const nuevos = (res.pedidos || []).map(con_cambios_sin_enviar);
       pagina.value = res.pagina || { pagina: 1, tamano: 10, total: nuevos.length, hay_mas: false };
 
       if (resetear || pagina.value.pagina === 1) {
@@ -94,6 +108,12 @@ export const usePedidosStore = defineStore('pedidos', () => {
   }
 
   async function cambiar_estado(id, nuevoEstado, latitud = null, longitud = null) {
+    const offline = use_offline_store();
+    if (offline.sin_conexion) {
+      offline.encolar(id, nuevoEstado, latitud, longitud);
+      pedidos.value = pedidos.value.map(con_cambios_sin_enviar);
+      return { id, estado: nuevoEstado, sin_enviar: true };
+    }
     const res = await pedidos_service.cambiar_estado(id, nuevoEstado, latitud, longitud);
     await cargar(true);
     return res;

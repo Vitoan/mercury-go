@@ -1,4 +1,5 @@
 import { obtener_api_url } from '@/config/debug';
+import { guardar_copia, obtener_copia } from '@/services/copia_local_service';
 import {
   asegurar_token,
   cabecera_autorizacion,
@@ -7,14 +8,12 @@ import {
   obtener_refresh_token
 } from '@/services/token_service';
 
-// El único módulo de la app que habla con la API.
-const api_url = obtener_api_url();
-
 // Semáforo de renovación única: si varias peticiones reciben 401 simultáneamente,
 // todas esperan la MISMA llamada a /api/sesion/refresh para evitar invalidar tokens por rotación.
 let renovacion_en_curso = null;
 
 function construir_url(endpoint) {
+  const api_url = obtener_api_url();
   if (!api_url) throw new Error('No se configuró la URL de la API.');
   return `${api_url.replace(/\/+$/, '')}/${String(endpoint).replace(/^\/+/, '')}`;
 }
@@ -148,9 +147,21 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
     if (opciones.es_blob) {
       return await respuesta.blob();
     }
-    return await respuesta.json();
+    const resultado = await respuesta.json();
+    if (opciones.guardable) {
+      guardar_copia(endpoint, resultado);
+    }
+    return resultado;
   } catch (error) {
     clearTimeout(timer);
+
+    // Si la lectura es guardable y no hay conexión con la API, devolver la copia local si existe
+    if (opciones.guardable && (!error.estado_http || error.estado_http === 0)) {
+      const copia = obtener_copia(endpoint);
+      if (copia) {
+        return copia;
+      }
+    }
 
     if (error.name === 'AbortError') {
       const err = new Error('Tiempo de espera agotado. La API no responde.');
@@ -295,3 +306,16 @@ export const ajax_service = {
     });
   }
 };
+
+export function ajax_request(configuracion = {}) {
+  const {
+    endpoint,
+    metodo = 'GET',
+    datos = null,
+    headers = {},
+    timeout = 15000,
+    guardable = false,
+    renovar = true
+  } = configuracion;
+  return ejecutar_fetch(metodo.toUpperCase(), endpoint, datos, { headers, timeout, guardable, renovar });
+}

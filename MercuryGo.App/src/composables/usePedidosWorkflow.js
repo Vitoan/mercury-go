@@ -6,6 +6,7 @@ import { compartir_archivo } from '@/services/compartir_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { geolocalizacion_service } from '@/services/geolocalizacion_service';
 import { notificaciones_service } from '@/services/notificaciones_service';
+import { use_offline_store } from '@/stores/offline_store';
 
 export function usePedidosWorkflow(toast) {
   const mostrarActionSheet = ref(false);
@@ -36,6 +37,19 @@ export function usePedidosWorkflow(toast) {
   const alTocarPedido = (pedido) => {
     pedidoSeleccionado.value = pedido;
     vibrar_toque();
+
+    const offline = use_offline_store();
+    if (offline.sin_conexion) {
+      if (sesion_store.rol_activo === 'CHOFER') {
+        mostrarActionSheet.value = true;
+      } else {
+        if (sesion_store.rol_activo === 'OPERARIO' && toast) {
+          toast.mostrar('El picking en depósito requiere red. Mostrando detalle guardado.', 'warning');
+        }
+        mostrarModalDetalle.value = true;
+      }
+      return;
+    }
 
     if (sesion_store.rol_activo === 'OPERARIO') {
       mostrarModalPicking.value = true;
@@ -133,6 +147,18 @@ export function usePedidosWorkflow(toast) {
       await pedidos_store.cambiar_estado(pedidoSeleccionado.value.id, nuevoEstado, lat, lng);
       vibrar_exito();
 
+      const offline = use_offline_store();
+      if (offline.sin_conexion) {
+        if (toast) {
+          toast.mostrar(
+            `Orden ${pedidoSeleccionado.value.numero}: estado '${formatear_nombre_estado(nuevoEstado)}' encolado sin red («Sin enviar»).`,
+            'warning'
+          );
+        }
+        mostrarActionSheet.value = false;
+        return;
+      }
+
       if (nuevoEstado === 'EnPuerta') {
         await notificaciones_service.disparar_notificacion_local(
           `🚚 En Puerta (${pedidoSeleccionado.value.numero})`,
@@ -173,6 +199,8 @@ export function usePedidosWorkflow(toast) {
   const botonesTransicion = computed(() => {
     if (!pedidoSeleccionado.value) return [];
     const estadoActual = pedidoSeleccionado.value.estado;
+    const offline = use_offline_store();
+    const sinRed = offline.sin_conexion;
     const botones = [];
 
     botones.push({
@@ -183,13 +211,15 @@ export function usePedidosWorkflow(toast) {
       }
     });
 
-    botones.push({
-      text: '📄 Ver / Compartir Comprobante PDF (con QR)',
-      handler: () => compartirComprobante(pedidoSeleccionado.value)
-    });
+    if (!sinRed) {
+      botones.push({
+        text: '📄 Ver / Compartir Comprobante PDF (con QR)',
+        handler: () => compartirComprobante(pedidoSeleccionado.value)
+      });
+    }
 
     const esChoferOAdmin = sesion_store.rol_activo === 'CHOFER' || sesion_store.es_admin;
-    if (esChoferOAdmin && (estadoActual === 'Despachado' || estadoActual === 'EnPuerta')) {
+    if (!sinRed && esChoferOAdmin && (estadoActual === 'Despachado' || estadoActual === 'EnPuerta')) {
       botones.push({
         text: '💵 Registrar Cobro en Destino (Efectivo / QR)',
         handler: () => {
@@ -199,7 +229,7 @@ export function usePedidosWorkflow(toast) {
       });
     }
 
-    if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
+    if (!sinRed && (estadoActual === 'Pendiente' || estadoActual === 'Confirmado')) {
       botones.push({
         text: '💳 Adjuntar Comprobante de Pago (Foto / PDF)',
         handler: () => abrirModalComprobante(pedidoSeleccionado.value)
@@ -207,7 +237,7 @@ export function usePedidosWorkflow(toast) {
     }
 
     const puedePicking = !sesion_store.rol_activo || sesion_store.rol_activo === 'ADMIN' || sesion_store.rol_activo === 'OPERARIO';
-    if (puedePicking && (estadoActual === 'Confirmado' || estadoActual === 'EnPreparacion')) {
+    if (!sinRed && puedePicking && (estadoActual === 'Confirmado' || estadoActual === 'EnPreparacion')) {
       botones.push({
         text: '📦 Realizar Picking / Preparación en Depósito',
         handler: () => abrirModalPicking(pedidoSeleccionado.value)
@@ -216,7 +246,7 @@ export function usePedidosWorkflow(toast) {
 
     const esCliente = sesion_store.rol_activo === 'CLIENTE';
     if (esCliente) {
-      if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
+      if (!sinRed && (estadoActual === 'Pendiente' || estadoActual === 'Confirmado')) {
         botones.push({
           text: 'Cancelar mi Pedido (✖ Cancelar)',
           role: 'destructive',
@@ -235,31 +265,37 @@ export function usePedidosWorkflow(toast) {
         text: 'Confirmar Pedido (▶ Confirmado)',
         handler: () => ejecutarCambioEstado('Confirmado')
       });
-      botones.push({
-        text: 'Cancelar Pedido (✖ Cancelado)',
-        role: 'destructive',
-        handler: () => ejecutarCambioEstado('Cancelado')
-      });
+      if (!sinRed) {
+        botones.push({
+          text: 'Cancelar Pedido (✖ Cancelado)',
+          role: 'destructive',
+          handler: () => ejecutarCambioEstado('Cancelado')
+        });
+      }
     } else if (estadoActual === 'Confirmado') {
       botones.push({
         text: 'Iniciar Carga en Depósito (▶ En Preparación)',
         handler: () => ejecutarCambioEstado('EnPreparacion')
       });
-      botones.push({
-        text: 'Cancelar Pedido (✖ Cancelado)',
-        role: 'destructive',
-        handler: () => ejecutarCambioEstado('Cancelado')
-      });
+      if (!sinRed) {
+        botones.push({
+          text: 'Cancelar Pedido (✖ Cancelado)',
+          role: 'destructive',
+          handler: () => ejecutarCambioEstado('Cancelado')
+        });
+      }
     } else if (estadoActual === 'EnPreparacion') {
       botones.push({
         text: 'Despachar al Camión (▶ En Ruta)',
         handler: () => ejecutarCambioEstado('Despachado')
       });
-      botones.push({
-        text: 'Cancelar Pedido (✖ Cancelado)',
-        role: 'destructive',
-        handler: () => ejecutarCambioEstado('Cancelado')
-      });
+      if (!sinRed) {
+        botones.push({
+          text: 'Cancelar Pedido (✖ Cancelado)',
+          role: 'destructive',
+          handler: () => ejecutarCambioEstado('Cancelado')
+        });
+      }
     } else if (estadoActual === 'Despachado') {
       botones.push({
         text: 'Llegando al Destino (▶ En Puerta)',
@@ -269,21 +305,25 @@ export function usePedidosWorkflow(toast) {
         text: 'Confirmar Entrega Directa (✔ Entregado)',
         handler: () => ejecutarCambioEstado('Entregado')
       });
-      botones.push({
-        text: 'Devolución / Cancelación (✖ Cancelado)',
-        role: 'destructive',
-        handler: () => ejecutarCambioEstado('Cancelado')
-      });
+      if (!sinRed) {
+        botones.push({
+          text: 'Devolución / Cancelación (✖ Cancelado)',
+          role: 'destructive',
+          handler: () => ejecutarCambioEstado('Cancelado')
+        });
+      }
     } else if (estadoActual === 'EnPuerta') {
       botones.push({
         text: 'Confirmar Entrega Final (✔ Entregado)',
         handler: () => ejecutarCambioEstado('Entregado')
       });
-      botones.push({
-        text: 'Devolución / Cancelación (✖ Cancelado)',
-        role: 'destructive',
-        handler: () => ejecutarCambioEstado('Cancelado')
-      });
+      if (!sinRed) {
+        botones.push({
+          text: 'Devolución / Cancelación (✖ Cancelado)',
+          role: 'destructive',
+          handler: () => ejecutarCambioEstado('Cancelado')
+        });
+      }
     }
 
     botones.push({

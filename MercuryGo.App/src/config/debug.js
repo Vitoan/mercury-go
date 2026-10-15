@@ -1,4 +1,5 @@
 const api_url_debug_predeterminada = 'http://localhost:5080';
+const api_url_produccion_predeterminada = 'https://mercurygo.runasp.net';
 
 export const debug_config = {
   debug_activado: import.meta.env.VITE_DEBUG_ACTIVADO !== 'false',
@@ -6,7 +7,7 @@ export const debug_config = {
 };
 
 export function obtener_api_url() {
-  const api_url_entorno = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  const api_url_entorno = (import.meta.env.VITE_API_URL || api_url_produccion_predeterminada).replace(/\/+$/, '');
   if (debug_config.debug_activado) return debug_config.api_url_debug;
   return api_url_entorno;
 }

@@ -3,7 +3,7 @@ import { construir_query } from '@/utils/consulta';
 
 export const productos_service = {
   obtener_resumen() {
-    return ajax_service.get('api/productos/resumen');
+    return ajax_service.get('api/productos/resumen', { guardable: true });
   },
 
   obtener_listado(parametros = {}) {

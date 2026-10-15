@@ -39,6 +39,7 @@ import { createPinia } from 'pinia';
 import { aplicar_tema_guardado } from './config/tema';
 import { sesion_store } from './stores/sesion_store';
 import { notificaciones_service } from './services/notificaciones_service';
+import { use_offline_store } from './stores/offline_store';
 
 // Aplicar tema guardado antes de montar para evitar parpadeos
 aplicar_tema_guardado();
@@ -59,5 +60,7 @@ sesion_store.preparar().finally(() => {
     app.mount('#app');
     // Inicialización defensiva de notificaciones locales y push (Semana 7)
     notificaciones_service.inicializar();
+    // Inicialización del listener de conectividad de red y sincronización offline (Semana 8)
+    use_offline_store().iniciar();
   });
 });

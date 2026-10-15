@@ -30,9 +30,14 @@
                 <ion-card-subtitle>Remito Oficial</ion-card-subtitle>
                 <ion-card-title class="mercury-numero-orden">{{ detalle.numero }}</ion-card-title>
               </div>
-              <ion-badge :color="obtener_color_estado(detalle.estado)" class="mercury-badge-estado-grande">
-                {{ detalle.estado }}
-              </ion-badge>
+              <div class="mercury-cabecera-badges">
+                <ion-badge :color="obtener_color_estado(detalle.estado)" class="mercury-badge-estado-grande">
+                  {{ detalle.estado }}
+                </ion-badge>
+                <ion-badge v-if="detalle.sin_enviar" color="warning" class="mercury-badge-estado-grande">
+                  Sin enviar
+                </ion-badge>
+              </div>
             </div>
           </ion-card-header>
           <ion-card-content>
@@ -102,7 +107,7 @@
               </div>
             </div>
 
-            <div class="mercury-botones-pdf-fila">
+            <div v-if="!offline_store.sin_conexion" class="mercury-botones-pdf-fila">
               <ion-button
                 expand="block"
                 color="primary"
@@ -122,7 +127,7 @@
             <div class="mercury-cabecera-fila">
               <ion-card-title>Mercadería Incluida</ion-card-title>
               <ion-button
-                v-if="esAdmin && !modoEdicion && detalle.estado !== 'Entregado' && detalle.estado !== 'Cancelado'"
+                v-if="esAdmin && !modoEdicion && !offline_store.sin_conexion && detalle.estado !== 'Entregado' && detalle.estado !== 'Cancelado'"
                 size="small"
                 fill="clear"
                 color="secondary"
@@ -228,10 +233,14 @@ import {
 } from 'ionicons/icons';
 import { pedidos_service } from '@/services/pedidos_service';
 import { sesion_store } from '@/stores/sesion_store';
+import { use_offline_store } from '@/stores/offline_store';
+import { con_cambios_sin_enviar } from '@/stores/pedidos_store';
 import { compartir_archivo } from '@/services/compartir_service';
 import { geolocalizacion_service } from '@/services/geolocalizacion_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
+
+const offline_store = use_offline_store();
 
 const props = defineProps({
   abierto: { type: Boolean, default: false },
@@ -379,7 +388,8 @@ const cargarDetalle = async () => {
 
   try {
     const res = await pedidos_service.obtener_por_id(props.pedidoId);
-    detalle.value = res.pedido || null;
+    const p = res.pedido || null;
+    detalle.value = p ? con_cambios_sin_enviar(p) : null;
     if (detalle.value) {
       itemsEdicion.value = (detalle.value.detalles || []).map((d) => ({
         producto_id: d.producto_id,

@@ -2,13 +2,15 @@ import { createRouter, createWebHistory } from '@ionic/vue-router';
 import main_layout from '../layouts/main_layout.vue';
 import { navegacion } from '../config/navegacion';
 import { sesion_store } from '@/stores/sesion_store';
+import { use_offline_store } from '@/stores/offline_store';
 
 const rutas_app = navegacion.map(item => ({
   path: item.ruta.replace('/app/', ''),
   name: item.id,
   component: item.componente,
   meta: {
-    roles: item.roles
+    roles: item.roles,
+    sin_red: item.sin_red
   }
 }));
 
@@ -44,8 +46,9 @@ const router = createRouter({
   routes
 });
 
-// Guard de navegación por rol.
+// Guard de navegación por rol y modo offline.
 // Bloquea rutas no públicas si no hay autenticación,
+// bloquea rutas dependientes de internet si no hay red,
 // y si el rol del usuario no tiene acceso a la pantalla, redirige a Inicio.
 router.beforeEach((to) => {
   // Mientras se restaura la sesión al arrancar no bloqueamos prematuramente
@@ -57,6 +60,12 @@ router.beforeEach((to) => {
 
   if (!sesion_store.autenticado) {
     return { path: '/login', replace: true };
+  }
+
+  // Si no hay conexión, solo permitir rutas marcadas como sin_red
+  const offline_store = use_offline_store();
+  if (offline_store.sin_conexion && to.meta && !to.meta.sin_red) {
+    return { path: '/app/pedidos', replace: true };
   }
 
   const rolesPermitidos = to.meta.roles;
