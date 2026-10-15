@@ -192,6 +192,15 @@
         </ion-card>
       </div>
     </ion-content>
+
+    <!-- Toast nativo para notificaciones y feedback -->
+    <ion-toast
+      :is-open="toast.visible.value"
+      :message="toast.mensaje.value"
+      :color="toast.color.value"
+      duration="3000"
+      @didDismiss="toast.ocultar"
+    />
   </ion-modal>
 </template>
 
@@ -216,7 +225,9 @@ import {
   IonBadge,
   IonIcon,
   IonTextarea,
-  IonSpinner
+  IonSpinner,
+  IonToast,
+  alertController
 } from '@ionic/vue';
 import {
   documentTextOutline,
@@ -239,7 +250,9 @@ import { compartir_archivo } from '@/services/compartir_service';
 import { geolocalizacion_service } from '@/services/geolocalizacion_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
+import { useToast } from '@/composables/useToast';
 
+const toast = useToast();
 const offline_store = use_offline_store();
 
 const props = defineProps({
@@ -319,52 +332,114 @@ const aprobarComprobante = async () => {
   if (!props.pedidoId) return;
 
   const totalSugerido = totalCalculado.value || detalle.value?.total || 0;
-  const input = prompt(
-    `Revisión de Comprobante:\nVerificá el extracto bancario e ingresá el monto exacto acreditado en cuenta:`,
-    totalSugerido.toString()
-  );
+  const alert = await alertController.create({
+    header: 'Auditoría Bancaria',
+    subHeader: `Orden ${detalle.value?.numero || props.pedidoId}`,
+    message: 'Verificá el extracto bancario e ingresá el monto exacto acreditado en cuenta:',
+    inputs: [
+      {
+        name: 'monto',
+        type: 'number',
+        placeholder: 'Monto acreditado',
+        value: totalSugerido.toString(),
+        min: 1
+      }
+    ],
+    buttons: [
+      {
+        text: 'Cancelar',
+        role: 'cancel'
+      },
+      {
+        text: 'Aprobar Pago',
+        handler: async (data) => {
+          const rawMonto = data?.monto;
+          if (!rawMonto) {
+            toast.mostrarError('Por favor ingresá un monto válido mayor a 0.');
+            return false;
+          }
 
-  if (input === null) return; // Cancelado por el usuario
+          const monto = parseFloat(String(rawMonto).replace(/\./g, '').replace(',', '.'));
+          if (isNaN(monto) || monto <= 0) {
+            toast.mostrarError('Por favor ingresá un monto válido mayor a 0.');
+            return false;
+          }
 
-  const monto = parseFloat(input.replace(/\./g, '').replace(',', '.'));
-  if (isNaN(monto) || monto <= 0) {
-    alert('Por favor ingresá un monto válido mayor a 0.');
-    return;
-  }
+          procesandoPago.value = true;
+          try {
+            vibrar_toque();
+            await pedidos_service.aprobar_comprobante(props.pedidoId, monto);
+            await vibrar_exito();
+            toast.mostrarExito('¡Comprobante aprobado exitosamente!');
+            await cargarDetalle();
+            emit('pedido_actualizado');
+            return true;
+          } catch (err) {
+            await vibrar_error();
+            toast.mostrarError(err.mensaje || err.message || 'Error al aprobar el comprobante.');
+            return false;
+          } finally {
+            procesandoPago.value = false;
+          }
+        }
+      }
+    ]
+  });
 
-  procesandoPago.value = true;
-  try {
-    vibrar_toque();
-    await pedidos_service.aprobar_comprobante(props.pedidoId, monto);
-    await vibrar_exito();
-    await cargarDetalle();
-    emit('pedido_actualizado');
-  } catch (err) {
-    await vibrar_error();
-    alert(err.mensaje || err.message || 'Error al aprobar el comprobante.');
-  } finally {
-    procesandoPago.value = false;
-  }
+  await alert.present();
 };
 
 const rechazarComprobante = async () => {
   if (!props.pedidoId) return;
-  const motivo = prompt('Ingresá el motivo del rechazo:', 'Comprobante no acreditado o ilegible');
-  if (motivo === null) return;
 
-  procesandoPago.value = true;
-  try {
-    vibrar_toque();
-    await pedidos_service.rechazar_comprobante(props.pedidoId, motivo);
-    await vibrar_exito();
-    await cargarDetalle();
-    emit('pedido_actualizado');
-  } catch (err) {
-    await vibrar_error();
-    alert(err.mensaje || err.message || 'Error al rechazar el comprobante.');
-  } finally {
-    procesandoPago.value = false;
-  }
+  const alert = await alertController.create({
+    header: 'Rechazar Comprobante',
+    message: 'Ingresá el motivo del rechazo del comprobante de pago:',
+    inputs: [
+      {
+        name: 'motivo',
+        type: 'text',
+        placeholder: 'Motivo de rechazo',
+        value: 'Comprobante no acreditado o ilegible'
+      }
+    ],
+    buttons: [
+      {
+        text: 'Cancelar',
+        role: 'cancel'
+      },
+      {
+        text: 'Rechazar Pago',
+        role: 'destructive',
+        handler: async (data) => {
+          const motivo = data?.motivo?.trim();
+          if (!motivo) {
+            toast.mostrarError('Por favor especificá el motivo del rechazo.');
+            return false;
+          }
+
+          procesandoPago.value = true;
+          try {
+            vibrar_toque();
+            await pedidos_service.rechazar_comprobante(props.pedidoId, motivo);
+            await vibrar_exito();
+            toast.mostrarExito('Comprobante rechazado correctamente.');
+            await cargarDetalle();
+            emit('pedido_actualizado');
+            return true;
+          } catch (err) {
+            await vibrar_error();
+            toast.mostrarError(err.mensaje || err.message || 'Error al rechazar el comprobante.');
+            return false;
+          } finally {
+            procesandoPago.value = false;
+          }
+        }
+      }
+    ]
+  });
+
+  await alert.present();
 };
 
 const totalCalculado = computed(() => {
@@ -438,7 +513,7 @@ const decrementar = (item) => {
 
 const eliminarItem = (item) => {
   if (itemsEdicion.value.length <= 1) {
-    alert('El pedido debe conservar al menos un artículo.');
+    toast.mostrarAdvertencia('El pedido debe conservar al menos un artículo.');
     return;
   }
   itemsEdicion.value = itemsEdicion.value.filter((i) => i.producto_id !== item.producto_id);
@@ -457,12 +532,13 @@ const guardarCambiosEdicion = async () => {
     };
     await pedidos_service.actualizar_pedido(props.pedidoId, payload);
     await vibrar_exito();
+    toast.mostrarExito('¡Pedido actualizado con éxito!');
     modoEdicion.value = false;
     await cargarDetalle();
     emit('pedido_actualizado');
   } catch (err) {
     await vibrar_error();
-    alert(err.mensaje || 'Error al actualizar el pedido.');
+    toast.mostrarError(err.mensaje || 'Error al actualizar el pedido.');
   } finally {
     guardandoEdicion.value = false;
   }
@@ -479,7 +555,7 @@ const descargarPdf = async () => {
       texto: `Comprobante oficial de orden ${detalle.value.numero} de MercuryGO.`
     });
   } catch (err) {
-    alert('Error al generar el comprobante PDF: ' + err.message);
+    toast.mostrarError('Error al generar el comprobante PDF: ' + err.message);
   }
 };
 

@@ -121,12 +121,12 @@
           <!-- Bloque Superior: Imagen y Badges -->
           <div class="mercury-producto-img-bloque">
             <img
-              v-if="p.imagen_url && !imagenesConError[p.id]"
-              :key="obtenerSrcImagen(p)"
-              :src="obtenerSrcImagen(p)"
+              v-if="p.imagen_url && !imgFallback.tieneError(p.id)"
+              :key="imgFallback.obtenerSrc(p.id, p.imagen_url)"
+              :src="imgFallback.obtenerSrc(p.id, p.imagen_url)"
               :alt="p.nombre"
               class="mercury-producto-foto-portada"
-              @error="marcarErrorImagen(p)"
+              @error="imgFallback.marcarError(p.id, p.imagen_url)"
             />
             <div v-else class="mercury-producto-sin-foto">
               <ion-icon :icon="cubeOutline" />
@@ -207,20 +207,20 @@
 
     <!-- Action Sheet para tomar foto o elegir de galería -->
     <ion-action-sheet
-      :is-open="mostrarActionSheetFoto"
+      :is-open="fotoProducto.mostrarActionSheet.value"
       header="Actualizar Foto de Mercadería"
       :sub-header="productoSeleccionadoParaFoto ? productoSeleccionadoParaFoto.nombre : ''"
-      :buttons="botonesFoto"
-      @didDismiss="mostrarActionSheetFoto = false"
+      :buttons="fotoProducto.botones.value"
+      @didDismiss="fotoProducto.mostrarActionSheet.value = false"
     />
 
     <!-- Input file invisible para navegador web o selección de archivo -->
     <input
-      ref="inputFotoProducto"
+      :ref="(el) => fotoProducto.inputArchivoWeb.value = el"
       type="file"
       accept="image/*"
       style="display: none;"
-      @change="alSeleccionarFotoWeb"
+      @change="fotoProducto.alSeleccionarArchivoWeb"
     />
 
     <!-- Toast de Notificación -->
@@ -235,7 +235,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonItem,
@@ -246,7 +246,8 @@ import {
   IonButton,
   IonThumbnail,
   IonActionSheet,
-  IonToast
+  IonToast,
+  onIonViewWillEnter
 } from '@ionic/vue';
 import {
   gridOutline,
@@ -273,10 +274,10 @@ import { productos_store } from '@/stores/productos_store';
 import { productos_service } from '@/services/productos_service';
 import { carrito_store } from '@/stores/carrito_store';
 import { sesion_store } from '@/stores/sesion_store';
-import { tomar_foto, camara_disponible } from '@/services/camara_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
-import { resolver_url_imagen } from '@/utils/imagenes';
 import { useToast } from '@/composables/useToast';
+import { useImagenFallback } from '@/composables/useImagenFallback';
+import { useFotoProducto } from '@/composables/useFotoProducto';
 
 const busqueda = ref('');
 const categoriaSeleccionada = ref(null);
@@ -287,12 +288,21 @@ const router = useRouter();
 const mostrarCarrito = ref(false);
 const mostrarModalProducto = ref(false);
 const productoSeleccionadoParaEditar = ref(null);
-
-const mostrarActionSheetFoto = ref(false);
 const productoSeleccionadoParaFoto = ref(null);
-const inputFotoProducto = ref(null);
 
 const toast = useToast();
+const imgFallback = useImagenFallback();
+
+const fotoProducto = useFotoProducto({
+  onFotoCapturada: async (archivo) => {
+    if (productoSeleccionadoParaFoto.value) {
+      await subirFotoProducto(productoSeleccionadoParaFoto.value, archivo);
+    }
+  },
+  onError: (msg) => {
+    toast.mostrarAdvertencia(msg);
+  }
+});
 
 const abrirNuevoProducto = () => {
   vibrar_toque();
@@ -308,8 +318,6 @@ const abrirEditarProducto = (producto) => {
 
 const alGuardarProducto = async () => {
   await vibrar_exito();
-  // Limpiar el mapa de errores para que la nueva imagen cargue de inmediato
-  imagenesConError.value = {};
   await Promise.all([
     productos_store.cargar_resumen(),
     productos_store.cargar_listado(true)
@@ -317,75 +325,9 @@ const alGuardarProducto = async () => {
   toast.mostrarExito('¡Producto guardado exitosamente!');
 };
 
-const imagenesConError = ref({});
-const fallbackIntentado = ref({});
-
-function obtenerSrcImagen(p) {
-  if (fallbackIntentado.value[p.id]) {
-    return fallbackIntentado.value[p.id];
-  }
-  return resolver_url_imagen(p.imagen_url);
-}
-
-const marcarErrorImagen = (p) => {
-  if (p.imagen_url && p.imagen_url.startsWith('/seed/productos/') && !fallbackIntentado.value[p.id]) {
-    const nombre = p.imagen_url.split('/').pop();
-    fallbackIntentado.value[p.id] = `/assets/productos/${nombre}`;
-    return;
-  }
-  imagenesConError.value[p.id] = true;
-};
-
-const botonesFoto = computed(() => {
-  const botones = [];
-  if (camara_disponible()) {
-    botones.push({
-      text: '📷 Tomar Foto con Cámara',
-      handler: () => capturarFotoProducto('camara')
-    });
-    botones.push({
-      text: '🖼 Elegir de Galería / Fotos',
-      handler: () => capturarFotoProducto('galeria')
-    });
-  }
-  botones.push({
-    text: '📁 Seleccionar Archivo (PC / Web)',
-    handler: () => {
-      if (inputFotoProducto.value) {
-        inputFotoProducto.value.click();
-      }
-    }
-  });
-  botones.push({
-    text: 'Cancelar',
-    role: 'cancel'
-  });
-  return botones;
-});
-
 const abrirOpcionesFoto = (producto) => {
   productoSeleccionadoParaFoto.value = producto;
-  mostrarActionSheetFoto.value = true;
-};
-
-const capturarFotoProducto = async (origen) => {
-  mostrarActionSheetFoto.value = false;
-  vibrar_toque();
-  const res = await tomar_foto(origen, { prefijo: 'producto', width: 900, quality: 65 });
-  if (res.ok && res.archivo && productoSeleccionadoParaFoto.value) {
-    await subirFotoProducto(productoSeleccionadoParaFoto.value, res.archivo);
-  } else if (res.mensaje && !res.cancelado) {
-    await vibrar_error();
-    toast.mostrarAdvertencia(res.mensaje);
-  }
-};
-
-const alSeleccionarFotoWeb = async (event) => {
-  const archivo = event?.target?.files?.[0];
-  if (archivo && productoSeleccionadoParaFoto.value) {
-    await subirFotoProducto(productoSeleccionadoParaFoto.value, archivo);
-  }
-  if (event?.target) event.target.value = '';
+  fotoProducto.abrirSelector();
 };
 
 const subirFotoProducto = async (producto, archivo) => {
@@ -396,7 +338,7 @@ const subirFotoProducto = async (producto, archivo) => {
     producto.imagen_url = res.imagen_url;
 
     // Desbloquear inmediatamente la imagen en la tarjeta del catálogo
-    delete imagenesConError.value[producto.id];
+    imgFallback.limpiarError(producto.id);
 
     // Sincronizar también la vitrina y ofertas
     await productos_store.cargar_resumen();
@@ -458,7 +400,7 @@ const recargar = (event = null) => {
   productos_store.cargar_listado(true, event);
 };
 
-onMounted(async () => {
+onIonViewWillEnter(async () => {
   await productos_store.cargar_resumen();
   await productos_store.cargar_listado(true);
 });

@@ -35,7 +35,7 @@
             color="primary"
             class="mercury-btn-foto-accion"
             :disabled="subiendoFoto"
-            @click="mostrarActionSheetFoto = true"
+            @click="fotoProducto.abrirSelector()"
           >
             <ion-icon slot="start" :icon="cameraOutline" />
             {{ imagenUrlActual ? 'Cambiar Foto' : 'Cargar Foto' }}
@@ -146,19 +146,19 @@
 
       <!-- Action Sheet para tomar foto o elegir de galería -->
       <ion-action-sheet
-        :is-open="mostrarActionSheetFoto"
+        :is-open="fotoProducto.mostrarActionSheet.value"
         header="Foto del Producto"
-        :buttons="botonesFoto"
-        @didDismiss="mostrarActionSheetFoto = false"
+        :buttons="fotoProducto.botones.value"
+        @didDismiss="fotoProducto.mostrarActionSheet.value = false"
       />
 
       <!-- Input file invisible para navegador web o selección de archivo -->
       <input
-        ref="inputFoto"
+        :ref="(el) => fotoProducto.inputArchivoWeb.value = el"
         type="file"
         accept="image/*"
         style="display: none;"
-        @change="alSeleccionarFotoWeb"
+        @change="fotoProducto.alSeleccionarArchivoWeb"
       />
     </ion-content>
   </ion-modal>
@@ -189,9 +189,9 @@ import {
 import { alertCircleOutline, cameraOutline, cubeOutline } from 'ionicons/icons';
 import { productos_store } from '@/stores/productos_store';
 import { productos_service } from '@/services/productos_service';
-import { tomar_foto, camara_disponible } from '@/services/camara_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
+import { useFotoProducto } from '@/composables/useFotoProducto';
 
 const props = defineProps({
   abierto: { type: Boolean, default: false },
@@ -203,10 +203,17 @@ const emit = defineEmits(['cerrar', 'producto_guardado']);
 const guardando = ref(false);
 const subiendoFoto = ref(false);
 const errorMensaje = ref('');
-const mostrarActionSheetFoto = ref(false);
-const inputFoto = ref(null);
 const imagenUrlActual = ref(null);
 const archivoFotoPendiente = ref(null);
+
+const fotoProducto = useFotoProducto({
+  onFotoCapturada: async (archivo) => {
+    await procesarArchivoFoto(archivo);
+  },
+  onError: (msg) => {
+    errorMensaje.value = msg;
+  }
+});
 
 const formulario = ref({
   nombre: '',
@@ -225,31 +232,6 @@ const esValido = computed(() => {
     formulario.value.categoria_id &&
     formulario.value.precio > 0
   );
-});
-
-const botonesFoto = computed(() => {
-  const botones = [];
-  if (camara_disponible()) {
-    botones.push({
-      text: '📷 Tomar Foto con Cámara',
-      handler: () => capturarFoto('camara')
-    });
-    botones.push({
-      text: '🖼 Elegir de Galería / Fotos',
-      handler: () => capturarFoto('galeria')
-    });
-  }
-  botones.push({
-    text: '📁 Seleccionar Archivo (PC / Web)',
-    handler: () => {
-      inputFoto.value?.click();
-    }
-  });
-  botones.push({
-    text: 'Cancelar',
-    role: 'cancel'
-  });
-  return botones;
 });
 
 watch(
@@ -282,25 +264,6 @@ watch(
   { immediate: true }
 );
 
-const capturarFoto = async (origen) => {
-  mostrarActionSheetFoto.value = false;
-  vibrar_toque();
-  const res = await tomar_foto(origen, { prefijo: 'producto', width: 900, quality: 65 });
-  if (res.ok && res.archivo) {
-    await procesarArchivoFoto(res.archivo);
-  } else if (res.mensaje && !res.cancelado) {
-    await vibrar_error();
-    errorMensaje.value = res.mensaje;
-  }
-};
-
-const alSeleccionarFotoWeb = async (event) => {
-  const archivo = event?.target?.files?.[0];
-  if (archivo) {
-    await procesarArchivoFoto(archivo);
-  }
-  if (event?.target) event.target.value = '';
-};
 
 const procesarArchivoFoto = async (archivo) => {
   if (props.producto?.id) {

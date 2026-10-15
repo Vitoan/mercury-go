@@ -37,11 +37,11 @@
         <ion-card v-for="oferta in ofertas" :key="oferta.id" class="mercury-card-oferta-vertical">
           <div class="mercury-oferta-img-bloque">
             <img
-              v-if="oferta.imagen_url"
-              :src="obtenerSrcOferta(oferta)"
+              v-if="oferta.imagen_url && !imgFallback.tieneError(oferta.id)"
+              :src="imgFallback.obtenerSrc(oferta.id, oferta.imagen_url)"
               :alt="oferta.nombre"
               class="mercury-oferta-foto"
-              @error="alErrorImagenOferta(oferta)"
+              @error="imgFallback.marcarError(oferta.id, oferta.imagen_url)"
             />
             <div v-else class="mercury-oferta-sin-foto">
               <ion-icon :icon="cubeOutline" />
@@ -94,18 +94,29 @@
       @cerrar="mostrarModalProducto = false"
       @producto_guardado="alGuardarProducto"
     />
+
+    <!-- Toast de Notificación -->
+    <ion-toast
+      :is-open="toast.visible.value"
+      :message="toast.mensaje.value"
+      :color="toast.color.value"
+      duration="2500"
+      @didDismiss="toast.ocultar"
+    />
   </comp-page>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonCard,
   IonCardContent,
   IonBadge,
   IonButton,
-  IonIcon
+  IonIcon,
+  IonToast,
+  onIonViewWillEnter
 } from '@ionic/vue';
 import {
   flameOutline,
@@ -119,40 +130,28 @@ import CompProductoModal from '../components/dominio/productos/comp_producto_mod
 import { productos_store } from '@/stores/productos_store';
 import { carrito_store } from '@/stores/carrito_store';
 import { sesion_store } from '@/stores/sesion_store';
-import { resolver_url_imagen } from '@/utils/imagenes';
 import { vibrar_toque, vibrar_exito } from '@/services/vibracion_service';
+import { useImagenFallback } from '@/composables/useImagenFallback';
+import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
+const imgFallback = useImagenFallback();
+const toast = useToast();
 
 const mostrarModalProducto = ref(false);
 const productoSeleccionadoParaEditar = ref(null);
-const fallbacksOferta = ref({});
 
 const ofertas = computed(() => productos_store.ofertas);
 
-const obtenerSrcOferta = (oferta) => {
-  if (fallbacksOferta.value[oferta.id]) {
-    return fallbacksOferta.value[oferta.id];
-  }
-  return resolver_url_imagen(oferta.imagen_url);
-};
-
-const alErrorImagenOferta = (oferta) => {
-  if (oferta.imagen_url && oferta.imagen_url.startsWith('/seed/productos/') && !fallbacksOferta.value[oferta.id]) {
-    const nombre = oferta.imagen_url.split('/').pop();
-    fallbacksOferta.value[oferta.id] = `/assets/productos/${nombre}`;
-    return;
-  }
-  oferta.imagen_url = null;
-};
-
-const sumarAlCarrito = (producto) => {
+const sumarAlCarrito = async (producto) => {
   vibrar_toque();
   if (!sesion_store.autenticado) {
     router.push('/login');
     return;
   }
   carrito_store.agregar_producto(producto, 1);
+  await vibrar_exito();
+  toast.mostrarExito(`¡${producto.nombre} agregado al carrito!`);
 };
 
 const abrirNuevoProducto = () => {
@@ -176,7 +175,7 @@ const alActualizar = async (event) => {
   await productos_store.cargar_resumen(event);
 };
 
-onMounted(() => {
+onIonViewWillEnter(() => {
   productos_store.cargar_resumen();
 });
 </script>

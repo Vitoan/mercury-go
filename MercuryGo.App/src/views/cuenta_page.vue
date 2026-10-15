@@ -137,11 +137,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
   IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCardContent,
-  IonItem, IonLabel, IonIcon, IonToggle, IonButton, IonSpinner, IonBadge 
+  IonItem, IonLabel, IonIcon, IonToggle, IonButton, IonSpinner, IonBadge,
+  onIonViewWillEnter
 } from '@ionic/vue';
 import { 
   personCircleOutline, contrastOutline, 
@@ -211,7 +212,7 @@ const confirmarCerrarSesion = async () => {
   router.replace('/login');
 };
 
-onMounted(() => {
+onIonViewWillEnter(() => {
   modoOscuro.value = es_tema_oscuro();
   vibracionActiva.value = es_vibracion_activa();
   cargarCuentaCorriente();
