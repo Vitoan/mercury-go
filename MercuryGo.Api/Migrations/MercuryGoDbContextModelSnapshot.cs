@@ -605,6 +605,7 @@ namespace MercuryGo.Api.Migrations
                             Descripcion = "Caja x 12 unidades",
                             Disponible = true,
                             EnOferta = true,
+                            ImagenUrl = "/seed/productos/aceite.jpg",
                             Nombre = "Aceite de Girasol 1.5L",
                             Precio = 2400.00m
                         },
@@ -617,6 +618,7 @@ namespace MercuryGo.Api.Migrations
                             Descripcion = "Pack x 10 unidades",
                             Disponible = true,
                             EnOferta = false,
+                            ImagenUrl = "/seed/productos/harina.jpg",
                             Nombre = "Harina 000 1kg",
                             Precio = 950.00m
                         },
@@ -629,6 +631,7 @@ namespace MercuryGo.Api.Migrations
                             Descripcion = "Bolsa x 10 unidades",
                             Disponible = false,
                             EnOferta = false,
+                            ImagenUrl = "/seed/productos/arroz.jpg",
                             Nombre = "Arroz Largo Fino 1kg",
                             Precio = 1800.00m
                         },
@@ -641,6 +644,7 @@ namespace MercuryGo.Api.Migrations
                             Descripcion = "Caja x 20 paquetes",
                             Disponible = true,
                             EnOferta = false,
+                            ImagenUrl = "/seed/productos/fideos.jpg",
                             Nombre = "Fideos Guiseros 500g",
                             Precio = 1100.00m
                         },
@@ -653,6 +657,7 @@ namespace MercuryGo.Api.Migrations
                             Descripcion = "Fardo x 10 unidades",
                             Disponible = true,
                             EnOferta = false,
+                            ImagenUrl = "/seed/productos/azucar.jpg",
                             Nombre = "Azúcar Común 1kg",
                             Precio = 1250.00m
                         },
@@ -665,6 +670,7 @@ namespace MercuryGo.Api.Migrations
                             Descripcion = "Pack x 6 unidades",
                             Disponible = true,
                             EnOferta = true,
+                            ImagenUrl = "/seed/productos/yerba.jpg",
                             Nombre = "Yerba Mate 1kg",
                             Precio = 3400.00m
                         });
