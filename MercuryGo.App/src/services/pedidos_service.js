@@ -20,13 +20,14 @@ export const pedidos_service = {
     return ajax_service.post('api/pedidos', pedido);
   },
 
-  cambiar_estado(id, estado, latitud = null, longitud = null) {
+  cambiar_estado(id, estado, latitud = null, longitud = null, idempotency_key = null) {
     const payload = { estado };
     if (latitud !== null && longitud !== null) {
       payload.latitud = latitud;
       payload.longitud = longitud;
     }
-    return ajax_service.put(`api/pedidos/${id}/estado`, payload);
+    const opciones = idempotency_key ? { idempotency_key } : {};
+    return ajax_service.put(`api/pedidos/${id}/estado`, payload, opciones);
   },
 
   cancelar(id) {
@@ -47,16 +48,18 @@ export const pedidos_service = {
     return ajax_service.post(`api/pedidos/${id}/comprobante-pago`, formData);
   },
 
-  actualizar_picking(id, items) {
-    return ajax_service.put(`api/pedidos/${id}/picking`, { items });
+  actualizar_picking(id, items, idempotency_key = null) {
+    const opciones = idempotency_key ? { idempotency_key } : {};
+    return ajax_service.put(`api/pedidos/${id}/picking`, { items }, opciones);
   },
 
   actualizar_pedido(id, datos) {
     return ajax_service.put(`api/pedidos/${id}`, datos);
   },
 
-  registrar_cobro_chofer(id, monto, metodo = 'Efectivo') {
-    return ajax_service.post(`api/pedidos/${id}/cobro-chofer`, { monto, metodo });
+  registrar_cobro_chofer(id, monto, metodo = 'Efectivo', idempotency_key = null) {
+    const opciones = idempotency_key ? { idempotency_key } : {};
+    return ajax_service.post(`api/pedidos/${id}/cobro-chofer`, { monto, metodo }, opciones);
   },
 
   obtener_cuenta_corriente() {
@@ -92,15 +95,17 @@ export const pedidos_service = {
     return ajax_service.put(`api/pedidos/${id}/chofer`, { chofer_id });
   },
 
-  registrar_no_entregado(id, motivo, nota = null, foto_url = null) {
-    return ajax_service.post(`api/pedidos/${id}/no-entregado`, { motivo, nota, foto_url });
+  registrar_no_entregado(id, motivo, nota = null, foto_url = null, idempotency_key = null) {
+    const opciones = idempotency_key ? { idempotency_key } : {};
+    return ajax_service.post(`api/pedidos/${id}/no-entregado`, { motivo, nota, foto_url }, opciones);
   },
 
   reintentar_entrega(id) {
     return ajax_service.post(`api/pedidos/${id}/reintentar-entrega`);
   },
 
-  registrar_entrega_parcial(id, lineas, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null) {
+  registrar_entrega_parcial(id, lineas, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null, idempotency_key = null) {
+    const opciones = idempotency_key ? { idempotency_key } : {};
     return ajax_service.post(`api/pedidos/${id}/entrega-parcial`, {
       lineas,
       motivo,
@@ -108,7 +113,7 @@ export const pedidos_service = {
       longitud,
       foto_url,
       firma_url
-    });
+    }, opciones);
   },
 
   ajustar_cobro(cobro_id, nuevo_monto, motivo) {

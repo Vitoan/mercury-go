@@ -132,7 +132,32 @@
           </ion-item>
         </ion-card-content>
       </ion-card>
+
+      <!-- Tarjeta de Sincronización y Cola Offline -->
+      <ion-card class="mercury-card-preferencias">
+        <ion-card-header>
+          <ion-card-subtitle>Sincronización Local</ion-card-subtitle>
+          <ion-card-title>Cola de Envíos Offline</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-item lines="none" button @click="mostrarModalCola = true">
+            <ion-icon slot="start" :icon="cloudUploadOutline" color="primary" />
+            <ion-label>
+              <h3>Operaciones en Cola</h3>
+              <p>{{ offline_store.pendientes_count }} cambio(s) pendiente(s) de sincronizar</p>
+            </ion-label>
+            <ion-badge slot="end" :color="offline_store.pendientes_count > 0 ? 'warning' : 'success'">
+              {{ offline_store.pendientes_count }}
+            </ion-badge>
+          </ion-item>
+        </ion-card-content>
+      </ion-card>
     </div>
+
+    <comp-cola-offline-modal
+      :abierto="mostrarModalCola"
+      @cerrar="mostrarModalCola = false"
+    />
   </comp-page>
 </template>
 
@@ -147,16 +172,21 @@ import {
 import { 
   personCircleOutline, contrastOutline, 
   alertCircleOutline, logOutOutline,
-  phonePortraitOutline, cardOutline
+  phonePortraitOutline, cardOutline,
+  cloudUploadOutline
 } from 'ionicons/icons';
+import { alertController } from '@ionic/vue';
 import CompPage from '../components/estructura/comp_page.vue';
 import CompComprobanteModal from '../components/dominio/pedidos/comp_comprobante_modal.vue';
+import CompColaOfflineModal from '../components/dominio/pedidos/comp_cola_offline_modal.vue';
 import { alternar_tema, es_tema_oscuro } from '../config/tema';
 import { alternar_vibracion, es_vibracion_activa, vibrar_toque } from '../services/vibracion_service';
 import { sesion_store } from '@/stores/sesion_store';
+import { use_offline_store } from '@/stores/offline_store';
 import { pedidos_service } from '@/services/pedidos_service';
 
 const router = useRouter();
+const offline_store = use_offline_store();
 
 const modoOscuro = ref(false);
 const vibracionActiva = ref(true);
@@ -164,6 +194,7 @@ const vibracionActiva = ref(true);
 const cuentaCorriente = ref(null);
 const cargandoCC = ref(false);
 const mostrarModalComprobante = ref(false);
+const mostrarModalCola = ref(false);
 
 const cargarCuentaCorriente = async () => {
   if (sesion_store.rol_activo !== 'CLIENTE') return;
@@ -208,6 +239,26 @@ const toggleVibracion = () => {
 };
 
 const confirmarCerrarSesion = async () => {
+  if (offline_store.pendientes_count > 0) {
+    const alert = await alertController.create({
+      header: 'Operaciones Pendientes',
+      message: `Tenés ${offline_store.pendientes_count} cambio(s) encolado(s) que aún no se sincronizaron con el servidor. Si cerrás sesión ahora, podrían perderse. ¿Deseás salir de todos modos?`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Cerrar Sesión',
+          role: 'destructive',
+          handler: async () => {
+            await sesion_store.salir();
+            router.replace('/login');
+          }
+        }
+      ]
+    });
+    await alert.present();
+    return;
+  }
+
   await sesion_store.salir();
   router.replace('/login');
 };

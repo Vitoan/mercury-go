@@ -86,6 +86,10 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
     ...opciones.headers
   };
 
+  if (opciones.idempotency_key) {
+    cabeceras['Idempotency-Key'] = String(opciones.idempotency_key);
+  }
+
   const config = {
     method: metodo,
     signal: controller.signal,
