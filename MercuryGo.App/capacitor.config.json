@@ -1,0 +1,9 @@
+{
+  "appId": "ar.edu.ulp.mercurygo",
+  "appName": "MercuryGO",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}

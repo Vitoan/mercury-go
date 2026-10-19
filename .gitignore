@@ -24,9 +24,35 @@ npm-debug.log*
 /.versions
 /.vscode/*
 !/.vscode/extensions.json
-/coverage
-/dist
-/node_modules
-/platforms
-/plugins
-/www
+coverage/
+dist/
+node_modules/
+platforms/
+plugins/
+www/
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+_ReSharper*/
+
+# Environment & Sensitive
+.env
+.env.*
+!.env.development
+!.env.release
+*.local
+google-services.json
+keystore.properties
+*.jks
+*.keystore
+appsettings.Production.json
+*.zip
+publish/
+
+# CodeGraph
+.codegraph/
