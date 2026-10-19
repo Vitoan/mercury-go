@@ -17,8 +17,8 @@ Este documento registra el progreso, ramas, decisiones y estado de cada fase seg
 | Fase | Nombre | Rama | Estado | Commits | Aprobación Humana |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **0** | **Auditoría (solo lectura)** | `refactor/fase0-auditoria` | 🟢 Completada | `b507f3d` | Aprobada por usuario |
-| **1** | **Modelo de datos y migraciones** | `refactor/fase1-modelo` | 🟢 Completada | Pendiente commit | En verificación final |
-| **2** | **Reglas de estado y endpoints** | `refactor/fase2-estados` | ⚪ No iniciada | — | — |
+| **1** | **Modelo de datos y migraciones** | `refactor/fase1-modelo` | 🟢 Completada | `8cc8499` | Aprobada por usuario |
+| **2** | **Reglas de estado y endpoints** | `refactor/fase2-estados` | 🟢 Completada | Pendiente commit | En verificación final |
 | **3** | **Seguridad de sesión (app)** | `refactor/fase3-seguridad` | ⚪ No iniciada | — | — |
 | **4** | **Vistas y flujos (app)** | `refactor/fase4-vistas` | ⚪ No iniciada | — | — |
 | **5** | **Modo offline con cola e idempotencia** | `refactor/fase5-offline` | ⚪ No iniciada | — | — |

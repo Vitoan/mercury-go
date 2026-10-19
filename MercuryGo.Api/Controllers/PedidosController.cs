@@ -14,20 +14,12 @@ namespace MercuryGo.Api.Controllers;
 [ApiController]
 [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario},{RolCodigos.Chofer},{RolCodigos.Cliente}")]
 [Route("api/pedidos")]
-public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment env) : ControllerBase
+public sealed class PedidosController(
+    MercuryGoDbContext db,
+    IWebHostEnvironment env,
+    MercuryGo.Api.Services.IPedidoTransicionService transicionService,
+    MercuryGo.Api.Services.IdempotenciaService idempotenciaService) : ControllerBase
 {
-    // Diccionario de la máquina de estados de un pedido logístico.
-    // La validación vive estrictamente en el servidor.
-    private static readonly Dictionary<EstadoPedido, EstadoPedido[]> TransicionesValidas = new()
-    {
-        [EstadoPedido.Pendiente] = [EstadoPedido.Confirmado, EstadoPedido.Cancelado],
-        [EstadoPedido.Confirmado] = [EstadoPedido.EnPreparacion, EstadoPedido.Cancelado],
-        [EstadoPedido.EnPreparacion] = [EstadoPedido.Despachado, EstadoPedido.Cancelado],
-        [EstadoPedido.Despachado] = [EstadoPedido.EnPuerta, EstadoPedido.Entregado, EstadoPedido.Cancelado],
-        [EstadoPedido.EnPuerta] = [EstadoPedido.Entregado, EstadoPedido.Cancelado],
-        [EstadoPedido.Entregado] = [], // Estado final: no admite cambios posteriores
-        [EstadoPedido.Cancelado] = []  // Estado final
-    };
 
     // Listado paginado con filtros de texto, estados múltiples ("Pendiente,EnPreparacion") y cliente.
     [HttpGet]
@@ -175,13 +167,26 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
     // Creación de orden de carga: LOS PRECIOS NO VIAJAN DESDE EL TELÉFONO.
     // El servidor lee los precios vigentes de la base de datos para preservar la integridad contable.
     [HttpPost]
-    public async Task<IActionResult> Crear([FromBody] CrearPedidoRequest request, CancellationToken ct)
+    public async Task<IActionResult> Crear(
+        [FromBody] CrearPedidoRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
+        // 1. Verificar idempotencia
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var op = await idempotenciaService.ObtenerOperacionAsync(idempotencyKey, "CREAR_PEDIDO", ct);
+            if (op?.ResultadoJson != null)
+            {
+                return Content(op.ResultadoJson, "application/json");
+            }
+        }
+
         if (request.ClienteId <= 0)
             return BadRequest(new { codigo = "cliente_requerido", mensaje = "Debe especificar un cliente comercial válido." });
 
-        var clienteExiste = await db.Clientes.AnyAsync(c => c.Id == request.ClienteId && c.Activo, ct);
-        if (!clienteExiste)
+        var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == request.ClienteId && c.Activo, ct);
+        if (cliente is null)
             return BadRequest(new { codigo = "cliente_no_encontrado", mensaje = "El cliente seleccionado no existe o está inactivo." });
 
         if (request.Items is null || request.Items.Count == 0)
@@ -192,6 +197,10 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
             .Where(p => productosIds.Contains(p.Id) && p.Activo)
             .ToDictionaryAsync(p => p.Id, ct);
 
+        // Validar existencias
+        var tieneFalloValidacion = false;
+        var detalleValidacion = new List<string>();
+
         foreach (var item in request.Items)
         {
             if (!productosDb.TryGetValue(item.ProductoId, out var prod))
@@ -199,6 +208,12 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
             if (item.Cantidad <= 0)
                 return BadRequest(new { codigo = "cantidad_invalida", mensaje = $"La cantidad para '{prod.Nombre}' debe ser mayor a cero." });
+
+            if (!prod.Disponible)
+            {
+                tieneFalloValidacion = true;
+                detalleValidacion.Add($"Producto '{prod.Nombre}' no disponible en catálogo");
+            }
         }
 
         // Generar número de remito correlativo
@@ -206,7 +221,9 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         var numeroRemito = $"PED-{(totalPedidos + 1):D6}";
 
         var estadoInicial = EstadoPedido.Pendiente;
-        if (!string.IsNullOrWhiteSpace(request.Estado) && Enum.TryParse<EstadoPedido>(request.Estado, true, out var est) && est == EstadoPedido.Confirmado)
+        if (!tieneFalloValidacion && !string.IsNullOrWhiteSpace(request.Estado) &&
+            Enum.TryParse<EstadoPedido>(request.Estado, true, out var est) && est == EstadoPedido.Confirmado &&
+            User.IsInRole(RolCodigos.Admin))
         {
             estadoInicial = EstadoPedido.Confirmado;
         }
@@ -218,6 +235,10 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
             Estado = estadoInicial,
             FechaPedido = DateTime.UtcNow,
             Observaciones = NormalizarTexto(request.Observaciones),
+            ValidacionFallida = tieneFalloValidacion,
+            ValidacionDetalle = tieneFalloValidacion ? string.Join(" · ", detalleValidacion) : null,
+            ConfirmadoPorId = estadoInicial == EstadoPedido.Confirmado ? User.UsuarioId() : null,
+            ConfirmadoEn = estadoInicial == EstadoPedido.Confirmado ? DateTime.UtcNow : null,
             Activo = true,
             CreadoEn = DateTime.UtcNow
         };
@@ -233,6 +254,8 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
                 PedidoId = nuevoPedido.Id,
                 ProductoId = prod.Id,
                 Cantidad = item.Cantidad,
+                CantidadPedida = item.Cantidad,
+                CantidadPreparada = item.Cantidad,
                 PrecioUnitario = prod.Precio, // Precio histórico congelado al crear
                 CreadoEn = DateTime.UtcNow
             });
@@ -240,17 +263,47 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
         await db.SaveChangesAsync(ct);
 
-        return Ok(new { pedido_id = nuevoPedido.Id, numero = nuevoPedido.Numero });
+        var respuestaObj = new
+        {
+            pedido_id = nuevoPedido.Id,
+            numero = nuevoPedido.Numero,
+            estado = nuevoPedido.Estado.ToString(),
+            validacion_fallida = nuevoPedido.ValidacionFallida,
+            validacion_detalle = nuevoPedido.ValidacionDetalle
+        };
+
+        var respuestaJson = System.Text.Json.JsonSerializer.Serialize(respuestaObj);
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await idempotenciaService.RegistrarOperacionAsync(
+                idempotencyKey,
+                "CREAR_PEDIDO",
+                User.UsuarioId(),
+                nuevoPedido.Id,
+                respuestaJson,
+                ct
+            );
+        }
+
+        return Ok(respuestaObj);
     }
 
-    // Transición de estado evaluada con la máquina de estados del servidor.
+    // Transición de estado evaluada con la máquina centralizada IPedidoTransicionService
     [HttpPut("{id:long}/estado")]
-    public async Task<IActionResult> CambiarEstado(long id, [FromBody] CambiarEstadoRequest request, CancellationToken ct)
+    public async Task<IActionResult> CambiarEstado(
+        long id,
+        [FromBody] CambiarEstadoRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
-        // Los clientes no pueden avanzar ni cambiar estados logísticos de la orden
-        if (User.EsCliente())
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "rol_no_autorizado", mensaje = "Los clientes solo pueden consultar o cancelar sus pedidos." });
+            var op = await idempotenciaService.ObtenerOperacionAsync(idempotencyKey, "CAMBIAR_ESTADO", ct);
+            if (op?.ResultadoJson != null)
+            {
+                return Content(op.ResultadoJson, "application/json");
+            }
         }
 
         if (!Enum.TryParse<EstadoPedido>(request.Estado, true, out var nuevoEstado))
@@ -260,88 +313,44 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue dado de baja." });
 
-        if (pedido.Estado == nuevoEstado)
-            return Ok(new { estado = pedido.Estado.ToString() });
+        var contexto = new MercuryGo.Api.Services.ContextoTransicion(
+            UsuarioId: User.UsuarioId(),
+            RolCodigo: User.RolCodigo() ?? string.Empty,
+            Latitud: request.Latitud,
+            Longitud: request.Longitud,
+            EsSincronizacionOffline: request.EsOffline,
+            OcurridoEn: request.OcurridoEn
+        );
 
-        if (!TransicionesValidas.TryGetValue(pedido.Estado, out var destinosPermitidos) || !destinosPermitidos.Contains(nuevoEstado))
+        var resultado = await transicionService.TransicionarAsync(pedido, nuevoEstado, contexto, ct);
+        if (!resultado.Exito)
         {
-            return BadRequest(new
-            {
-                codigo = "transicion_invalida",
-                mensaje = $"No es posible cambiar el estado de '{pedido.Estado}' a '{nuevoEstado}'. Transición rechazada por el servidor."
-            });
-        }
-
-        pedido.Estado = nuevoEstado;
-        pedido.ActualizadoEn = DateTime.UtcNow;
-
-        // Si el chofer llega a puerta o entrega con GPS (Semana 7)
-        if (nuevoEstado == EstadoPedido.EnPuerta || nuevoEstado == EstadoPedido.Entregado)
-        {
-            if (request.Latitud.HasValue && request.Longitud.HasValue)
-            {
-                pedido.LatitudEntrega = request.Latitud.Value;
-                pedido.LongitudEntrega = request.Longitud.Value;
-            }
-            if (nuevoEstado == EstadoPedido.EnPuerta)
-            {
-                pedido.FechaEnPuerta = DateTime.UtcNow;
-            }
-        }
-
-        // Crear notificación in-app para el cliente (Semana 7)
-        var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == pedido.ClienteId, ct);
-        if (cliente is not null && !string.IsNullOrWhiteSpace(cliente.Email))
-        {
-            var usuarioCliente = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Email == cliente.Email, ct);
-            if (usuarioCliente is not null)
-            {
-                string tituloNotif;
-                string mensajeNotif;
-                string tipoNotif = "PEDIDO";
-
-                if (nuevoEstado == EstadoPedido.EnPuerta)
-                {
-                    tituloNotif = $"🚚 ¡Chofer en puerta! ({pedido.Numero})";
-                    mensajeNotif = $"El repartidor acaba de arribar a tu domicilio con el pedido {pedido.Numero}.";
-                    tipoNotif = "GPS";
-                }
-                else if (nuevoEstado == EstadoPedido.Despachado)
-                {
-                    tituloNotif = $"📦 Pedido despachado ({pedido.Numero})";
-                    mensajeNotif = $"Tu pedido {pedido.Numero} ha salido del depósito en camino a tu destino.";
-                }
-                else if (nuevoEstado == EstadoPedido.Entregado)
-                {
-                    tituloNotif = $"✅ Pedido entregado ({pedido.Numero})";
-                    mensajeNotif = $"El pedido {pedido.Numero} fue marcado como entregado satisfactoriamente.";
-                }
-                else
-                {
-                    tituloNotif = $"Actualización de Pedido ({pedido.Numero})";
-                    mensajeNotif = $"El pedido {pedido.Numero} cambió su estado a: {nuevoEstado}.";
-                }
-
-                db.Notificaciones.Add(new Notificacion
-                {
-                    UsuarioId = usuarioCliente.Id,
-                    Titulo = tituloNotif,
-                    Mensaje = mensajeNotif,
-                    Tipo = tipoNotif,
-                    ReferenciaId = pedido.Id,
-                    CreadoEn = DateTime.UtcNow
-                });
-            }
+            return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
         }
 
         await db.SaveChangesAsync(ct);
 
-        return Ok(new
+        var respuestaObj = new
         {
             estado = pedido.Estado.ToString(),
             latitud = pedido.LatitudEntrega,
             longitud = pedido.LongitudEntrega
-        });
+        };
+
+        var respuestaJson = System.Text.Json.JsonSerializer.Serialize(respuestaObj);
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await idempotenciaService.RegistrarOperacionAsync(
+                idempotencyKey,
+                "CAMBIAR_ESTADO",
+                User.UsuarioId(),
+                pedido.Id,
+                respuestaJson,
+                ct
+            );
+        }
+
+        return Ok(respuestaObj);
     }
 
     // Cancelación lógica de una orden de carga
@@ -352,32 +361,30 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o ya fue cancelado." });
 
-        // Si es cliente, validar que sea su propio pedido y que esté en etapa inicial
+        // Si es cliente, no puede cancelar directo: debe usar /solicitar-cancelacion (Decisión 12)
         if (User.EsCliente())
         {
-            var emailUsuario = User.Email();
-            var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct)
-                       ?? await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == 1 && c.Activo, ct);
-
-            if (cliente is null || pedido.ClienteId != cliente.Id)
+            return BadRequest(new
             {
-                return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "pedido_ajeno", mensaje = "No tiene permiso para cancelar este pedido." });
-            }
-
-            if (pedido.Estado != EstadoPedido.Pendiente && pedido.Estado != EstadoPedido.Confirmado)
-            {
-                return BadRequest(new { codigo = "cancelacion_tardia", mensaje = "El pedido ya está en preparación o en ruta de despacho y no puede ser cancelado por el cliente." });
-            }
+                codigo = "requiere_solicitud",
+                mensaje = "Los clientes deben solicitar la cancelación para aprobación del Administrador."
+            });
         }
 
-        if (pedido.Estado == EstadoPedido.Entregado)
-            return BadRequest(new { codigo = "pedido_ya_entregado", mensaje = "Una orden entregada no puede cancelarse." });
+        var contexto = new MercuryGo.Api.Services.ContextoTransicion(
+            UsuarioId: User.UsuarioId(),
+            RolCodigo: User.RolCodigo() ?? string.Empty
+        );
 
-        pedido.Estado = EstadoPedido.Cancelado;
-        pedido.ActualizadoEn = DateTime.UtcNow;
+        var resultado = await transicionService.TransicionarAsync(pedido, EstadoPedido.Cancelado, contexto, ct);
+        if (!resultado.Exito)
+        {
+            return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
+        }
+
         await db.SaveChangesAsync(ct);
 
-        return Ok(new { cancelado = true });
+        return Ok(new { cancelado = true, estado = pedido.Estado.ToString() });
     }
 
     // Edición de pedido exclusivo para ADMINISTRADOR
@@ -428,11 +435,24 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         return Ok(new { mensaje = "Pedido actualizado correctamente.", id = pedido.Id });
     }
 
-    // Registro de cobro en destino por parte del CHOFER (Efectivo o Transferencia)
+    // Registro de cobro en destino por parte del CHOFER (Efectivo o Transferencia / CU-13 / Decisión 9)
     [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Chofer}")]
     [HttpPost("{id:long}/cobro-chofer")]
-    public async Task<IActionResult> RegistrarCobroChofer(long id, [FromBody] CobroChoferRequest request, CancellationToken ct)
+    public async Task<IActionResult> RegistrarCobroChofer(
+        long id,
+        [FromBody] CobroChoferRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var op = await idempotenciaService.ObtenerOperacionAsync(idempotencyKey, "COBRO_CHOFER", ct);
+            if (op?.ResultadoJson != null)
+            {
+                return Content(op.ResultadoJson, "application/json");
+            }
+        }
+
         if (request.Monto <= 0)
             return BadRequest(new { codigo = "monto_invalido", mensaje = "El monto cobrado debe ser mayor a cero." });
 
@@ -441,19 +461,51 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
 
         var metodo = string.IsNullOrWhiteSpace(request.Metodo) ? "Efectivo" : request.Metodo.Trim();
-        var logCobro = $"[Cobro Chofer: ${request.Monto:N2} ({metodo})]";
+        var ocurridoEn = request.OcurridoEn ?? DateTime.UtcNow;
 
+        // 1. Guardar en tabla relacional estructurada
+        var nuevoCobro = new CobroPedido
+        {
+            PedidoId = pedido.Id,
+            Monto = request.Monto,
+            Metodo = metodo,
+            RegistradoPorId = User.UsuarioId(),
+            OcurridoEn = ocurridoEn,
+            RecibidoEn = DateTime.UtcNow
+        };
+        db.CobrosPedido.Add(nuevoCobro);
+
+        // 2. Preservar etiqueta en Observaciones para total retrocompatibilidad
+        var logCobro = $"[Cobro Chofer: ${request.Monto:N2} ({metodo})]";
         var obs = pedido.Observaciones ?? string.Empty;
         pedido.Observaciones = string.IsNullOrWhiteSpace(obs) ? logCobro : $"{obs} · {logCobro}";
         pedido.ActualizadoEn = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
 
-        return Ok(new
+        var respuestaObj = new
         {
             mensaje = $"Cobro de ${request.Monto:N2} registrado exitosamente.",
+            cobro_id = nuevoCobro.Id,
+            monto = nuevoCobro.Monto,
+            metodo = nuevoCobro.Metodo,
             observaciones = pedido.Observaciones
-        });
+        };
+
+        var respuestaJson = System.Text.Json.JsonSerializer.Serialize(respuestaObj);
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await idempotenciaService.RegistrarOperacionAsync(
+                idempotencyKey,
+                "COBRO_CHOFER",
+                User.UsuarioId(),
+                pedido.Id,
+                respuestaJson,
+                ct
+            );
+        }
+
+        return Ok(respuestaObj);
     }
 
     // Resumen de Cuenta Corriente y Deuda para el CLIENTE autenticado
@@ -647,7 +699,7 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         });
     }
 
-    // Aprobación de comprobante bancario por el ADMIN (acredita el pago y reduce la deuda con el monto verificado)
+    // Aprobación de comprobante bancario por el ADMIN (acredita el pago y reduce la deuda con el monto verificado / CU-15)
     [Authorize(Roles = RolCodigos.Admin)]
     [HttpPut("{id:long}/aprobar-comprobante")]
     public async Task<IActionResult> AprobarComprobante(long id, [FromBody] AprobarComprobanteRequest? request, CancellationToken ct)
@@ -666,7 +718,13 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
         var obs = pedido.Observaciones ?? string.Empty;
         var match = System.Text.RegularExpressions.Regex.Match(obs, @"/uploads/comprobantes/[^\s\]]+");
-        var ruta = match.Success ? match.Value : string.Empty;
+        var ruta = match.Success ? match.Value : (pedido.ComprobanteUrl ?? string.Empty);
+
+        // Actualizar campos estructurados (Fase 1 / Sección 4)
+        pedido.ComprobanteEstado = "Aprobado";
+        pedido.ComprobanteUrl = string.IsNullOrWhiteSpace(ruta) ? null : ruta;
+        pedido.AuditadoPorId = User.UsuarioId();
+        pedido.AuditadoEn = DateTime.UtcNow;
 
         // Limpiar cualquier etiqueta previa de comprobante
         var obsLimpia = System.Text.RegularExpressions.Regex.Replace(obs, @"\s*·?\s*\[Comprobante de pago:[^\]]+\]", string.Empty).Trim();
@@ -683,12 +741,13 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         {
             mensaje = $"Comprobante de la orden {pedido.Numero} aprobado por ${montoAprobado:N2}. Pago acreditado exitosamente.",
             pedido_id = pedido.Id,
+            comprobante_estado = pedido.ComprobanteEstado,
             monto_acreditado = montoAprobado,
             observaciones = pedido.Observaciones
         });
     }
 
-    // Rechazo de comprobante bancario por el ADMIN (no descuenta y almacena motivo)
+    // Rechazo de comprobante bancario por el ADMIN (no descuenta y almacena motivo / CU-15)
     [Authorize(Roles = RolCodigos.Admin)]
     [HttpPut("{id:long}/rechazar-comprobante")]
     public async Task<IActionResult> RechazarComprobante(long id, [FromBody] RechazarComprobanteRequest request, CancellationToken ct)
@@ -699,9 +758,16 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
         var obs = pedido.Observaciones ?? string.Empty;
         var match = System.Text.RegularExpressions.Regex.Match(obs, @"/uploads/comprobantes/[^\s\]]+");
-        var ruta = match.Success ? match.Value : string.Empty;
+        var ruta = match.Success ? match.Value : (pedido.ComprobanteUrl ?? string.Empty);
 
         var motivo = string.IsNullOrWhiteSpace(request?.Motivo) ? "No acreditado en cuenta bancaria" : request.Motivo.Trim();
+
+        // Actualizar campos estructurados
+        pedido.ComprobanteEstado = "Rechazado";
+        pedido.ComprobanteUrl = string.IsNullOrWhiteSpace(ruta) ? null : ruta;
+        pedido.AuditadoPorId = User.UsuarioId();
+        pedido.AuditadoEn = DateTime.UtcNow;
+
         var obsLimpia = System.Text.RegularExpressions.Regex.Replace(obs, @"\s*·?\s*\[Comprobante de pago:[^\]]+\]", string.Empty).Trim();
         var nuevaEtiqueta = $"[Comprobante de pago: RECHAZADO - Motivo: {motivo} · {ruta}]";
 
@@ -716,6 +782,7 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         {
             mensaje = $"Comprobante de la orden {pedido.Numero} rechazado: {motivo}",
             pedido_id = pedido.Id,
+            comprobante_estado = pedido.ComprobanteEstado,
             observaciones = pedido.Observaciones
         });
     }
@@ -750,11 +817,19 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         {
             if (mapaRequest.TryGetValue(item.d.ProductoId, out var pick))
             {
+                item.d.CantidadPreparada = Math.Max(0, pick.CantidadPreparada);
                 var enFalta = string.Equals(pick.EstadoItem, "EnFalta", StringComparison.OrdinalIgnoreCase) || pick.CantidadPreparada < item.d.Cantidad;
                 if (enFalta)
                 {
                     esCompleto = false;
                     faltantes.Add($"{item.ProductoNombre} (prep. {pick.CantidadPreparada}/{item.d.Cantidad})");
+
+                    // Decisión 5: si el picking queda incompleto, se ajusta la cantidad definitiva de la orden
+                    var diferencia = item.d.Cantidad - item.d.CantidadPreparada;
+                    if (diferencia > 0)
+                    {
+                        item.d.Cantidad = item.d.CantidadPreparada;
+                    }
                 }
             }
             else
@@ -763,6 +838,9 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
                 faltantes.Add($"{item.ProductoNombre} (no verificado)");
             }
         }
+
+        pedido.PickingResultado = esCompleto ? "Completo" : "Incompleto";
+        pedido.PickingEn = DateTime.UtcNow;
 
         var logPicking = esCompleto
             ? "[Picking: COMPLETO]"
@@ -787,11 +865,12 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         {
             completo = esCompleto,
             estado = pedido.Estado.ToString(),
+            picking_resultado = pedido.PickingResultado,
             faltantes,
             observaciones = pedido.Observaciones,
             mensaje = esCompleto
                 ? "Picking completado exitosamente. Todo listo para despacho."
-                : "Picking registrado con faltantes para revisión del Administrador."
+                : "Picking registrado con faltantes. Pedido ajustado a lo preparado."
         });
     }
 
@@ -820,7 +899,11 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         await using var stream = System.IO.File.Create(rutaFisica);
         await archivo.CopyToAsync(stream, ct);
 
-        // Guardamos la referencia en observaciones con estado PENDIENTE de revisión para el Administrador
+        // Guardamos en campos estructurados (CU-14 / Decisión 9)
+        pedido.ComprobanteEstado = "Pendiente";
+        pedido.ComprobanteUrl = $"/uploads/comprobantes/{nombreArchivo}";
+
+        // Guardamos también la referencia en observaciones para total retrocompatibilidad
         var etiquetaComprobante = $"[Comprobante de pago: PENDIENTE · /uploads/comprobantes/{nombreArchivo}]";
         var obsActual = pedido.Observaciones ?? string.Empty;
         var obsLimpia = System.Text.RegularExpressions.Regex.Replace(obsActual, @"\s*·?\s*\[Comprobante de pago:[^\]]+\]", string.Empty).Trim();
@@ -834,7 +917,8 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 
         return Ok(new
         {
-            comprobante_url = $"/uploads/comprobantes/{nombreArchivo}",
+            comprobante_url = pedido.ComprobanteUrl,
+            comprobante_estado = pedido.ComprobanteEstado,
             mensaje = "Comprobante de pago adjuntado exitosamente a la orden."
         });
     }
@@ -986,6 +1070,312 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
         }).GeneratePdf();
     }
 
+    // Confirmación explícita de pedido para ADMINISTRADOR (CU-19 / Decisión 1)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPost("{id:long}/confirmar")]
+    public async Task<IActionResult> ConfirmarPedido(
+        long id,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var contexto = new MercuryGo.Api.Services.ContextoTransicion(
+            UsuarioId: User.UsuarioId(),
+            RolCodigo: User.RolCodigo() ?? string.Empty
+        );
+
+        var resultado = await transicionService.TransicionarAsync(pedido, EstadoPedido.Confirmado, contexto, ct);
+        if (!resultado.Exito)
+            return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Pedido {pedido.Numero} confirmado exitosamente.",
+            estado = pedido.Estado.ToString(),
+            confirmado_por_id = pedido.ConfirmadoPorId,
+            confirmado_en = pedido.ConfirmadoEn
+        });
+    }
+
+    // Solicitud de cancelación por parte del CLIENTE (CU-09 / Decisión 12)
+    [Authorize(Roles = RolCodigos.Cliente)]
+    [HttpPost("{id:long}/solicitar-cancelacion")]
+    public async Task<IActionResult> SolicitarCancelacion(long id, [FromBody] SolicitarCancelacionRequest request, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
+            return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede solicitar la cancelación de un pedido finalizado o cancelado." });
+
+        pedido.CancelacionEstado = "Solicitada";
+        pedido.CancelacionMotivo = string.IsNullOrWhiteSpace(request?.Motivo) ? "Solicitado por el cliente" : request.Motivo.Trim();
+        pedido.CancelacionSolicitadaPorId = User.UsuarioId();
+        pedido.ActualizadoEn = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = "Solicitud de cancelación enviada para evaluación del Administrador.",
+            cancelacion_estado = pedido.CancelacionEstado,
+            motivo = pedido.CancelacionMotivo
+        });
+    }
+
+    // Resolución de cancelación por el ADMINISTRADOR (CU-09 / Decisión 12)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPost("{id:long}/resolver-cancelacion")]
+    public async Task<IActionResult> ResolverCancelacion(long id, [FromBody] ResolverCancelacionRequest request, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (request.Aprobada)
+        {
+            var contexto = new MercuryGo.Api.Services.ContextoTransicion(
+                UsuarioId: User.UsuarioId(),
+                RolCodigo: User.RolCodigo() ?? string.Empty
+            );
+
+            var resultado = await transicionService.TransicionarAsync(pedido, EstadoPedido.Cancelado, contexto, ct);
+            if (!resultado.Exito)
+                return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
+
+            pedido.CancelacionEstado = "Aprobada";
+        }
+        else
+        {
+            pedido.CancelacionEstado = "Rechazada";
+        }
+
+        pedido.ActualizadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = request.Aprobada ? "Cancelación aprobada y stock restituido." : "Cancelación rechazada.",
+            estado = pedido.Estado.ToString(),
+            cancelacion_estado = pedido.CancelacionEstado
+        });
+    }
+
+    // Asignación o reasignación de chofer (CU-20 / OPERARIO y ADMIN)
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario}")]
+    [HttpPut("{id:long}/chofer")]
+    public async Task<IActionResult> AsignarChofer(long id, [FromBody] AsignarChoferRequest request, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
+            return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede asignar chofer a un pedido finalizado o cancelado." });
+
+        var chofer = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == request.ChoferId && u.Activo, ct);
+        if (chofer is null)
+            return BadRequest(new { codigo = "chofer_invalido", mensaje = "El chofer seleccionado no existe o está inactivo." });
+
+        pedido.ChoferId = chofer.Id;
+        pedido.ActualizadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Chofer '{chofer.Nombre}' asignado correctamente a la orden {pedido.Numero}.",
+            pedido_id = pedido.Id,
+            chofer_id = pedido.ChoferId
+        });
+    }
+
+    // Registro de entrega fallida (CU-21 / CHOFER y ADMIN)
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Chofer}")]
+    [HttpPost("{id:long}/no-entregado")]
+    public async Task<IActionResult> RegistrarEntregaFallida(
+        long id,
+        [FromBody] EntregaFallidaRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Motivo))
+            return BadRequest(new { codigo = "motivo_requerido", mensaje = "Debe indicar el motivo de la entrega fallida." });
+
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var contexto = new MercuryGo.Api.Services.ContextoTransicion(
+            UsuarioId: User.UsuarioId(),
+            RolCodigo: User.RolCodigo() ?? string.Empty,
+            Latitud: request.Latitud,
+            Longitud: request.Longitud,
+            EsSincronizacionOffline: request.EsOffline,
+            OcurridoEn: request.OcurridoEn
+        );
+
+        var resultado = await transicionService.TransicionarAsync(pedido, EstadoPedido.NoEntregado, contexto, ct);
+        if (!resultado.Exito)
+            return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
+
+        var intento = new IntentoEntrega
+        {
+            PedidoId = pedido.Id,
+            ChoferId = User.UsuarioId(),
+            Motivo = request.Motivo.Trim(),
+            Nota = NormalizarTexto(request.Nota),
+            FotoUrl = request.FotoUrl,
+            OcurridoEn = request.OcurridoEn ?? DateTime.UtcNow
+        };
+        db.IntentosEntrega.Add(intento);
+
+        await db.SaveChangesAsync(ct);
+
+        var respuestaObj = new
+        {
+            mensaje = "Entrega fallida registrada. Pedido en estado NoEntregado.",
+            estado = pedido.Estado.ToString(),
+            intento_id = intento.Id,
+            motivo = intento.Motivo
+        };
+
+        return Ok(respuestaObj);
+    }
+
+    // Reintento o reprogramación de entrega (CU-21 / ADMIN)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPost("{id:long}/reintentar-entrega")]
+    public async Task<IActionResult> ReintentarEntrega(long id, [FromBody] ReintentarEntregaRequest? request, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (pedido.Estado != EstadoPedido.NoEntregado)
+            return BadRequest(new { codigo = "estado_invalido", mensaje = "Solo pedidos en estado NoEntregado admiten reintento de despacho." });
+
+        if (request?.ChoferId.HasValue == true)
+        {
+            pedido.ChoferId = request.ChoferId.Value;
+        }
+
+        var contexto = new MercuryGo.Api.Services.ContextoTransicion(
+            UsuarioId: User.UsuarioId(),
+            RolCodigo: User.RolCodigo() ?? string.Empty
+        );
+
+        var resultado = await transicionService.TransicionarAsync(pedido, EstadoPedido.Despachado, contexto, ct);
+        if (!resultado.Exito)
+            return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Orden {pedido.Numero} reprogramada y despachada nuevamente.",
+            estado = pedido.Estado.ToString(),
+            chofer_id = pedido.ChoferId
+        });
+    }
+
+    // Cierre de entrega parcial con ítems rechazados (CU-13 / Decisión 14)
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Chofer}")]
+    [HttpPost("{id:long}/entrega-parcial")]
+    public async Task<IActionResult> EntregaParcial(
+        long id,
+        [FromBody] EntregaParcialRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        var detalles = await db.DetallesPedido.Where(d => d.PedidoId == id).ToListAsync(ct);
+        var mapaRechazos = (request.ItemsRechazados ?? []).ToDictionary(r => r.ProductoId);
+
+        foreach (var d in detalles)
+        {
+            if (mapaRechazos.TryGetValue(d.ProductoId, out var rechazo))
+            {
+                var cantRechazada = Math.Min(d.Cantidad, Math.Max(0, rechazo.CantidadRechazada));
+                d.CantidadRechazada = cantRechazada;
+                d.CantidadEntregada = d.Cantidad - cantRechazada;
+                d.MotivoRechazo = NormalizarTexto(rechazo.Motivo);
+
+                // Devolver unidades lógicas y ajustar total por los productos rechazados en puerta
+                if (cantRechazada > 0)
+                {
+                    d.Cantidad = d.CantidadEntregada.Value; // Ajuste del total de la orden
+                }
+            }
+            else
+            {
+                d.CantidadEntregada = d.Cantidad;
+                d.CantidadRechazada = 0;
+            }
+        }
+
+        // Adjuntar prueba de entrega si se envió (CU-23)
+        if (!string.IsNullOrWhiteSpace(request.FotoUrl)) pedido.EntregaFotoUrl = request.FotoUrl;
+        if (!string.IsNullOrWhiteSpace(request.FirmaUrl)) pedido.EntregaFirmaUrl = request.FirmaUrl;
+
+        var contexto = new MercuryGo.Api.Services.ContextoTransicion(
+            UsuarioId: User.UsuarioId(),
+            RolCodigo: User.RolCodigo() ?? string.Empty,
+            Latitud: request.Latitud,
+            Longitud: request.Longitud,
+            EsSincronizacionOffline: request.EsOffline,
+            OcurridoEn: request.OcurridoEn
+        );
+
+        var resultado = await transicionService.TransicionarAsync(pedido, EstadoPedido.Entregado, contexto, ct);
+        if (!resultado.Exito)
+            return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Entrega registrada con ajustes por ítems rechazados.",
+            estado = pedido.Estado.ToString(),
+            total_ajustado = detalles.Sum(d => d.Cantidad * d.PrecioUnitario)
+        });
+    }
+
+    // Ajuste manual de cobro por parte del Administrador (Decisión 4)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPut("cobros/{cobroId:long}/ajustar")]
+    public async Task<IActionResult> AjustarCobro(long cobroId, [FromBody] AjustarCobroRequest request, CancellationToken ct)
+    {
+        var cobro = await db.CobrosPedido.FirstOrDefaultAsync(c => c.Id == cobroId, ct);
+        if (cobro is null)
+            return NotFound(new { codigo = "cobro_no_encontrado", mensaje = "El cobro no existe." });
+
+        if (request.NuevoMonto < 0)
+            return BadRequest(new { codigo = "monto_invalido", mensaje = "El monto ajustado no puede ser negativo." });
+
+        cobro.Monto = request.NuevoMonto;
+        if (!string.IsNullOrWhiteSpace(request.Metodo)) cobro.Metodo = request.Metodo.Trim();
+        cobro.RecibidoEn = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Cobro ajustado a ${cobro.Monto:N2}.",
+            cobro_id = cobro.Id,
+            monto = cobro.Monto,
+            metodo = cobro.Metodo
+        });
+    }
+
     private static IContainer CeldaEncabezado(IContainer c) =>
         c.BorderBottom(1).BorderColor(Colors.Grey.Lighten1).PaddingVertical(5);
 
@@ -1009,12 +1399,21 @@ public sealed class PedidosController(MercuryGoDbContext db, IWebHostEnvironment
 public sealed record CrearPedidoItemRequest(long ProductoId, int Cantidad);
 public sealed record CrearPedidoRequest(long ClienteId, string? Observaciones, List<CrearPedidoItemRequest> Items, string? Estado = null);
 public sealed record EditarPedidoRequest(List<CrearPedidoItemRequest>? Items, string? Observaciones);
-public sealed record CobroChoferRequest(decimal Monto, string? Metodo = "Efectivo");
+public sealed record CobroChoferRequest(decimal Monto, string? Metodo = "Efectivo", DateTime? OcurridoEn = null);
 public sealed record AprobarComprobanteRequest(decimal? Monto);
 public sealed record RechazarComprobanteRequest(string? Motivo);
-public sealed record CambiarEstadoRequest(string Estado, double? Latitud = null, double? Longitud = null);
+public sealed record CambiarEstadoRequest(string Estado, double? Latitud = null, double? Longitud = null, bool EsOffline = false, DateTime? OcurridoEn = null);
 public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);
 public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items);
+
+public sealed record SolicitarCancelacionRequest(string? Motivo);
+public sealed record ResolverCancelacionRequest(bool Aprobada);
+public sealed record AsignarChoferRequest(long ChoferId);
+public sealed record EntregaFallidaRequest(string Motivo, string? Nota = null, string? FotoUrl = null, double? Latitud = null, double? Longitud = null, bool EsOffline = false, DateTime? OcurridoEn = null);
+public sealed record ReintentarEntregaRequest(long? ChoferId = null);
+public sealed record ItemRechazadoRequest(long ProductoId, int CantidadRechazada, string? Motivo = null);
+public sealed record EntregaParcialRequest(List<ItemRechazadoRequest>? ItemsRechazados, string? FotoUrl = null, string? FirmaUrl = null, double? Latitud = null, double? Longitud = null, bool EsOffline = false, DateTime? OcurridoEn = null);
+public sealed record AjustarCobroRequest(decimal NuevoMonto, string? Metodo = null);
 
 public sealed record PedidoListaResponse(
     long Id,
@@ -1038,7 +1437,14 @@ public sealed record PedidoDetalleResponse(
     decimal Total,
     double? LatitudEntrega = null,
     double? LongitudEntrega = null,
-    DateTime? FechaEnPuerta = null
+    DateTime? FechaEnPuerta = null,
+    long? ChoferId = null,
+    string? PickingResultado = null,
+    string? ComprobanteEstado = null,
+    string? ComprobanteUrl = null,
+    string? CancelacionEstado = null,
+    bool ValidacionFallida = false,
+    string? ValidacionDetalle = null
 );
 
 public sealed record ClientePedidoResponse(long Id, string RazonSocial, string Cuit);
@@ -1049,5 +1455,10 @@ public sealed record DetallePedidoResponse(
     string ProductoNombre,
     int Cantidad,
     decimal PrecioUnitario,
-    decimal Subtotal
+    decimal Subtotal,
+    int CantidadPedida = 0,
+    int CantidadPreparada = 0,
+    int? CantidadEntregada = null,
+    int? CantidadRechazada = null,
+    string? MotivoRechazo = null
 );
