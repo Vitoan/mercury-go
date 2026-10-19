@@ -50,6 +50,9 @@ google-services.json
 keystore.properties
 *.jks
 *.keystore
+appsettings.Production.json
+*.zip
+publish/
 
 # CodeGraph
 .codegraph/

@@ -12,8 +12,26 @@ export function guardar_copia(endpoint, respuesta) {
 
 export function obtener_copia(endpoint) {
   try {
-    const copia = localStorage.getItem(prefijo + endpoint);
-    return copia ? JSON.parse(copia) : null;
+    const claveExacta = prefijo + endpoint;
+    const copia = localStorage.getItem(claveExacta);
+    if (copia) return JSON.parse(copia);
+
+    // Fallback: probar con/sin barra inicial
+    const endpointAlt = endpoint.startsWith('/') ? endpoint.slice(1) : `/${endpoint}`;
+    const copiaAlt = localStorage.getItem(prefijo + endpointAlt);
+    if (copiaAlt) return JSON.parse(copiaAlt);
+
+    // Fallback para pedidos: si no hay coincidencia exacta de query string, devolver cualquier copia guardada de pedidos
+    if (endpoint.includes('api/pedidos') && !endpoint.includes('/resumen')) {
+      const clavePedidos = Object.keys(localStorage).find(
+        (k) => k.startsWith(prefijo) && k.includes('api/pedidos') && !k.includes('/resumen')
+      );
+      if (clavePedidos) {
+        const fallback = localStorage.getItem(clavePedidos);
+        return fallback ? JSON.parse(fallback) : null;
+      }
+    }
+    return null;
   } catch {
     return null;
   }

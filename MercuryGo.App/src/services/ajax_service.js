@@ -1,5 +1,6 @@
 import { obtener_api_url } from '@/config/debug';
 import { guardar_copia, obtener_copia } from '@/services/copia_local_service';
+import { use_offline_store } from '@/stores/offline_store';
 import {
   asegurar_token,
   cabecera_autorizacion,
@@ -151,12 +152,22 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
     if (opciones.guardable) {
       guardar_copia(endpoint, resultado);
     }
+    try {
+      use_offline_store().marcar_en_linea();
+    } catch {}
     return resultado;
   } catch (error) {
     clearTimeout(timer);
 
+    const esFalloRed = !error.estado_http || error.estado_http === 0;
+    if (esFalloRed) {
+      try {
+        use_offline_store().marcar_desconectado();
+      } catch {}
+    }
+
     // Si la lectura es guardable y no hay conexión con la API, devolver la copia local si existe
-    if (opciones.guardable && (!error.estado_http || error.estado_http === 0)) {
+    if (opciones.guardable && esFalloRed) {
       const copia = obtener_copia(endpoint);
       if (copia) {
         return copia;

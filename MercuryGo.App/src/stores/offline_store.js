@@ -9,7 +9,7 @@ const clave_cola = 'mercurygo_cola_offline';
 
 export const use_offline_store = defineStore('offline', {
   state: () => ({
-    en_linea: true,
+    en_linea: typeof navigator !== 'undefined' ? navigator.onLine : true,
     cola: JSON.parse(localStorage.getItem(clave_cola) || '[]'),
     sincronizando: false
   }),
@@ -21,20 +21,42 @@ export const use_offline_store = defineStore('offline', {
   actions: {
     iniciar: async function () {
       const vm = this;
+      if (typeof window !== 'undefined') {
+        window.addEventListener('online', () => {
+          vm.marcar_en_linea();
+        });
+        window.addEventListener('offline', () => {
+          vm.marcar_desconectado();
+        });
+      }
       try {
         Network.addListener('networkStatusChange', function (estado) {
-          vm.en_linea = Boolean(estado.connected);
           if (estado.connected) {
-            vm.sincronizar();
+            vm.marcar_en_linea();
+          } else {
+            vm.marcar_desconectado();
           }
         });
         const estado = await Network.getStatus();
-        vm.en_linea = Boolean(estado.connected);
-        if (vm.en_linea) {
-          vm.sincronizar();
+        if (estado.connected) {
+          vm.marcar_en_linea();
+        } else {
+          vm.marcar_desconectado();
         }
       } catch (err) {
         console.warn('No se pudo inicializar Network listener:', err);
+      }
+    },
+    marcar_desconectado: function () {
+      const vm = this;
+      vm.en_linea = false;
+    },
+    marcar_en_linea: function () {
+      const vm = this;
+      const estabaDesconectado = !vm.en_linea;
+      vm.en_linea = true;
+      if (estabaDesconectado || vm.cola.length > 0) {
+        vm.sincronizar();
       }
     },
     guardar_cola: function (cola) {

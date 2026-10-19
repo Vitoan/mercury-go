@@ -6,7 +6,7 @@ import { use_offline_store } from '@/stores/offline_store';
 export function con_cambios_sin_enviar(pedido) {
   if (!pedido) return pedido;
   const offline = use_offline_store();
-  const cambios = (offline.cola || []).filter((c) => c.pedido_id === pedido.id);
+  const cambios = (offline.cola || []).filter((c) => c.pedido_id == pedido.id);
   if (cambios.length === 0) return pedido;
   const ultimo = cambios[cambios.length - 1];
   return {
@@ -114,9 +114,19 @@ export const usePedidosStore = defineStore('pedidos', () => {
       pedidos.value = pedidos.value.map(con_cambios_sin_enviar);
       return { id, estado: nuevoEstado, sin_enviar: true };
     }
-    const res = await pedidos_service.cambiar_estado(id, nuevoEstado, latitud, longitud);
-    await cargar(true);
-    return res;
+    try {
+      const res = await pedidos_service.cambiar_estado(id, nuevoEstado, latitud, longitud);
+      await cargar(true);
+      return res;
+    } catch (err) {
+      if (!err.estado_http || err.estado_http === 0) {
+        offline.marcar_desconectado();
+        offline.encolar(id, nuevoEstado, latitud, longitud);
+        pedidos.value = pedidos.value.map(con_cambios_sin_enviar);
+        return { id, estado: nuevoEstado, sin_enviar: true };
+      }
+      throw err;
+    }
   }
 
   async function cancelar_orden(id) {

@@ -144,11 +144,11 @@ export function usePedidosWorkflow(toast) {
         }
       }
 
-      await pedidos_store.cambiar_estado(pedidoSeleccionado.value.id, nuevoEstado, lat, lng);
+      const res = await pedidos_store.cambiar_estado(pedidoSeleccionado.value.id, nuevoEstado, lat, lng);
       vibrar_exito();
 
       const offline = use_offline_store();
-      if (offline.sin_conexion) {
+      if (res?.sin_enviar || offline.sin_conexion) {
         if (toast) {
           toast.mostrar(
             `Orden ${pedidoSeleccionado.value.numero}: estado '${formatear_nombre_estado(nuevoEstado)}' encolado sin red («Sin enviar»).`,
