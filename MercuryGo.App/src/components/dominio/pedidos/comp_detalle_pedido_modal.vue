@@ -107,6 +107,54 @@
               </div>
             </div>
 
+            <!-- Solicitud de Cancelación de Cliente (si existe) -->
+            <div v-if="detalle.cancelacion_estado && detalle.cancelacion_estado !== 'Ninguna'" class="mercury-cancelacion-banner">
+              <strong>Estado de Cancelación:</strong> {{ detalle.cancelacion_estado }}
+              <p v-if="detalle.cancelacion_motivo">Motivo: {{ detalle.cancelacion_motivo }}</p>
+              <div v-if="esAdmin && detalle.cancelacion_estado === 'Solicitada'" class="mercury-botones-resolucion">
+                <ion-button size="small" color="danger" @click="resolverCancelacion(true)">Aprobar Cancelación</ion-button>
+                <ion-button size="small" fill="outline" color="medium" @click="resolverCancelacion(false)">Rechazar Solicitud</ion-button>
+              </div>
+            </div>
+
+            <!-- Botones de Acción de Estado y Cliente -->
+            <div class="mercury-acciones-detalle-fila" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+              <!-- Cliente: Repetir Pedido -->
+              <ion-button
+                v-if="esCliente && !offline_store.sin_conexion"
+                expand="block"
+                color="secondary"
+                fill="outline"
+                @click="repetirPedido"
+              >
+                <ion-icon slot="start" :icon="repeatOutline" />
+                Repetir este Pedido
+              </ion-button>
+
+              <!-- Cliente: Solicitar Cancelación (si está confirmado o en preparación) -->
+              <ion-button
+                v-if="esCliente && !offline_store.sin_conexion && (detalle.estado === 'Confirmado' || detalle.estado === 'EnPreparacion') && (!detalle.cancelacion_estado || detalle.cancelacion_estado === 'Ninguna')"
+                expand="block"
+                color="danger"
+                fill="outline"
+                @click="solicitarCancelacion"
+              >
+                <ion-icon slot="start" :icon="closeCircleOutline" />
+                Solicitar Cancelación de Pedido
+              </ion-button>
+
+              <!-- Admin: Confirmar Pedido (si está pendiente) -->
+              <ion-button
+                v-if="esAdmin && !offline_store.sin_conexion && detalle.estado === 'Pendiente'"
+                expand="block"
+                color="primary"
+                @click="confirmarPedidoAdmin"
+              >
+                <ion-icon slot="start" :icon="checkmarkCircleOutline" />
+                Confirmar Pedido (▶ Confirmado)
+              </ion-button>
+            </div>
+
             <div v-if="!offline_store.sin_conexion" class="mercury-botones-pdf-fila">
               <ion-button
                 expand="block"
@@ -240,10 +288,13 @@ import {
   documentAttachOutline,
   checkmarkCircleOutline,
   closeCircleOutline,
-  navigateOutline
+  navigateOutline,
+  repeatOutline
 } from 'ionicons/icons';
 import { pedidos_service } from '@/services/pedidos_service';
 import { sesion_store } from '@/stores/sesion_store';
+import { carrito_store } from '@/stores/carrito_store';
+import { productos_service } from '@/services/productos_service';
 import { use_offline_store } from '@/stores/offline_store';
 import { con_cambios_sin_enviar } from '@/stores/pedidos_store';
 import { compartir_archivo } from '@/services/compartir_service';
@@ -272,6 +323,107 @@ const itemsEdicion = ref([]);
 const observacionesEdicion = ref('');
 
 const esAdmin = computed(() => sesion_store.es_admin);
+const esCliente = computed(() => sesion_store.rol_activo === 'CLIENTE');
+
+const repetirPedido = async () => {
+  if (!detalle.value?.detalles || detalle.value.detalles.length === 0) return;
+  vibrar_toque();
+
+  try {
+    const resProds = await productos_service.obtener_todos();
+    const prodsActuales = resProds?.productos || [];
+    let agregados = 0;
+    let omitidos = 0;
+
+    for (const d of detalle.value.detalles) {
+      const prod = prodsActuales.find((p) => p.id === d.producto_id);
+      if (prod && prod.disponible) {
+        carrito_store.agregar_producto(prod, d.cantidad);
+        agregados++;
+      } else {
+        omitidos++;
+      }
+    }
+
+    if (agregados > 0) {
+      await vibrar_exito();
+      toast.mostrarExito(`¡Se cargaron ${agregados} producto(s) en tu carrito!`);
+      if (omitidos > 0) {
+        toast.mostrarAdvertencia(`${omitidos} producto(s) no estaban disponibles y fueron omitidos.`);
+      }
+      cerrar();
+    } else {
+      toast.mostrarError('Ninguno de los productos del pedido está disponible actualmente.');
+    }
+  } catch (err) {
+    toast.mostrarError('Error al cargar productos en el carrito: ' + (err.mensaje || err.message));
+  }
+};
+
+const solicitarCancelacion = async () => {
+  if (!props.pedidoId) return;
+
+  const alert = await alertController.create({
+    header: 'Solicitar Cancelación',
+    message: 'Ingresá el motivo por el cual solicitás cancelar este pedido:',
+    inputs: [
+      {
+        name: 'motivo',
+        type: 'text',
+        placeholder: 'Ej: Pedido duplicado, cambio de planes...'
+      }
+    ],
+    buttons: [
+      { text: 'Volver', role: 'cancel' },
+      {
+        text: 'Enviar Solicitud',
+        role: 'destructive',
+        handler: async (data) => {
+          const mot = data?.motivo?.trim() || 'Solicitud de cancelación por cliente';
+          try {
+            await pedidos_service.solicitar_cancelacion(props.pedidoId, mot);
+            await vibrar_exito();
+            toast.mostrarExito('¡Solicitud de cancelación enviada al Administrador!');
+            await cargarDetalle();
+            emit('pedido_actualizado');
+            return true;
+          } catch (err) {
+            toast.mostrarError(err.mensaje || 'Error al solicitar cancelación.');
+            return false;
+          }
+        }
+      }
+    ]
+  });
+
+  await alert.present();
+};
+
+const resolverCancelacion = async (aprobada) => {
+  if (!props.pedidoId) return;
+  try {
+    await pedidos_service.resolver_cancelacion(props.pedidoId, aprobada);
+    await vibrar_exito();
+    toast.mostrarExito(aprobada ? 'Cancelación aprobada.' : 'Solicitud de cancelación rechazada.');
+    await cargarDetalle();
+    emit('pedido_actualizado');
+  } catch (err) {
+    toast.mostrarError(err.mensaje || 'Error al resolver cancelación.');
+  }
+};
+
+const confirmarPedidoAdmin = async () => {
+  if (!props.pedidoId) return;
+  try {
+    await pedidos_service.confirmar(props.pedidoId);
+    await vibrar_exito();
+    toast.mostrarExito('¡Pedido confirmado exitosamente!');
+    await cargarDetalle();
+    emit('pedido_actualizado');
+  } catch (err) {
+    toast.mostrarError(err.mensaje || 'Error al confirmar pedido.');
+  }
+};
 
 const observacionesVisibles = computed(() => {
   const obs = detalle.value?.observaciones || '';

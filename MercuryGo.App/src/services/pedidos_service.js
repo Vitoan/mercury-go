@@ -74,5 +74,44 @@ export const pedidos_service = {
 
   rechazar_comprobante(id, motivo = '') {
     return ajax_service.put(`api/pedidos/${id}/rechazar-comprobante`, { motivo });
+  },
+
+  confirmar(id) {
+    return ajax_service.post(`api/pedidos/${id}/confirmar`);
+  },
+
+  solicitar_cancelacion(id, motivo) {
+    return ajax_service.post(`api/pedidos/${id}/solicitar-cancelacion`, { motivo });
+  },
+
+  resolver_cancelacion(id, aprobada, motivo = null) {
+    return ajax_service.post(`api/pedidos/${id}/resolver-cancelacion`, { aprobada, motivo });
+  },
+
+  asignar_chofer(id, chofer_id) {
+    return ajax_service.put(`api/pedidos/${id}/chofer`, { chofer_id });
+  },
+
+  registrar_no_entregado(id, motivo, nota = null, foto_url = null) {
+    return ajax_service.post(`api/pedidos/${id}/no-entregado`, { motivo, nota, foto_url });
+  },
+
+  reintentar_entrega(id) {
+    return ajax_service.post(`api/pedidos/${id}/reintentar-entrega`);
+  },
+
+  registrar_entrega_parcial(id, lineas, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null) {
+    return ajax_service.post(`api/pedidos/${id}/entrega-parcial`, {
+      lineas,
+      motivo,
+      latitud,
+      longitud,
+      foto_url,
+      firma_url
+    });
+  },
+
+  ajustar_cobro(cobro_id, nuevo_monto, motivo) {
+    return ajax_service.put(`api/pedidos/cobros/${cobro_id}/ajustar`, { nuevo_monto, motivo });
   }
 };

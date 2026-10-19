@@ -228,6 +228,22 @@
       @pedido_creado="workflow.alCrearPedidoAdmin"
     />
 
+    <!-- Modal de Entrega Fallida (Chofer / Admin) -->
+    <comp-entrega-fallida-modal
+      :abierto="workflow.mostrarModalEntregaFallida.value"
+      :pedido="workflow.pedidoSeleccionado.value"
+      @cerrar="workflow.mostrarModalEntregaFallida.value = false"
+      @entrega_fallida_registrada="workflow.alRegistrarEntregaFallida"
+    />
+
+    <!-- Modal de Entrega Parcial / Rechazo (Chofer / Admin) -->
+    <comp-entrega-parcial-modal
+      :abierto="workflow.mostrarModalEntregaParcial.value"
+      :pedido="workflow.pedidoSeleccionado.value"
+      @cerrar="workflow.mostrarModalEntregaParcial.value = false"
+      @entrega_parcial_registrada="workflow.alRegistrarEntregaParcial"
+    />
+
     <!-- Toast para feedback de transiciones y errores -->
     <ion-toast
       :is-open="toast.visible.value"
@@ -277,6 +293,8 @@ import CompPickingModal from '../components/dominio/pedidos/comp_picking_modal.v
 import CompPedidoAdminModal from '../components/dominio/pedidos/comp_pedido_admin_modal.vue';
 import CompDetallePedidoModal from '../components/dominio/pedidos/comp_detalle_pedido_modal.vue';
 import CompCobroChoferModal from '../components/dominio/pedidos/comp_cobro_chofer_modal.vue';
+import CompEntregaFallidaModal from '../components/dominio/pedidos/comp_entrega_fallida_modal.vue';
+import CompEntregaParcialModal from '../components/dominio/pedidos/comp_entrega_parcial_modal.vue';
 
 import { usePedidosStore } from '@/stores/pedidos_store';
 import { useSesionStore } from '@/stores/sesion_store';
