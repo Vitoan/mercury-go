@@ -3,9 +3,20 @@ import { Network } from '@capacitor/network';
 import { pedidos_service } from '@/services/pedidos_service';
 import { obtener_token } from '@/services/token_service';
 import { usePedidosStore } from '@/stores/pedidos_store';
-import { vibrar_exito, vibrar_advertencia } from '@/services/vibracion_service';
+import { vibrar_exito, vibrar_advertencia, vibrar_error } from '@/services/vibracion_service';
 
-const clave_cola = 'mercurygo_cola_offline';
+const clave_cola = 'mercurygo_cola_offline_v2';
+
+function generar_uuid_v4() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export const use_offline_store = defineStore('offline', {
   state: () => ({
@@ -13,11 +24,19 @@ export const use_offline_store = defineStore('offline', {
     cola: JSON.parse(localStorage.getItem(clave_cola) || '[]'),
     sincronizando: false
   }),
+
   getters: {
     sin_conexion(state) {
       return !state.en_linea;
+    },
+    pendientes_count(state) {
+      return state.cola.filter((a) => a.estado === 'pendiente' || a.estado === 'enviando' || a.estado === 'error').length;
+    },
+    conflictos_count(state) {
+      return state.cola.filter((a) => a.estado === 'conflicto').length;
     }
   },
+
   actions: {
     iniciar: async function () {
       const vm = this;
@@ -30,7 +49,7 @@ export const use_offline_store = defineStore('offline', {
         });
       }
       try {
-        Network.addListener('networkStatusChange', function (estado) {
+        Network.addListener('networkStatusChange', (estado) => {
           if (estado.connected) {
             vm.marcar_en_linea();
           } else {
@@ -47,81 +66,194 @@ export const use_offline_store = defineStore('offline', {
         console.warn('No se pudo inicializar Network listener:', err);
       }
     },
+
     marcar_desconectado: function () {
-      const vm = this;
-      vm.en_linea = false;
+      this.en_linea = false;
     },
+
     marcar_en_linea: function () {
-      const vm = this;
-      const estabaDesconectado = !vm.en_linea;
-      vm.en_linea = true;
-      if (estabaDesconectado || vm.cola.length > 0) {
-        vm.sincronizar();
+      const estabaDesconectado = !this.en_linea;
+      this.en_linea = true;
+      if (estabaDesconectado || this.pendientes_count > 0) {
+        this.sincronizar();
       }
     },
-    guardar_cola: function (cola) {
-      const vm = this;
-      vm.cola = cola;
+
+    guardar_cola: function (nuevaCola) {
+      this.cola = nuevaCola;
       try {
-        localStorage.setItem(clave_cola, JSON.stringify(cola));
+        localStorage.setItem(clave_cola, JSON.stringify(nuevaCola));
       } catch (error) {
         console.warn('Error al guardar cola offline:', error);
       }
     },
-    encolar: function (pedido_id, estado, latitud = null, longitud = null) {
-      const vm = this;
-      const nuevo = {
-        id: Date.now(),
-        pedido_id,
-        estado,
-        latitud,
-        longitud
+
+    // Encola una acción con UUID v4 e Idempotency-Key
+    encolar_accion: function (tipo, pedido_id, payload = {}, lat = null, lng = null, archivo_local = null) {
+      const accion = {
+        id: generar_uuid_v4(),
+        tipo, // ENTREGAR | EN_PUERTA | NO_ENTREGADO | COBRO | PICKING_ITEM | DESPACHAR | CREAR_PEDIDO
+        pedido_id: Number(pedido_id),
+        payload,
+        ocurrido_en: new Date().toISOString(),
+        lat,
+        lng,
+        intentos: 0,
+        estado: 'pendiente', // pendiente | enviando | enviada | error | conflicto
+        error: null,
+        archivo_local
       };
-      vm.guardar_cola([...vm.cola, nuevo]);
+
+      this.guardar_cola([...this.cola, accion]);
+      return accion;
     },
-    sincronizar: async function () {
-      const vm = this;
-      const token = await obtener_token();
-      if (vm.sincronizando || vm.cola.length === 0 || !token) return;
 
-      vm.sincronizando = true;
-      const en_cola = vm.cola.length;
-      const rechazados = [];
+    // Compatibilidad retroactiva con la llamada previa de encolar estado
+    encolar: function (pedido_id, estado, latitud = null, longitud = null) {
+      return this.encolar_accion(estado.toUpperCase(), pedido_id, { estado }, latitud, longitud);
+    },
 
-      for (const cambio of [...vm.cola]) {
-        try {
-          await pedidos_service.cambiar_estado(
-            cambio.pedido_id,
-            cambio.estado,
-            cambio.latitud,
-            cambio.longitud
-          );
-        } catch (error) {
-          const estadoHttp = error?.estado_http;
-          // Sin red, sesión vencida o servidor caído: sigue en la cola
-          if (!estadoHttp || estadoHttp === 401 || estadoHttp >= 500) {
-            continue;
-          }
-          // Rechazo 400 o 409: otro usuario movió el pedido mientras no había red, no mejora reintentando
-          rechazados.push(error.message || error.mensaje || 'Transición no permitida');
+    limpiar_enviadas: function () {
+      this.guardar_cola(this.cola.filter((a) => a.estado !== 'enviada'));
+    },
+
+    reintentar_accion: function (accionId) {
+      const colaActualizada = this.cola.map((a) => {
+        if (a.id === accionId) {
+          return { ...a, estado: 'pendiente', error: null };
         }
-        vm.guardar_cola(vm.cola.filter((item) => item.id !== cambio.id));
+        return a;
+      });
+      this.guardar_cola(colaActualizada);
+      if (this.en_linea) {
+        this.sincronizar();
+      }
+    },
+
+    // Ejecución FIFO agrupada por pedido_id
+    sincronizar: async function () {
+      const token = await obtener_token();
+      if (this.sincronizando || this.cola.length === 0 || !token) return;
+
+      this.sincronizando = true;
+      let exitoAlMenosUno = false;
+      let conflictoOcurrido = false;
+
+      // Agrupar acciones pendientes en orden FIFO por pedido_id
+      const pedidosIds = [...new Set(this.cola.filter((a) => a.estado === 'pendiente' || a.estado === 'error').map((a) => a.pedido_id))];
+
+      for (const pId of pedidosIds) {
+        const accionesDelPedido = this.cola.filter((a) => a.pedido_id === pId && (a.estado === 'pendiente' || a.estado === 'error'));
+
+        for (const accion of accionesDelPedido) {
+          if (!this.en_linea) break;
+
+          accion.estado = 'enviando';
+          accion.intentos = (accion.intentos || 0) + 1;
+          this.guardar_cola([...this.cola]);
+
+          try {
+            await this.ejecutar_despacho_api(accion);
+            accion.estado = 'enviada';
+            accion.error = null;
+            exitoAlMenosUno = true;
+          } catch (err) {
+            const estadoHttp = err?.estado_http;
+            const esErrorConexion = !estadoHttp || estadoHttp === 0 || estadoHttp >= 500;
+
+            if (esErrorConexion) {
+              accion.estado = 'error';
+              accion.error = err?.message || 'Error temporal de conexión.';
+              // No continuar con las siguientes acciones de ESTE pedido (garantizar FIFO)
+              break;
+            } else if (estadoHttp === 409 || estadoHttp === 400) {
+              accion.estado = 'conflicto';
+              accion.error = err?.mensaje || err?.message || 'Conflicto de estado en servidor.';
+              conflictoOcurrido = true;
+              break;
+            } else {
+              accion.estado = 'error';
+              accion.error = err?.mensaje || err?.message || 'Rechazado por servidor.';
+              break;
+            }
+          } finally {
+            this.guardar_cola([...this.cola]);
+          }
+        }
       }
 
-      vm.sincronizando = false;
+      this.sincronizando = false;
 
-      if (rechazados.length > 0) {
+      if (conflictoOcurrido) {
         vibrar_advertencia();
-        console.warn(`La API no aceptó ${rechazados.length} cambios guardados:`, rechazados[0]);
-      } else if (vm.cola.length < en_cola) {
+      } else if (exitoAlMenosUno) {
         vibrar_exito();
       }
 
-      if (vm.cola.length < en_cola) {
+      if (exitoAlMenosUno) {
         try {
           await usePedidosStore().cargar(true);
-        } catch (e) {
-          console.warn('Error al recargar pedidos tras sincronización:', e);
+        } catch {
+          // Ignorar recarga fallida
+        }
+      }
+    },
+
+    ejecutar_despacho_api: async function (accion) {
+      const { tipo, pedido_id, payload, lat, lng, id } = accion;
+
+      switch (tipo) {
+        case 'ENTREGAR':
+        case 'EN_PUERTA':
+        case 'DESPACHADO':
+        case 'ENPREPARACION':
+        case 'CONFIRMADO':
+        case 'CANCELADO': {
+          const estadoDestino = payload?.estado || (tipo === 'EN_PUERTA' ? 'EnPuerta' : tipo === 'ENTREGAR' ? 'Entregado' : tipo);
+          return await pedidos_service.cambiar_estado(pedido_id, estadoDestino, lat, lng, id);
+        }
+
+        case 'NO_ENTREGADO': {
+          return await pedidos_service.registrar_no_entregado(
+            pedido_id,
+            payload?.motivo || 'ClienteAusente',
+            payload?.nota,
+            payload?.foto_url,
+            id
+          );
+        }
+
+        case 'COBRO': {
+          return await pedidos_service.registrar_cobro_chofer(
+            pedido_id,
+            payload?.monto,
+            payload?.metodo || 'Efectivo',
+            id
+          );
+        }
+
+        case 'ENTREGA_PARCIAL': {
+          return await pedidos_service.registrar_entrega_parcial(
+            pedido_id,
+            payload?.lineas || [],
+            payload?.motivo,
+            lat,
+            lng,
+            payload?.foto_url,
+            payload?.firma_url,
+            id
+          );
+        }
+
+        case 'PICKING_ITEM': {
+          return await pedidos_service.actualizar_picking(pedido_id, payload?.items || [], id);
+        }
+
+        default: {
+          if (payload?.estado) {
+            return await pedidos_service.cambiar_estado(pedido_id, payload.estado, lat, lng, id);
+          }
+          throw new Error(`Tipo de acción no soportado: ${tipo}`);
         }
       }
     }
