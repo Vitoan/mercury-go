@@ -28,6 +28,30 @@ async function leer(clave) {
   }
 }
 
+async function migrar_claves_inseguras_si_existen() {
+  try {
+    // Si hubiese quedado algún token residual en localStorage de versiones previas
+    const tokenViejo = typeof window !== 'undefined' ? window.localStorage?.getItem(CLAVE_TOKEN) : null;
+    const refreshViejo = typeof window !== 'undefined' ? window.localStorage?.getItem(CLAVE_REFRESH) : null;
+    const expiraViejo = typeof window !== 'undefined' ? window.localStorage?.getItem(CLAVE_EXPIRA) : null;
+
+    if (tokenViejo) {
+      await guardar(CLAVE_TOKEN, tokenViejo);
+      window.localStorage.removeItem(CLAVE_TOKEN);
+    }
+    if (refreshViejo) {
+      await guardar(CLAVE_REFRESH, refreshViejo);
+      window.localStorage.removeItem(CLAVE_REFRESH);
+    }
+    if (expiraViejo) {
+      await guardar(CLAVE_EXPIRA, expiraViejo);
+      window.localStorage.removeItem(CLAVE_EXPIRA);
+    }
+  } catch {
+    // No interrumpir si el entorno bloquea acceso a storage
+  }
+}
+
 export async function guardar_sesion(token, expira_en, refresh_token, refresh_expira_en) {
   token_en_memoria = token;
   await guardar(CLAVE_TOKEN, token);
@@ -37,6 +61,7 @@ export async function guardar_sesion(token, expira_en, refresh_token, refresh_ex
 }
 
 export async function restaurar_sesion() {
+  await migrar_claves_inseguras_si_existen();
   token_en_memoria = await leer(CLAVE_TOKEN);
   return token_en_memoria;
 }
