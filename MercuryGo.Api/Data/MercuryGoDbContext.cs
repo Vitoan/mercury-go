@@ -14,6 +14,9 @@ public class MercuryGoDbContext : DbContext
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Pedido> Pedidos => Set<Pedido>();
     public DbSet<DetallePedido> DetallesPedido => Set<DetallePedido>();
+    public DbSet<CobroPedido> CobrosPedido => Set<CobroPedido>();
+    public DbSet<IntentoEntrega> IntentosEntrega => Set<IntentoEntrega>();
+    public DbSet<OperacionProcesada> OperacionesProcesadas => Set<OperacionProcesada>();
     public DbSet<Rol> Roles => Set<Rol>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -108,6 +111,36 @@ public class MercuryGoDbContext : DbContext
                   .HasForeignKey(p => p.ClienteId)
                   .OnDelete(DeleteBehavior.Restrict);
 
+            entity.HasOne(p => p.Chofer)
+                  .WithMany()
+                  .HasForeignKey(p => p.ChoferId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(p => p.ConfirmadoPor)
+                  .WithMany()
+                  .HasForeignKey(p => p.ConfirmadoPorId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(p => p.AuditadoPor)
+                  .WithMany()
+                  .HasForeignKey(p => p.AuditadoPorId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(p => p.CancelacionSolicitadaPor)
+                  .WithMany()
+                  .HasForeignKey(p => p.CancelacionSolicitadaPorId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.Property(e => e.PickingResultado).HasMaxLength(30);
+            entity.Property(e => e.ComprobanteEstado).HasMaxLength(30).HasDefaultValue("SinComprobante");
+            entity.Property(e => e.ComprobanteUrl).HasMaxLength(500);
+            entity.Property(e => e.EntregaFotoUrl).HasMaxLength(500);
+            entity.Property(e => e.EntregaFirmaUrl).HasMaxLength(500);
+            entity.Property(e => e.CancelacionEstado).HasMaxLength(30).HasDefaultValue("Ninguna");
+            entity.Property(e => e.CancelacionMotivo).HasMaxLength(255);
+            entity.Property(e => e.ValidacionFallida).HasDefaultValue(false);
+            entity.Property(e => e.ValidacionDetalle).HasMaxLength(500);
+
             entity.HasData(
                 new Pedido { Id = 1, ClienteId = 1, Numero = "PED-000001", Estado = EstadoPedido.Entregado,    FechaPedido = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc), Observaciones = "Entregar en depósito trasero", Activo = true, CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc) },
                 new Pedido { Id = 2, ClienteId = 2, Numero = "PED-000002", Estado = EstadoPedido.Despachado,   FechaPedido = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc), Observaciones = null, Activo = true, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
@@ -123,6 +156,9 @@ public class MercuryGoDbContext : DbContext
             entity.ToTable("detalles_pedido");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Cantidad).IsRequired();
+            entity.Property(e => e.CantidadPedida).IsRequired();
+            entity.Property(e => e.CantidadPreparada).IsRequired();
+            entity.Property(e => e.MotivoRechazo).HasMaxLength(255);
             entity.Property(e => e.PrecioUnitario).HasPrecision(18, 2).IsRequired();
 
             entity.HasOne(d => d.Pedido)
@@ -138,21 +174,80 @@ public class MercuryGoDbContext : DbContext
             // Seed de líneas de pedido (precios históricos al momento del pedido)
             entity.HasData(
                 // PED-000001
-                new DetallePedido { Id = 1, PedidoId = 1, ProductoId = 1, Cantidad = 5,  PrecioUnitario = 2400.00m, CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc) },
-                new DetallePedido { Id = 2, PedidoId = 1, ProductoId = 5, Cantidad = 10, PrecioUnitario = 1250.00m, CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc) },
-                new DetallePedido { Id = 3, PedidoId = 1, ProductoId = 6, Cantidad = 3,  PrecioUnitario = 3400.00m, CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 1, PedidoId = 1, ProductoId = 1, Cantidad = 5,  CantidadPedida = 5,  CantidadPreparada = 5,  PrecioUnitario = 2400.00m, CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 2, PedidoId = 1, ProductoId = 5, Cantidad = 10, CantidadPedida = 10, CantidadPreparada = 10, PrecioUnitario = 1250.00m, CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 3, PedidoId = 1, ProductoId = 6, Cantidad = 3,  CantidadPedida = 3,  CantidadPreparada = 3,  PrecioUnitario = 3400.00m, CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc) },
                 // PED-000002
-                new DetallePedido { Id = 4, PedidoId = 2, ProductoId = 2, Cantidad = 20, PrecioUnitario = 950.00m,  CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
-                new DetallePedido { Id = 5, PedidoId = 2, ProductoId = 4, Cantidad = 15, PrecioUnitario = 1100.00m, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 4, PedidoId = 2, ProductoId = 2, Cantidad = 20, CantidadPedida = 20, CantidadPreparada = 20, PrecioUnitario = 950.00m,  CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 5, PedidoId = 2, ProductoId = 4, Cantidad = 15, CantidadPedida = 15, CantidadPreparada = 15, PrecioUnitario = 1100.00m, CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, DateTimeKind.Utc) },
                 // PED-000003
-                new DetallePedido { Id = 6, PedidoId = 3, ProductoId = 1, Cantidad = 8,  PrecioUnitario = 2400.00m, CreadoEn = new DateTime(2026, 8, 27, 0, 0, 0, DateTimeKind.Utc) },
-                new DetallePedido { Id = 7, PedidoId = 3, ProductoId = 6, Cantidad = 6,  PrecioUnitario = 3400.00m, CreadoEn = new DateTime(2026, 8, 27, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 6, PedidoId = 3, ProductoId = 1, Cantidad = 8,  CantidadPedida = 8,  CantidadPreparada = 8,  PrecioUnitario = 2400.00m, CreadoEn = new DateTime(2026, 8, 27, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 7, PedidoId = 3, ProductoId = 6, Cantidad = 6,  CantidadPedida = 6,  CantidadPreparada = 6,  PrecioUnitario = 3400.00m, CreadoEn = new DateTime(2026, 8, 27, 0, 0, 0, DateTimeKind.Utc) },
                 // PED-000004
-                new DetallePedido { Id = 8, PedidoId = 4, ProductoId = 5, Cantidad = 12, PrecioUnitario = 1250.00m, CreadoEn = new DateTime(2026, 8, 28, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 8, PedidoId = 4, ProductoId = 5, Cantidad = 12, CantidadPedida = 12, CantidadPreparada = 12, PrecioUnitario = 1250.00m, CreadoEn = new DateTime(2026, 8, 28, 0, 0, 0, DateTimeKind.Utc) },
                 // PED-000005
-                new DetallePedido { Id = 9, PedidoId = 5, ProductoId = 3, Cantidad = 4,  PrecioUnitario = 1800.00m, CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, DateTimeKind.Utc) },
-                new DetallePedido { Id = 10, PedidoId = 5, ProductoId = 2, Cantidad = 8, PrecioUnitario = 950.00m,  CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, DateTimeKind.Utc) }
+                new DetallePedido { Id = 9, PedidoId = 5, ProductoId = 3, Cantidad = 4,  CantidadPedida = 4,  CantidadPreparada = 4,  PrecioUnitario = 1800.00m, CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, DateTimeKind.Utc) },
+                new DetallePedido { Id = 10, PedidoId = 5, ProductoId = 2, Cantidad = 8, CantidadPedida = 8,  CantidadPreparada = 8,  PrecioUnitario = 950.00m,  CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, DateTimeKind.Utc) }
             );
+        });
+
+        // ── CobroPedido (CU-13 / Decisión 9) ──────────────────────────────────
+        modelBuilder.Entity<CobroPedido>(entity =>
+        {
+            entity.ToTable("cobros_pedido");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Monto).HasPrecision(18, 2).IsRequired();
+            entity.Property(e => e.Metodo).HasMaxLength(50).IsRequired().HasDefaultValue("Efectivo");
+            entity.Property(e => e.OcurridoEn).IsRequired();
+            entity.Property(e => e.RecibidoEn).IsRequired();
+
+            entity.HasOne(c => c.Pedido)
+                  .WithMany(p => p.Cobros)
+                  .HasForeignKey(c => c.PedidoId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.RegistradoPor)
+                  .WithMany()
+                  .HasForeignKey(c => c.RegistradoPorId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── IntentoEntrega (CU-21) ───────────────────────────────────────────
+        modelBuilder.Entity<IntentoEntrega>(entity =>
+        {
+            entity.ToTable("intentos_entrega");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Motivo).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Nota).HasMaxLength(500);
+            entity.Property(e => e.FotoUrl).HasMaxLength(500);
+            entity.Property(e => e.OcurridoEn).IsRequired();
+
+            entity.HasOne(i => i.Pedido)
+                  .WithMany(p => p.IntentosEntrega)
+                  .HasForeignKey(i => i.PedidoId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(i => i.Chofer)
+                  .WithMany()
+                  .HasForeignKey(i => i.ChoferId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── OperacionProcesada (Idempotencia / Sección 4 y 6.3) ───────────────
+        modelBuilder.Entity<OperacionProcesada>(entity =>
+        {
+            entity.ToTable("operaciones_procesadas");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.Tipo).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ProcesadaEn).IsRequired();
+
+            entity.HasIndex(e => new { e.Id, e.Tipo });
+
+            entity.HasOne(o => o.Usuario)
+                  .WithMany()
+                  .HasForeignKey(o => o.UsuarioId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // ── Rol ───────────────────────────────────────────────────────────────

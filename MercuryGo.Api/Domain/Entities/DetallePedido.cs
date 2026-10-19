@@ -13,6 +13,11 @@ public sealed class DetallePedido : EntityBase
     public Producto? Producto { get; set; }
 
     public int Cantidad { get; set; }
+    public int CantidadPedida { get; set; }
+    public int CantidadPreparada { get; set; }
+    public int? CantidadEntregada { get; set; }
+    public int? CantidadRechazada { get; set; }
+    public string? MotivoRechazo { get; set; }
 
     // Precio al momento de confirmar el pedido (precio histórico).
     public decimal PrecioUnitario { get; set; }

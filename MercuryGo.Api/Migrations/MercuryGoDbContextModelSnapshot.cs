@@ -202,6 +202,64 @@ namespace MercuryGo.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.CobroPedido", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("actualizado_en");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("creado_en");
+
+                    b.Property<string>("Metodo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasDefaultValue("Efectivo")
+                        .HasColumnName("metodo");
+
+                    b.Property<decimal>("Monto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("monto");
+
+                    b.Property<DateTime>("OcurridoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("ocurrido_en");
+
+                    b.Property<long>("PedidoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pedido_id");
+
+                    b.Property<DateTime>("RecibidoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("recibido_en");
+
+                    b.Property<long?>("RegistradoPorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("registrado_por_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cobros_pedido");
+
+                    b.HasIndex("PedidoId")
+                        .HasDatabaseName("ix_cobros_pedido_pedido_id");
+
+                    b.HasIndex("RegistradoPorId")
+                        .HasDatabaseName("ix_cobros_pedido_registrado_por_id");
+
+                    b.ToTable("cobros_pedido", (string)null);
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.DetallePedido", b =>
                 {
                     b.Property<long>("Id")
@@ -219,9 +277,30 @@ namespace MercuryGo.Api.Migrations
                         .HasColumnType("int")
                         .HasColumnName("cantidad");
 
+                    b.Property<int?>("CantidadEntregada")
+                        .HasColumnType("int")
+                        .HasColumnName("cantidad_entregada");
+
+                    b.Property<int>("CantidadPedida")
+                        .HasColumnType("int")
+                        .HasColumnName("cantidad_pedida");
+
+                    b.Property<int>("CantidadPreparada")
+                        .HasColumnType("int")
+                        .HasColumnName("cantidad_preparada");
+
+                    b.Property<int?>("CantidadRechazada")
+                        .HasColumnType("int")
+                        .HasColumnName("cantidad_rechazada");
+
                     b.Property<DateTime>("CreadoEn")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("creado_en");
+
+                    b.Property<string>("MotivoRechazo")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("motivo_rechazo");
 
                     b.Property<long>("PedidoId")
                         .HasColumnType("bigint")
@@ -252,6 +331,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 1L,
                             Cantidad = 5,
+                            CantidadPedida = 5,
+                            CantidadPreparada = 5,
                             CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 1L,
                             PrecioUnitario = 2400.00m,
@@ -261,6 +342,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 2L,
                             Cantidad = 10,
+                            CantidadPedida = 10,
+                            CantidadPreparada = 10,
                             CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 1L,
                             PrecioUnitario = 1250.00m,
@@ -270,6 +353,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 3L,
                             Cantidad = 3,
+                            CantidadPedida = 3,
+                            CantidadPreparada = 3,
                             CreadoEn = new DateTime(2026, 8, 20, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 1L,
                             PrecioUnitario = 3400.00m,
@@ -279,6 +364,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 4L,
                             Cantidad = 20,
+                            CantidadPedida = 20,
+                            CantidadPreparada = 20,
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 2L,
                             PrecioUnitario = 950.00m,
@@ -288,6 +375,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 5L,
                             Cantidad = 15,
+                            CantidadPedida = 15,
+                            CantidadPreparada = 15,
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 2L,
                             PrecioUnitario = 1100.00m,
@@ -297,6 +386,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 6L,
                             Cantidad = 8,
+                            CantidadPedida = 8,
+                            CantidadPreparada = 8,
                             CreadoEn = new DateTime(2026, 8, 27, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 3L,
                             PrecioUnitario = 2400.00m,
@@ -306,6 +397,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 7L,
                             Cantidad = 6,
+                            CantidadPedida = 6,
+                            CantidadPreparada = 6,
                             CreadoEn = new DateTime(2026, 8, 27, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 3L,
                             PrecioUnitario = 3400.00m,
@@ -315,6 +408,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 8L,
                             Cantidad = 12,
+                            CantidadPedida = 12,
+                            CantidadPreparada = 12,
                             CreadoEn = new DateTime(2026, 8, 28, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 4L,
                             PrecioUnitario = 1250.00m,
@@ -324,6 +419,8 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 9L,
                             Cantidad = 4,
+                            CantidadPedida = 4,
+                            CantidadPreparada = 4,
                             CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 5L,
                             PrecioUnitario = 1800.00m,
@@ -333,11 +430,70 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 10L,
                             Cantidad = 8,
+                            CantidadPedida = 8,
+                            CantidadPreparada = 8,
                             CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, 0, DateTimeKind.Utc),
                             PedidoId = 5L,
                             PrecioUnitario = 950.00m,
                             ProductoId = 2L
                         });
+                });
+
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.IntentoEntrega", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("actualizado_en");
+
+                    b.Property<long?>("ChoferId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("chofer_id");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("creado_en");
+
+                    b.Property<string>("FotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("foto_url");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("motivo");
+
+                    b.Property<string>("Nota")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("nota");
+
+                    b.Property<DateTime>("OcurridoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("ocurrido_en");
+
+                    b.Property<long>("PedidoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pedido_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_intentos_entrega");
+
+                    b.HasIndex("ChoferId")
+                        .HasDatabaseName("ix_intentos_entrega_chofer_id");
+
+                    b.HasIndex("PedidoId")
+                        .HasDatabaseName("ix_intentos_entrega_pedido_id");
+
+                    b.ToTable("intentos_entrega", (string)null);
                 });
 
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Notificacion", b =>
@@ -400,6 +556,47 @@ namespace MercuryGo.Api.Migrations
                     b.ToTable("notificaciones", (string)null);
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.OperacionProcesada", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("PedidoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pedido_id");
+
+                    b.Property<DateTime>("ProcesadaEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("procesada_en");
+
+                    b.Property<string>("ResultadoJson")
+                        .HasColumnType("longtext")
+                        .HasColumnName("resultado_json");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("tipo");
+
+                    b.Property<long?>("UsuarioId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_operaciones_procesadas");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("ix_operaciones_procesadas_usuario_id");
+
+                    b.HasIndex("Id", "Tipo")
+                        .HasDatabaseName("ix_operaciones_procesadas_id_tipo");
+
+                    b.ToTable("operaciones_procesadas", (string)null);
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Pedido", b =>
                 {
                     b.Property<long>("Id")
@@ -419,13 +616,75 @@ namespace MercuryGo.Api.Migrations
                         .HasColumnType("datetime(6)")
                         .HasColumnName("actualizado_en");
 
+                    b.Property<DateTime?>("AuditadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("auditado_en");
+
+                    b.Property<long?>("AuditadoPorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("auditado_por_id");
+
+                    b.Property<string>("CancelacionEstado")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("Ninguna")
+                        .HasColumnName("cancelacion_estado");
+
+                    b.Property<string>("CancelacionMotivo")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("cancelacion_motivo");
+
+                    b.Property<long?>("CancelacionSolicitadaPorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cancelacion_solicitada_por_id");
+
+                    b.Property<long?>("ChoferId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("chofer_id");
+
                     b.Property<long>("ClienteId")
                         .HasColumnType("bigint")
                         .HasColumnName("cliente_id");
 
+                    b.Property<string>("ComprobanteEstado")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("SinComprobante")
+                        .HasColumnName("comprobante_estado");
+
+                    b.Property<string>("ComprobanteUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("comprobante_url");
+
+                    b.Property<DateTime?>("ConfirmadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("confirmado_en");
+
+                    b.Property<long?>("ConfirmadoPorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("confirmado_por_id");
+
                     b.Property<DateTime>("CreadoEn")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("creado_en");
+
+                    b.Property<string>("EntregaFirmaUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("entrega_firma_url");
+
+                    b.Property<string>("EntregaFotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("entrega_foto_url");
+
+                    b.Property<DateTime?>("EntregadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("entregado_en");
 
                     b.Property<string>("Estado")
                         .IsRequired()
@@ -460,11 +719,43 @@ namespace MercuryGo.Api.Migrations
                         .HasColumnType("varchar(500)")
                         .HasColumnName("observaciones");
 
+                    b.Property<DateTime?>("PickingEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("picking_en");
+
+                    b.Property<string>("PickingResultado")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("picking_resultado");
+
+                    b.Property<string>("ValidacionDetalle")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("validacion_detalle");
+
+                    b.Property<bool>("ValidacionFallida")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("validacion_fallida");
+
                     b.HasKey("Id")
                         .HasName("pk_pedidos");
 
+                    b.HasIndex("AuditadoPorId")
+                        .HasDatabaseName("ix_pedidos_auditado_por_id");
+
+                    b.HasIndex("CancelacionSolicitadaPorId")
+                        .HasDatabaseName("ix_pedidos_cancelacion_solicitada_por_id");
+
+                    b.HasIndex("ChoferId")
+                        .HasDatabaseName("ix_pedidos_chofer_id");
+
                     b.HasIndex("ClienteId")
                         .HasDatabaseName("ix_pedidos_cliente_id");
+
+                    b.HasIndex("ConfirmadoPorId")
+                        .HasDatabaseName("ix_pedidos_confirmado_por_id");
 
                     b.HasIndex("Numero")
                         .IsUnique()
@@ -482,7 +773,8 @@ namespace MercuryGo.Api.Migrations
                             Estado = "Entregado",
                             FechaPedido = new DateTime(2026, 8, 20, 0, 0, 0, 0, DateTimeKind.Utc),
                             Numero = "PED-000001",
-                            Observaciones = "Entregar en depósito trasero"
+                            Observaciones = "Entregar en depósito trasero",
+                            ValidacionFallida = false
                         },
                         new
                         {
@@ -492,7 +784,8 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
                             Estado = "Despachado",
                             FechaPedido = new DateTime(2026, 8, 25, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Numero = "PED-000002"
+                            Numero = "PED-000002",
+                            ValidacionFallida = false
                         },
                         new
                         {
@@ -503,7 +796,8 @@ namespace MercuryGo.Api.Migrations
                             Estado = "EnPreparacion",
                             FechaPedido = new DateTime(2026, 8, 27, 0, 0, 0, 0, DateTimeKind.Utc),
                             Numero = "PED-000003",
-                            Observaciones = "Urgente, requiere factura A"
+                            Observaciones = "Urgente, requiere factura A",
+                            ValidacionFallida = false
                         },
                         new
                         {
@@ -513,7 +807,8 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 28, 0, 0, 0, 0, DateTimeKind.Utc),
                             Estado = "Confirmado",
                             FechaPedido = new DateTime(2026, 8, 28, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Numero = "PED-000004"
+                            Numero = "PED-000004",
+                            ValidacionFallida = false
                         },
                         new
                         {
@@ -523,7 +818,8 @@ namespace MercuryGo.Api.Migrations
                             CreadoEn = new DateTime(2026, 8, 30, 0, 0, 0, 0, DateTimeKind.Utc),
                             Estado = "Pendiente",
                             FechaPedido = new DateTime(2026, 8, 30, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Numero = "PED-000005"
+                            Numero = "PED-000005",
+                            ValidacionFallida = false
                         });
                 });
 
@@ -931,6 +1227,26 @@ namespace MercuryGo.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.CobroPedido", b =>
+                {
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Pedido", "Pedido")
+                        .WithMany("Cobros")
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_cobros_pedido_pedidos_pedido_id");
+
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "RegistradoPor")
+                        .WithMany()
+                        .HasForeignKey("RegistradoPorId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_cobros_pedido_usuarios_registrado_por_id");
+
+                    b.Navigation("Pedido");
+
+                    b.Navigation("RegistradoPor");
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.DetallePedido", b =>
                 {
                     b.HasOne("MercuryGo.Api.Domain.Entities.Pedido", "Pedido")
@@ -952,6 +1268,26 @@ namespace MercuryGo.Api.Migrations
                     b.Navigation("Producto");
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.IntentoEntrega", b =>
+                {
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "Chofer")
+                        .WithMany()
+                        .HasForeignKey("ChoferId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_intentos_entrega_usuarios_chofer_id");
+
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Pedido", "Pedido")
+                        .WithMany("IntentosEntrega")
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_intentos_entrega_pedidos_pedido_id");
+
+                    b.Navigation("Chofer");
+
+                    b.Navigation("Pedido");
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Notificacion", b =>
                 {
                     b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "Usuario")
@@ -964,8 +1300,37 @@ namespace MercuryGo.Api.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.OperacionProcesada", b =>
+                {
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_operaciones_procesadas_usuarios_usuario_id");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Pedido", b =>
                 {
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "AuditadoPor")
+                        .WithMany()
+                        .HasForeignKey("AuditadoPorId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_pedidos_usuarios_auditado_por_id");
+
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "CancelacionSolicitadaPor")
+                        .WithMany()
+                        .HasForeignKey("CancelacionSolicitadaPorId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_pedidos_usuarios_cancelacion_solicitada_por_id");
+
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "Chofer")
+                        .WithMany()
+                        .HasForeignKey("ChoferId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_pedidos_usuarios_chofer_id");
+
                     b.HasOne("MercuryGo.Api.Domain.Entities.Cliente", "Cliente")
                         .WithMany("Pedidos")
                         .HasForeignKey("ClienteId")
@@ -973,7 +1338,21 @@ namespace MercuryGo.Api.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_pedidos_clientes_cliente_id");
 
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "ConfirmadoPor")
+                        .WithMany()
+                        .HasForeignKey("ConfirmadoPorId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_pedidos_usuarios_confirmado_por_id");
+
+                    b.Navigation("AuditadoPor");
+
+                    b.Navigation("CancelacionSolicitadaPor");
+
+                    b.Navigation("Chofer");
+
                     b.Navigation("Cliente");
+
+                    b.Navigation("ConfirmadoPor");
                 });
 
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Producto", b =>
@@ -1023,7 +1402,11 @@ namespace MercuryGo.Api.Migrations
 
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Pedido", b =>
                 {
+                    b.Navigation("Cobros");
+
                     b.Navigation("Detalles");
+
+                    b.Navigation("IntentosEntrega");
                 });
 #pragma warning restore 612, 618
         }
