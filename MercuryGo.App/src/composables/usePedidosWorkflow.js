@@ -15,6 +15,8 @@ export function usePedidosWorkflow(toast) {
   const mostrarModalNuevoPedido = ref(false);
   const mostrarModalDetalle = ref(false);
   const mostrarModalCobro = ref(false);
+  const mostrarModalEntregaFallida = ref(false);
+  const mostrarModalEntregaParcial = ref(false);
   const pedidoSeleccionado = ref(null);
 
   const formatear_nombre_estado = (estado) => {
@@ -196,6 +198,16 @@ export function usePedidosWorkflow(toast) {
     }
   };
 
+  const alRegistrarEntregaFallida = () => {
+    if (toast) toast.mostrar('Se registró la entrega fallida correctamente.', 'warning');
+    pedidos_store.cargar(true);
+  };
+
+  const alRegistrarEntregaParcial = () => {
+    if (toast) toast.mostrarExito('¡Entrega parcial registrada exitosamente!');
+    pedidos_store.cargar(true);
+  };
+
   const botonesTransicion = computed(() => {
     if (!pedidoSeleccionado.value) return [];
     const estadoActual = pedidoSeleccionado.value.estado;
@@ -246,7 +258,7 @@ export function usePedidosWorkflow(toast) {
 
     const esCliente = sesion_store.rol_activo === 'CLIENTE';
     if (esCliente) {
-      if (!sinRed && (estadoActual === 'Pendiente' || estadoActual === 'Confirmado')) {
+      if (!sinRed && estadoActual === 'Pendiente') {
         botones.push({
           text: 'Cancelar mi Pedido (✖ Cancelar)',
           role: 'destructive',
@@ -258,6 +270,42 @@ export function usePedidosWorkflow(toast) {
         role: 'cancel'
       });
       return botones;
+    }
+
+    // Acciones de Chofer en destino (EnPuerta o Despachado)
+    if (esChoferOAdmin && (estadoActual === 'Despachado' || estadoActual === 'EnPuerta')) {
+      botones.push({
+        text: '📦 Registrar Entrega Parcial (Rechazos)',
+        handler: () => {
+          mostrarActionSheet.value = false;
+          mostrarModalEntregaParcial.value = true;
+        }
+      });
+
+      botones.push({
+        text: '⚠ No Entregado (Entrega Fallida)',
+        role: 'destructive',
+        handler: () => {
+          mostrarActionSheet.value = false;
+          mostrarModalEntregaFallida.value = true;
+        }
+      });
+    }
+
+    // Acciones de Reintento para NoEntregado
+    if (esChoferOAdmin && estadoActual === 'NoEntregado') {
+      botones.push({
+        text: '🔄 Reintentar Entrega (▶ Despachado)',
+        handler: async () => {
+          try {
+            await pedidos_service.reintentar_entrega(pedidoSeleccionado.value.id);
+            if (toast) toast.mostrarExito('¡Orden devuelta a ruta para nuevo intento!');
+            pedidos_store.cargar(true);
+          } catch (err) {
+            if (toast) toast.mostrarError(err.mensaje || 'Error al reintentar entrega.');
+          }
+        }
+      });
     }
 
     if (estadoActual === 'Pendiente') {
@@ -341,12 +389,16 @@ export function usePedidosWorkflow(toast) {
     mostrarModalNuevoPedido,
     mostrarModalDetalle,
     mostrarModalCobro,
+    mostrarModalEntregaFallida,
+    mostrarModalEntregaParcial,
     pedidoSeleccionado,
     formatear_nombre_estado,
     abrirOpcionesEstado,
     alTocarPedido,
     alActualizarPedidoDetalle,
     alRegistrarCobro,
+    alRegistrarEntregaFallida,
+    alRegistrarEntregaParcial,
     alSubirComprobante,
     alCompletarPicking,
     alCrearPedidoAdmin,

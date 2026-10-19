@@ -33,7 +33,7 @@ export const navegacion = [
     componente: () => import('@/views/productos_page.vue'),
     en_tabs: true,
     sin_red: false,
-    roles: ['ADMIN', 'CLIENTE']
+    roles: ['ADMIN', 'OPERARIO', 'CLIENTE']
   },
   {
     id: 'clientes',

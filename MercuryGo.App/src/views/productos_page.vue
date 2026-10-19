@@ -5,7 +5,7 @@
       <ion-button v-if="sesion_store.es_admin" title="Nuevo Producto" @click="abrirNuevoProducto">
         <ion-icon slot="icon-only" :icon="addCircleOutline" />
       </ion-button>
-      <ion-button class="mercury-btn-carrito" @click="mostrarCarrito = true">
+      <ion-button v-if="sesion_store.rol_activo !== 'OPERARIO'" class="mercury-btn-carrito" @click="mostrarCarrito = true">
         <ion-icon slot="icon-only" :icon="cartOutline" />
         <ion-badge v-if="carrito_store.cantidad_total > 0" color="danger" class="mercury-badge-carrito">
           {{ carrito_store.cantidad_total }}
@@ -174,7 +174,7 @@
             <div class="mercury-producto-acciones-pie">
               <span class="mercury-producto-precio-grande">${{ p.precio.toLocaleString('es-AR') }}</span>
               <ion-button
-                v-if="p.disponible"
+                v-if="p.disponible && sesion_store.rol_activo !== 'OPERARIO'"
                 size="small"
                 fill="solid"
                 color="primary"
