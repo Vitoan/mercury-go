@@ -8,7 +8,8 @@
     "build": "vite build",
     "build:release": "vite build --mode release",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",

@@ -21,8 +21,8 @@ Este documento registra el progreso, ramas, decisiones y estado de cada fase seg
 | **2** | **Reglas de estado y endpoints** | `refactor/fase2-estados` | 🟢 Completada | `8243f92` | Aprobada por usuario |
 | **3** | **Seguridad de sesión (app)** | `refactor/fase3-seguridad` | 🟢 Completada | `ab45e5a` | Aprobada por usuario |
 | **4** | **Vistas y flujos (app)** | `refactor/fase4-vistas` | 🟢 Completada | `6f119eb` | Aprobada por usuario |
-| **5** | **Modo offline con cola e idempotencia** | `refactor/fase5-offline` | 🟢 Completada | Pendiente commit | En verificación |
-| **6** | **Pruebas y cierre** | `refactor/fase6-cierre` | ⚪ No iniciada | — | — |
+| **5** | **Modo offline con cola e idempotencia** | `refactor/fase5-offline` | 🟢 Completada | `e410e82` | Aprobada por usuario |
+| **6** | **Pruebas y cierre** | `refactor/fase6-cierre` | 🟢 Completada | Pendiente commit | En verificación final |
 
 ---
 

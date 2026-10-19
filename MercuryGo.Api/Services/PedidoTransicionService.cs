@@ -119,6 +119,14 @@ public sealed class PedidoTransicionService(MercuryGoDbContext db) : IPedidoTran
                     pedido.LatitudEntrega = contexto.Latitud.Value;
                     pedido.LongitudEntrega = contexto.Longitud.Value;
                 }
+
+                if (estadoAnterior == EstadoPedido.Cancelado)
+                {
+                    var aviso = "[Aviso Sincronización Offline: Entrega registrada por chofer en destino]";
+                    pedido.Observaciones = string.IsNullOrWhiteSpace(pedido.Observaciones)
+                        ? aviso
+                        : $"{pedido.Observaciones} · {aviso}";
+                }
                 break;
 
             case EstadoPedido.Cancelado:
