@@ -32,7 +32,7 @@ export const navegacion = [
     icono: cubeOutline,
     componente: () => import('@/views/productos_page.vue'),
     en_tabs: true,
-    sin_red: false,
+    sin_red: true,
     roles: ['ADMIN', 'OPERARIO', 'CLIENTE']
   },
   {

@@ -15,9 +15,10 @@ export const pedidos_service = {
     return ajax_service.get(`api/pedidos/${id}`, { guardable: true });
   },
 
-  crear(pedido) {
+  crear(pedido, idempotency_key = null) {
     // Los precios NUNCA viajan desde el teléfono: el servidor lee los precios vigentes en MySQL
-    return ajax_service.post('api/pedidos', pedido);
+    const headers = idempotency_key ? { 'Idempotency-Key': String(idempotency_key) } : {};
+    return ajax_service.post('api/pedidos', pedido, { headers });
   },
 
   cambiar_estado(id, estado, latitud = null, longitud = null, idempotency_key = null) {

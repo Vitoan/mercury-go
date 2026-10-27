@@ -3,6 +3,7 @@ import { Network } from '@capacitor/network';
 import { pedidos_service } from '@/services/pedidos_service';
 import { obtener_token } from '@/services/token_service';
 import { usePedidosStore } from '@/stores/pedidos_store';
+import { notificaciones_service } from '@/services/notificaciones_service';
 import { vibrar_exito, vibrar_advertencia, vibrar_error } from '@/services/vibracion_service';
 
 const clave_cola = 'mercurygo_cola_offline_v2';
@@ -247,6 +248,21 @@ export const use_offline_store = defineStore('offline', {
 
         case 'PICKING_ITEM': {
           return await pedidos_service.actualizar_picking(pedido_id, payload?.items || [], id);
+        }
+
+        case 'CREAR_PEDIDO': {
+          const resultado = await pedidos_service.crear(payload, id);
+          try {
+            const pedidoCreado = resultado?.pedido || resultado || {};
+            const num = pedidoCreado.numero || 'Generado';
+            await notificaciones_service.disparar_notificacion_local(
+              '✅ Pedido Sincronizado',
+              'Tu orden ' + num + ' creada fuera de línea ya fue confirmada por el servidor.'
+            );
+          } catch (notifErr) {
+            console.warn('[Offline] Error al disparar notificación de pedido sincronizado:', notifErr);
+          }
+          return resultado;
         }
 
         default: {

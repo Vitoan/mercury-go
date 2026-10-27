@@ -25,6 +25,8 @@ var origenesProduccion = new List<string>
     "http://localhost",
     "https://localhost",
     "http://localhost:8100",
+    "http://localhost:5173",
+    "http://localhost:3000",
     "capacitor://localhost",
     "ionic://localhost"
 };

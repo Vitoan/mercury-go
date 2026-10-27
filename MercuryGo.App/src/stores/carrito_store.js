@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import { pedidos_service } from '@/services/pedidos_service';
 import { vibrar_exito, vibrar_toque } from '@/services/vibracion_service';
 import { notificaciones_service } from '@/services/notificaciones_service';
+import { use_offline_store } from '@/stores/offline_store';
 
 const CLAVE_CARRITO = 'mercurygo_carrito';
 

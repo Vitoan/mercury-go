@@ -7,7 +7,32 @@
         </ion-buttons>
         <ion-title>{{ titulo }}</ion-title>
         <ion-buttons slot="end">
-          <!-- Campana de Notificaciones (Semana 7) - Solo visible si hay sesión activa -->
+          <!-- Badge Sin Conexión -->
+          <ion-chip
+            v-if="offline_store.sin_conexion"
+            color="warning"
+            class="chip-sin-conexion"
+            title="Modo fuera de línea activo"
+          >
+            <ion-icon :icon="cloudOfflineOutline" />
+            <ion-label>Sin red</ion-label>
+          </ion-chip>
+
+          <!-- Botón / Badge de Cola Offline (si hay pendientes) -->
+          <ion-button
+            v-if="offline_store.pendientes_count > 0"
+            title="Envíos pendientes de sincronización"
+            color="warning"
+            @click="mostrarModalCola = true"
+            class="btn-cola-offline"
+          >
+            <ion-icon slot="icon-only" :icon="syncOutline" :class="{ 'rotando': offline_store.sincronizando }" />
+            <ion-badge color="warning" class="badge-cola">
+              {{ offline_store.pendientes_count }}
+            </ion-badge>
+          </ion-button>
+
+          <!-- Campana de Notificaciones -->
           <ion-button
             v-if="sesion_store.autenticado"
             title="Notificaciones"
@@ -37,20 +62,31 @@
       @cerrar="mostrarModalNotif = false"
       @actualizado="actualizarConteo"
     />
+
+    <!-- Modal de Cola Offline -->
+    <comp-cola-offline-modal
+      :abierto="mostrarModalCola"
+      @cerrar="mostrarModalCola = false"
+    />
   </ion-page>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { 
   IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonMenuButton, IonContent, IonRefresher, IonRefresherContent,
-  IonIcon, IonBadge
+  IonIcon, IonBadge, IonChip, IonLabel
 } from '@ionic/vue';
-import { notificationsOutline } from 'ionicons/icons';
+import { notificationsOutline, cloudOfflineOutline, syncOutline } from 'ionicons/icons';
 import CompNotificacionesModal from '@/components/modales/comp_notificaciones_modal.vue';
+import CompColaOfflineModal from '@/components/dominio/pedidos/comp_cola_offline_modal.vue';
 import { notificaciones_service } from '@/services/notificaciones_service';
 import { sesion_store } from '@/stores/sesion_store';
+import { use_offline_store } from '@/stores/offline_store';
+
+const offline_store = use_offline_store();
+const mostrarModalCola = ref(false);
 
 defineProps({
   titulo: { type: String, required: true },
@@ -78,8 +114,25 @@ const consultarNoLeidas = async () => {
   }
 };
 
+let intervaloNotificaciones = null;
+
 onMounted(() => {
   consultarNoLeidas();
+  // Sondeo suave cada 35 segundos para mantener actualizado el badge de la campana
+  if (!intervaloNotificaciones) {
+    intervaloNotificaciones = setInterval(() => {
+      if (sesion_store.autenticado && typeof document !== 'undefined' && !document.hidden) {
+        consultarNoLeidas();
+      }
+    }, 35000);
+  }
+});
+
+onUnmounted(() => {
+  if (intervaloNotificaciones) {
+    clearInterval(intervaloNotificaciones);
+    intervaloNotificaciones = null;
+  }
 });
 
 watch(() => sesion_store.autenticado, (activo) => {
@@ -97,8 +150,30 @@ const ejecutar_actualizar = (event) => {
 </script>
 
 <style scoped>
-.btn-notificaciones {
+.btn-notificaciones,
+.btn-cola-offline {
   position: relative;
+}
+.badge-cola {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 10px;
+}
+.chip-sin-conexion {
+  height: 26px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.rotando {
+  animation: girar 1s linear infinite;
+}
+@keyframes girar {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 .badge-notif {
   position: absolute;

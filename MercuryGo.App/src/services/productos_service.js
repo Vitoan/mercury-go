@@ -8,7 +8,7 @@ export const productos_service = {
 
   obtener_listado(parametros = {}) {
     const query = construir_query(parametros);
-    return ajax_service.get(`api/productos/listado${query}`);
+    return ajax_service.get(`api/productos/listado${query}`, { guardable: true });
   },
 
   obtener_por_id(id) {

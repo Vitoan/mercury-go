@@ -18,6 +18,15 @@
           <span class="mercury-login-tag">Control de Acceso y Flota</span>
         </div>
 
+        <!-- Banner Fuera de Línea en Login -->
+        <div v-if="offline_store.sin_conexion" class="mercury-login-offline-banner">
+          <ion-icon :icon="cloudOfflineOutline" />
+          <div>
+            <strong>Modo sin conexión a internet</strong>
+            <p>Para ingresar por primera vez necesitás conectarte a una red. Si ya iniciaste sesión antes en este teléfono, usá tu huella digital.</p>
+          </div>
+        </div>
+
         <!-- Formulario de Credenciales -->
         <ion-card class="mercury-login-card">
           <ion-card-content>
@@ -39,13 +48,22 @@
               <ion-icon slot="start" :icon="lockClosedOutline" class="mercury-input-icon" />
               <ion-input
                 v-model="password"
-                type="password"
+                :type="mostrarPassword ? 'text' : 'password'"
                 autocomplete="current-password"
                 label="Contraseña"
                 label-placement="stacked"
                 placeholder="••••••••"
                 @keyup.enter="entrar"
               />
+              <ion-button
+                slot="end"
+                fill="clear"
+                class="mercury-pwd-toggle"
+                @click="mostrarPassword = !mostrarPassword"
+                title="Mostrar / Ocultar contraseña"
+              >
+                <ion-icon slot="icon-only" :icon="mostrarPassword ? eyeOffOutline : eyeOutline" />
+              </ion-button>
             </ion-item>
 
             <div v-if="sesion_store.error" class="mercury-login-error">
@@ -56,7 +74,7 @@
             <ion-button
               expand="block"
               class="mercury-btn-login"
-              :disabled="sesion_store.cargando || !formularioValido"
+              :disabled="sesion_store.cargando || !formularioValido || offline_store.sin_conexion"
               @click="entrar"
             >
               <ion-spinner v-if="sesion_store.cargando" name="crescent" />
@@ -125,9 +143,14 @@ import {
   fingerPrintOutline,
   alertCircleOutline,
   sunnyOutline,
-  moonOutline
+  moonOutline,
+  cloudOfflineOutline,
+  eyeOutline,
+  eyeOffOutline
 } from 'ionicons/icons';
-import { sesion_store } from '@/stores/sesion_store';
+import { sesion_store } from '@/stores/sesion_store';
+import { use_offline_store } from '@/stores/offline_store';
+const offline_store = use_offline_store();
 import { biometria_disponible, verificar_identidad } from '@/services/biometria_service';
 import { restaurar_sesion } from '@/services/token_service';
 import { es_tema_oscuro, alternar_tema } from '@/config/tema';
@@ -136,6 +159,7 @@ const router = useRouter();
 
 const email = ref('');
 const password = ref('');
+const mostrarPassword = ref(false);
 const puede_biometria = ref(false);
 const modoOscuro = ref(false);
 
@@ -176,7 +200,11 @@ const entrar_con_biometria = async () => {
 
 const cargarCredenciales = (correo) => {
   email.value = correo;
-  password.value = 'Gestor123!';
+  if (correo.includes('admin')) {
+    password.value = 'Mercury2026!Admin';
+  } else {
+    password.value = 'Mercury123!';
+  }
 };
 </script>
 
@@ -263,6 +291,27 @@ const cargarCredenciales = (correo) => {
   border: 1px solid var(--mercury-accent-badge-border);
 }
 
+.mercury-login-offline-banner {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+  padding: 12px 16px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.mercury-login-offline-banner ion-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+.mercury-login-offline-banner p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
 .mercury-login-card {
   background: var(--mercury-bg-card);
   border: 1px solid var(--mercury-border);

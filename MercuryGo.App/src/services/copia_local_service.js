@@ -31,6 +31,17 @@ export function obtener_copia(endpoint) {
         return fallback ? JSON.parse(fallback) : null;
       }
     }
+
+    // Fallback para productos: si no hay coincidencia exacta de query string, devolver copia del listado de catálogo
+    if (endpoint.includes('api/productos/listado')) {
+      const claveProductos = Object.keys(localStorage).find(
+        (k) => k.startsWith(prefijo) && k.includes('api/productos/listado')
+      );
+      if (claveProductos) {
+        const fallback = localStorage.getItem(claveProductos);
+        return fallback ? JSON.parse(fallback) : null;
+      }
+    }
     return null;
   } catch {
     return null;

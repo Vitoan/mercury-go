@@ -21,6 +21,7 @@ const tabs = computed(() => {
   return navegacion
     .filter(i => {
       if (!i.en_tabs) return false;
+      // En modo sin red no ocultamos las pestañas que tienen soporte offline (productos, pedidos, inicio, cuenta)
       if (offline_store.sin_conexion && !i.sin_red) return false;
       // Si está pendiente de habilitación (sin rol), solo ve inicio y cuenta
       if (!rol) return i.id === 'inicio' || i.id === 'cuenta';
