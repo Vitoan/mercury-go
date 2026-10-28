@@ -64,7 +64,26 @@ export const usePedidosStore = defineStore('pedidos', () => {
         tamano: pagina.value.tamano
       });
 
-      const nuevos = (res.pedidos || []).map(con_cambios_sin_enviar);
+            const pedidosDeApi = (res.pedidos || []).map(con_cambios_sin_enviar);
+      const offline = use_offline_store();
+      const pedidosEncolados = (offline.cola || [])
+        .filter((c) => c.tipo === 'CREAR_PEDIDO' && c.estado !== 'enviada')
+        .map((c) => {
+          const detalles = c.payload?.detalles || [];
+          const totalCalculado = detalles.reduce((acc, d) => acc + ((d.precio_unitario || 0) * (d.cantidad || 1)), 0);
+          return {
+            id: 'offline-' + c.id,
+            numero: 'PED-OFFLINE-' + c.id.slice(0, 6).toUpperCase(),
+            cliente_razon_social: c.payload?.cliente_nombre || 'Orden Fuera de Línea',
+            fecha_pedido: c.ocurrido_en,
+            estado: 'Pendiente',
+            total: totalCalculado || (c.payload?.total || 0),
+            observaciones: c.payload?.observaciones,
+            sin_enviar: true,
+            es_creado_offline: true
+          };
+        });
+      const nuevos = [...pedidosEncolados, ...pedidosDeApi];
       pagina.value = res.pagina || { pagina: 1, tamano: 10, total: nuevos.length, hay_mas: false };
 
       if (resetear || pagina.value.pagina === 1) {
@@ -135,10 +154,36 @@ export const usePedidosStore = defineStore('pedidos', () => {
     return res;
   }
 
-  async function actualizar_picking(id, items) {
-    const res = await pedidos_service.actualizar_picking(id, items);
-    await cargar(true);
-    return res;
+    async function actualizar_picking(id, items) {
+    const offline = use_offline_store();
+    if (offline.sin_conexion) {
+      offline.encolar_accion('PICKING_ITEM', id, { items });
+      const faltantes = items.filter((i) => i.estado_item === 'EnFalta' || i.cantidad_preparada < i.cantidad_pedida).length;
+      const etiquetaPicking = faltantes === 0 ? '[Picking: COMPLETO]' : '[Picking: INCOMPLETO (' + faltantes + ' faltantes)]';
+      const pedidoEncontrado = pedidos.value.find((p) => String(p.id) === String(id));
+      if (pedidoEncontrado) {
+        const obsPrevias = (pedidoEncontrado.observaciones || '').replace(/\[Picking:[^\]]+\]/g, '').trim();
+        pedidoEncontrado.observaciones = (obsPrevias + ' ' + etiquetaPicking).trim();
+        pedidoEncontrado.sin_enviar = true;
+      }
+      return {
+        id,
+        sin_enviar: true,
+        completo: faltantes === 0,
+        mensaje: 'Picking guardado en el dispositivo. Se sincronizará al volver la red.'
+      };
+    }
+    try {
+      const res = await pedidos_service.actualizar_picking(id, items);
+      await cargar(true);
+      return res;
+    } catch (err) {
+      if (!err.estado_http || err.estado_http === 0) {
+        offline.marcar_desconectado();
+        return await actualizar_picking(id, items);
+      }
+      throw err;
+    }
   }
 
   function limpiar_filtros() {

@@ -131,6 +131,7 @@ import {
 } from 'ionicons/icons';
 import { camara_disponible, tomar_foto, comprimir_imagen } from '@/services/camara_service';
 import { pedidos_service } from '@/services/pedidos_service';
+import { use_offline_store } from '@/stores/offline_store';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 
 const props = defineProps({
@@ -139,6 +140,16 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['cerrar', 'comprobante_subido']);
+
+
+function archivoABase64(archivo) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(archivo);
+  });
+}
 
 const esNativo = computed(() => camara_disponible());
 const archivoSeleccionado = ref(null);
@@ -194,6 +205,29 @@ const enviarComprobante = async () => {
 
   subiendo.value = true;
   errorMensaje.value = '';
+
+  const offline = use_offline_store();
+  if (offline.sin_conexion) {
+    try {
+      const b64 = await archivoABase64(archivoSeleccionado.value);
+      offline.encolar_accion('COMPROBANTE_PAGO', props.pedido.id, {
+        base64: b64,
+        nombre: archivoSeleccionado.value.name,
+        tipo: archivoSeleccionado.value.type
+      });
+      await vibrar_exito();
+      emit('comprobante_subido', {
+        mensaje: 'Comprobante guardado sin conexión. Se enviará automáticamente cuando vuelva la red.'
+      });
+      cerrar();
+      return;
+    } catch (b64Err) {
+      errorMensaje.value = 'No se pudo procesar el archivo en el dispositivo.';
+      return;
+    } finally {
+      subiendo.value = false;
+    }
+  }
 
   try {
     const res = await pedidos_service.subir_comprobante_pago(props.pedido.id, archivoSeleccionado.value);

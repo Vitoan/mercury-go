@@ -6,6 +6,24 @@ import { usePedidosStore } from '@/stores/pedidos_store';
 import { notificaciones_service } from '@/services/notificaciones_service';
 import { vibrar_exito, vibrar_advertencia, vibrar_error } from '@/services/vibracion_service';
 
+
+function base64AArchivo(base64Data, nombreArchivo = 'comprobante.jpg', mimeType = 'image/jpeg') {
+  try {
+    const arr = base64Data.split(',');
+    const mime = (arr[0].match(/:(.*?);/) || [])[1] || mimeType;
+    const bstr = atob(arr.length > 1 ? arr[1] : arr[0]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], nombreArchivo, { type: mime });
+  } catch (err) {
+    console.error('Error al convertir base64 a archivo:', err);
+    return null;
+  }
+}
+
 const clave_cola = 'mercurygo_cola_offline_v2';
 
 function generar_uuid_v4() {
@@ -244,6 +262,25 @@ export const use_offline_store = defineStore('offline', {
             payload?.firma_url,
             id
           );
+        }
+
+        
+        case 'COMPROBANTE_PAGO': {
+          let archivo;
+          if (payload && payload.base64) {
+            archivo = base64AArchivo(payload.base64, payload.nombre || 'comprobante.jpg', payload.tipo || 'image/jpeg');
+          }
+          if (!archivo) throw new Error('Archivo de comprobante no disponible en la cola offline.');
+          const res = await pedidos_service.subir_comprobante_pago(pedido_id, archivo);
+          try {
+            await notificaciones_service.disparar_notificacion_local(
+              '✅ Comprobante Sincronizado',
+              'El comprobante de pago fue recibido por el servidor.'
+            );
+          } catch (notifErr) {
+            console.warn('[Offline] Error al disparar notificación de comprobante:', notifErr);
+          }
+          return res;
         }
 
         case 'PICKING_ITEM': {

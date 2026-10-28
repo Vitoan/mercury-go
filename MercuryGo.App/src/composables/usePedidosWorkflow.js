@@ -40,14 +40,13 @@ export function usePedidosWorkflow(toast) {
     pedidoSeleccionado.value = pedido;
     vibrar_toque();
 
-    const offline = use_offline_store();
+        const offline = use_offline_store();
     if (offline.sin_conexion) {
-      if (sesion_store.rol_activo === 'CHOFER') {
+      if (sesion_store.rol_activo === 'OPERARIO') {
+        mostrarModalPicking.value = true;
+      } else if (sesion_store.rol_activo === 'CHOFER') {
         mostrarActionSheet.value = true;
       } else {
-        if (sesion_store.rol_activo === 'OPERARIO' && toast) {
-          toast.mostrar('El picking en depósito requiere red. Mostrando detalle guardado.', 'warning');
-        }
         mostrarModalDetalle.value = true;
       }
       return;
@@ -231,7 +230,7 @@ export function usePedidosWorkflow(toast) {
     }
 
     const esChoferOAdmin = sesion_store.rol_activo === 'CHOFER' || sesion_store.es_admin;
-    if (!sinRed && esChoferOAdmin && (estadoActual === 'Despachado' || estadoActual === 'EnPuerta')) {
+    if (esChoferOAdmin && (estadoActual === 'Despachado' || estadoActual === 'EnPuerta')) {
       botones.push({
         text: '💵 Registrar Cobro en Destino (Efectivo / QR)',
         handler: () => {
@@ -241,7 +240,7 @@ export function usePedidosWorkflow(toast) {
       });
     }
 
-    if (!sinRed && (estadoActual === 'Pendiente' || estadoActual === 'Confirmado')) {
+    if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
       botones.push({
         text: '💳 Adjuntar Comprobante de Pago (Foto / PDF)',
         handler: () => abrirModalComprobante(pedidoSeleccionado.value)
@@ -249,7 +248,7 @@ export function usePedidosWorkflow(toast) {
     }
 
     const puedePicking = !sesion_store.rol_activo || sesion_store.rol_activo === 'ADMIN' || sesion_store.rol_activo === 'OPERARIO';
-    if (!sinRed && puedePicking && (estadoActual === 'Confirmado' || estadoActual === 'EnPreparacion')) {
+    if (puedePicking && (estadoActual === 'Confirmado' || estadoActual === 'EnPreparacion')) {
       botones.push({
         text: '📦 Realizar Picking / Preparación en Depósito',
         handler: () => abrirModalPicking(pedidoSeleccionado.value)

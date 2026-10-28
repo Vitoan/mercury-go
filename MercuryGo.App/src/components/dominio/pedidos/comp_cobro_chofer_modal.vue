@@ -81,6 +81,7 @@ import {
   IonSpinner
 } from '@ionic/vue';
 import { pedidos_service } from '@/services/pedidos_service';
+import { use_offline_store } from '@/stores/offline_store';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 
 const props = defineProps({
@@ -109,6 +110,19 @@ const confirmarCobro = async () => {
   if (!props.pedido || monto.value <= 0) return;
   enviando.value = true;
   try {
+    const offline = use_offline_store();
+    if (offline.sin_conexion) {
+      offline.encolar_accion('COBRO', props.pedido.id, {
+        monto: Number(monto.value),
+        metodo: metodo.value
+      });
+      await vibrar_exito();
+      emit('cobro_registrado', {
+        mensaje: 'Cobro de $' + Number(monto.value).toLocaleString('es-AR') + ' guardado sin conexión. Se enviará al reconectar.'
+      });
+      cerrar();
+      return;
+    }
     const res = await pedidos_service.registrar_cobro_chofer(props.pedido.id, monto.value, metodo.value);
     await vibrar_exito();
     emit('cobro_registrado', res);

@@ -103,6 +103,7 @@ import {
   IonSpinner
 } from '@ionic/vue';
 import { pedidos_service } from '@/services/pedidos_service';
+import { use_offline_store } from '@/stores/offline_store';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { geolocalizacion_service } from '@/services/geolocalizacion_service';
 
@@ -157,9 +158,7 @@ const confirmarEntregaParcial = async () => {
       const pos = await geolocalizacion_service.obtener_posicion_actual();
       lat = pos.latitud;
       lng = pos.longitud;
-    } catch {
-      // Ignorar si no hay GPS
-    }
+    } catch {}
 
     const payloadLineas = lineas.value.map((l) => ({
       detalle_id: l.id,
@@ -167,6 +166,20 @@ const confirmarEntregaParcial = async () => {
       cantidad_rechazada: l.cantidad_rechazada,
       motivo_rechazo: l.cantidad_rechazada > 0 ? motivo.value || 'Rechazado por cliente' : null
     }));
+
+    const offline = use_offline_store();
+    if (offline.sin_conexion) {
+      offline.encolar_accion('ENTREGA_PARCIAL', props.pedido.id, {
+        lineas: payloadLineas,
+        motivo: motivo.value
+      }, lat, lng);
+      await vibrar_exito();
+      emit('entrega_parcial_registrada', {
+        mensaje: 'Entrega parcial encolada sin conexión. Se enviará al reconectar.'
+      });
+      cerrar();
+      return;
+    }
 
     const res = await pedidos_service.registrar_entrega_parcial(
       props.pedido.id,

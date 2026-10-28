@@ -64,7 +64,7 @@ export const pedidos_service = {
   },
 
   obtener_cuenta_corriente() {
-    return ajax_service.get('api/pedidos/cuenta-corriente');
+    return ajax_service.get('api/pedidos/cuenta-corriente', { guardable: true });
   },
 
   obtener_cuentas_corrientes_clientes() {

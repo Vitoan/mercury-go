@@ -76,6 +76,7 @@ import {
   IonSpinner
 } from '@ionic/vue';
 import { pedidos_service } from '@/services/pedidos_service';
+import { use_offline_store } from '@/stores/offline_store';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 
 const props = defineProps({
@@ -101,6 +102,19 @@ const confirmarNoEntrega = async () => {
   if (!props.pedido || !motivo.value) return;
   enviando.value = true;
   try {
+    const offline = use_offline_store();
+    if (offline.sin_conexion) {
+      offline.encolar_accion('NO_ENTREGADO', props.pedido.id, {
+        motivo: motivo.value,
+        nota: nota.value
+      });
+      await vibrar_exito();
+      emit('entrega_fallida_registrada', {
+        mensaje: 'Entrega fallida registrada sin conexión. Se enviará al reconectar.'
+      });
+      cerrar();
+      return;
+    }
     const res = await pedidos_service.registrar_no_entregado(props.pedido.id, motivo.value, nota.value);
     await vibrar_exito();
     emit('entrega_fallida_registrada', res);
