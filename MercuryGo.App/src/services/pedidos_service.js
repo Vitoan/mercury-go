@@ -49,10 +49,6 @@ export const pedidos_service = {
     return ajax_service.blob(`/api/pedidos/cuenta-corriente/pagos/${id}/archivo`);
   },
 
-  obtener_qr_url(id) {
-    return ajax_service.blob(`/api/pedidos/${id}/qr`);
-  },
-
   subir_comprobante_pago(id, archivo) {
     const formData = new FormData();
     formData.append('archivo', archivo);

@@ -1519,18 +1519,6 @@ public sealed class PedidosController(
         return File(pdfBytes, "application/pdf", $"{pedido.p.Numero}.pdf");
     }
 
-    // Código QR en PNG con QRCoder conteniendo el número de remito (PED-00000X)
-    [HttpGet("{id:long}/qr")]
-    public async Task<IActionResult> Qr(long id, CancellationToken ct)
-    {
-        var pedido = await db.Pedidos.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
-        if (pedido is null)
-            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe." });
-
-        var qrBytes = GenerarQrPedido(pedido.Numero);
-        return File(qrBytes, "image/png", $"{pedido.Numero}-qr.png");
-    }
-
     private static byte[] GenerarComprobantePdf(Pedido p, Cliente c, List<DetallePedidoResponse> detalles, decimal total)
     {
         return Document.Create(doc =>
