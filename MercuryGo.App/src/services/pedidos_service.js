@@ -98,6 +98,10 @@ export const pedidos_service = {
     return ajax_service.put(`api/pedidos/${id}/chofer`, { chofer_id });
   },
 
+  obtener_choferes() {
+    return ajax_service.get('api/pedidos/choferes');
+  },
+
   registrar_no_entregado(id, motivo, nota = null, foto_url = null, idempotency_key = null) {
     const opciones = idempotency_key ? { idempotency_key } : {};
     return ajax_service.post(`api/pedidos/${id}/no-entregado`, { motivo, nota, foto_url }, opciones);

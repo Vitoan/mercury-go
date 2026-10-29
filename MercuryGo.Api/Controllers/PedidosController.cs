@@ -58,7 +58,10 @@ public sealed class PedidosController(
         }
         else if (User.IsInRole(RolCodigos.Chofer))
         {
-            // Chofer: se enfoca en órdenes despachadas y en puerta de entrega
+            // Cada chofer ve solo su propia ruta.
+            var choferId = User.UsuarioId();
+            consulta = consulta.Where(p => p.ChoferId == choferId);
+
             if (string.IsNullOrWhiteSpace(estados))
             {
                 consulta = consulta.Where(p => p.Estado == EstadoPedido.Despachado || p.Estado == EstadoPedido.EnPuerta);
@@ -162,7 +165,8 @@ public sealed class PedidosController(
             total,
             pedido.p.LatitudEntrega,
             pedido.p.LongitudEntrega,
-            pedido.p.FechaEnPuerta
+            pedido.p.FechaEnPuerta,
+            pedido.p.ChoferId
         );
 
         return Ok(new { pedido = resultado });
@@ -337,6 +341,14 @@ public sealed class PedidosController(
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue dado de baja." });
+
+        // No se despacha sin chofer: si no, el pedido queda fuera de la ruta de todos.
+        if (nuevoEstado == EstadoPedido.Despachado
+            && pedido.Estado != EstadoPedido.Despachado
+            && !pedido.ChoferId.HasValue)
+        {
+            return BadRequest(new { codigo = "chofer_requerido", mensaje = "Asigná un chofer antes de despachar el pedido." });
+        }
 
         var contexto = new MercuryGo.Api.Services.ContextoTransicion(
             UsuarioId: User.UsuarioId(),
@@ -1224,6 +1236,22 @@ public sealed class PedidosController(
         });
     }
 
+    // Listado de choferes activos para el selector de asignación (CU-20)
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario}")]
+    [HttpGet("choferes")]
+    public async Task<IActionResult> Choferes(CancellationToken ct)
+    {
+        var choferes = await (
+            from u in db.Usuarios.AsNoTracking()
+            join r in db.Roles.AsNoTracking() on u.RolId equals r.Id
+            where u.Activo && r.Codigo == RolCodigos.Chofer
+            orderby u.Nombre
+            select new { id = u.Id, nombre = u.Nombre }
+        ).ToListAsync(ct);
+
+        return Ok(new { choferes });
+    }
+
     // Asignación o reasignación de chofer (CU-20 / OPERARIO y ADMIN)
     [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario}")]
     [HttpPut("{id:long}/chofer")]
@@ -1236,9 +1264,15 @@ public sealed class PedidosController(
         if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
             return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede asignar chofer a un pedido finalizado o cancelado." });
 
-        var chofer = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == request.ChoferId && u.Activo, ct);
+        var chofer = await (
+            from u in db.Usuarios
+            join r in db.Roles on u.RolId equals r.Id
+            where u.Id == request.ChoferId && u.Activo && r.Codigo == RolCodigos.Chofer
+            select u
+        ).FirstOrDefaultAsync(ct);
+
         if (chofer is null)
-            return BadRequest(new { codigo = "chofer_invalido", mensaje = "El chofer seleccionado no existe o está inactivo." });
+            return BadRequest(new { codigo = "chofer_invalido", mensaje = "El chofer seleccionado no existe, está inactivo o no tiene rol de chofer." });
 
         pedido.ChoferId = chofer.Id;
         pedido.ActualizadoEn = DateTime.UtcNow;

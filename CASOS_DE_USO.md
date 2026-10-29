@@ -126,23 +126,23 @@ Aplican a todos los casos de uso, por eso no se repiten en cada uno.
 
 ### Reparto
 
-**CU-12 Ver ruta y marcar "En Puerta"** — `CHOFER` · 🟡
-- Ve los pedidos en `Despachado` y `EnPuerta`. Al llegar, toca "Marcar En Puerta" y la app guarda la ubicación GPS.
+**CU-12 Ver ruta y marcar "En Puerta"** — `CHOFER` · ✅
+- Ve solo los pedidos asignados a él (`ChoferId`) en `Despachado` y `EnPuerta`. Al llegar, toca "Marcar En Puerta" y la app guarda la ubicación GPS.
 - Front: `pedidos_page.vue`, `geolocalizacion_service.js`.
 - API: `PUT /api/pedidos/{id}/estado` con `{ estado: 'EnPuerta', latitud, longitud }`.
-- **Brecha:** el listado filtra por estado, no por chofer asignado.
 
 **CU-13 Cobrar y cerrar entrega (incluye Entrega Parcial)** — `CHOFER` (cierre también `ADMIN`) · ✅
 - El cobro en puerta es opcional: el chofer registra monto y método (efectivo, transferencia, cheque) o deja el pedido en cuenta corriente. Si el cliente rechaza ítems, se marcan en `comp_entrega_parcial_modal.vue` y el pedido se ajusta.
 - Front: `comp_cobro_chofer_modal.vue`, `comp_entrega_parcial_modal.vue`, `pedidos_page.vue`.
 - API: `POST /api/pedidos/{id}/cobro-chofer`, `POST /api/pedidos/{id}/entrega-parcial`, `PUT /api/pedidos/{id}/estado` → `Entregado`.
 - Reglas: solo se cobra en `Despachado`, `EnPuerta` o (Admin) `Entregado`; el acumulado no puede superar el total de la orden; se envía `Idempotency-Key` y `ocurrido_en`. Si el pedido tiene chofer asignado, solo ese chofer puede cobrarlo.
-- **Pendiente:** mientras CU-20 no tenga UI, la mayoría de los pedidos no tiene chofer asignado y la validación de propiedad no se aplica.
+- Como el despacho exige chofer asignado (CU-20), en la práctica todo pedido en reparto tiene dueño y la validación de propiedad se aplica siempre.
 
-**CU-20 Asignar chofer** — `OPERARIO`, `ADMIN` · 🔴
-- Al despachar o desde el panel de órdenes se asigna o reasigna chofer mientras la orden no esté `Entregado` ni `Cancelado`.
-- API: `PUT /api/pedidos/{id}/chofer` con `{ chofer_id }`.
-- **Brecha:** el endpoint existe y funciona; **no hay UI** que lo invoque.
+**CU-20 Asignar chofer** — `OPERARIO`, `ADMIN` · ✅
+- Al despachar o desde el detalle de la orden se asigna o reasigna chofer mientras el pedido no esté `Entregado` ni `Cancelado`.
+- Front: `comp_detalle_pedido_modal.vue` (selector "Chofer asignado", deshabilitado sin conexión) → `pedidos_service.obtener_choferes()` / `asignar_chofer()`.
+- API: `GET /api/pedidos/choferes` (solo rol `CHOFER` activos) y `PUT /api/pedidos/{id}/chofer` con `{ chofer_id }`.
+- Reglas: el usuario destino debe existir, estar activo y tener rol `CHOFER` (`400 chofer_invalido`); no se puede despachar un pedido sin chofer asignado (`400 chofer_requerido`).
 
 **CU-21 Registrar entrega fallida y reintentar** — `CHOFER`, `ADMIN` · 🟡
 - Desde `EnPuerta`, el chofer registra "No entregado" con motivo, nota y foto opcional.
@@ -220,7 +220,7 @@ stateDiagram-v2
 | → Pendiente | Cliente / Admin / Operario | CU-07 | ✅ |
 | Pendiente → Confirmado | Admin | CU-19 | ✅ |
 | Confirmado → EnPreparacion | Operario / Admin | CU-11 | ✅ |
-| EnPreparacion → Despachado | Operario / Admin | CU-11 + CU-20 | ✅ |
+| EnPreparacion → Despachado | Operario / Admin | CU-11 + CU-20 | ✅ (exige chofer asignado) |
 | Despachado → EnPuerta | Chofer / Admin | CU-12 | ✅ |
 | Despachado → Entregado | Chofer / Admin | CU-13 | ✅ |
 | EnPuerta → Entregado | Chofer / Admin | CU-13 | ✅ |
@@ -266,7 +266,7 @@ stateDiagram-v2
 | 10 | Conflicto offline vs. cancelación | Gana la acción del chofer | 🟡 transición permitida, sin aviso al Admin |
 | 11 | Tokens | Almacenamiento seguro (Keychain/Keystore) | ✅ |
 | 12 | Cancelación del Cliente | Solicita y el Admin aprueba | ✅ |
-| 13 | CU-20 a CU-23 y estado `NoEntregado` | Aprobados | 🟡 CU-20 sin UI |
+| 13 | CU-20 a CU-23 y estado `NoEntregado` | Aprobados | ✅ CU-20 con UI y API |
 | 14 | Ítems rechazados en la puerta | El chofer los marca y el pedido se ajusta | ✅ |
 | 15 | Prueba de entrega | Foto y firma siempre opcionales | 🟡 solo en entrega parcial |
 | 16 | Picking offline sobre pedido cancelado | Se guarda el picking; el pedido sigue `Cancelado` | 🔴 la API lo bloquea |

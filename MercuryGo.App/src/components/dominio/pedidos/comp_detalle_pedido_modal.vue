@@ -43,6 +43,31 @@
           <ion-card-content>
             <p><strong>Fecha:</strong> {{ formatear_fecha(detalle.fecha_pedido) }}</p>
             <p><strong>Cliente:</strong> {{ detalle.cliente?.razon_social }} (CUIT: {{ detalle.cliente?.cuit }})</p>
+
+            <!-- Asignación de chofer (CU-20) -->
+            <div v-if="puedeAsignarChofer" class="mercury-chofer-seccion">
+              <ion-item lines="inset">
+                <ion-label position="stacked">Chofer asignado</ion-label>
+                <ion-select
+                  :value="detalle.chofer_id"
+                  :disabled="guardandoChofer || offline_store.sin_conexion"
+                  placeholder="Sin asignar"
+                  interface="action-sheet"
+                  @ionChange="asignarChofer"
+                >
+                  <ion-select-option v-for="c in choferes" :key="c.id" :value="c.id">
+                    {{ c.nombre }}
+                  </ion-select-option>
+                </ion-select>
+              </ion-item>
+              <p v-if="!detalle.chofer_id" class="mercury-chofer-aviso">
+                Asigná un chofer antes de despachar el pedido.
+              </p>
+              <p v-else-if="offline_store.sin_conexion" class="mercury-chofer-aviso">
+                Sin conexión no se puede reasignar el chofer.
+              </p>
+            </div>
+
             <p v-if="observacionesVisibles"><strong>Observaciones:</strong> {{ observacionesVisibles }}</p>
 
             <!-- Sección de Geolocalización de Entrega (Semana 7) -->
@@ -275,6 +300,8 @@ import {
   IonTextarea,
   IonSpinner,
   IonToast,
+  IonSelect,
+  IonSelectOption,
   alertController
 } from '@ionic/vue';
 import {
@@ -324,6 +351,50 @@ const observacionesEdicion = ref('');
 
 const esAdmin = computed(() => sesion_store.es_admin);
 const esCliente = computed(() => sesion_store.rol_activo === 'CLIENTE');
+const esOperario = computed(() => sesion_store.rol_activo === 'OPERARIO');
+
+const choferes = ref([]);
+const guardandoChofer = ref(false);
+
+// Solo Admin y Operario asignan chofer, y solo mientras el pedido no esté cerrado.
+const puedeAsignarChofer = computed(
+  () =>
+    (esAdmin.value || esOperario.value) &&
+    Boolean(detalle.value) &&
+    detalle.value.estado !== 'Entregado' &&
+    detalle.value.estado !== 'Cancelado'
+);
+
+const cargarChoferes = async () => {
+  if (!puedeAsignarChofer.value || choferes.value.length > 0) return;
+  try {
+    const res = await pedidos_service.obtener_choferes();
+    choferes.value = res?.choferes || [];
+  } catch {
+    choferes.value = [];
+  }
+};
+
+const asignarChofer = async (evento) => {
+  const choferId = Number(evento?.detail?.value);
+  if (!choferId || !detalle.value || guardandoChofer.value) return;
+
+  guardandoChofer.value = true;
+  try {
+    const res = await pedidos_service.asignar_chofer(detalle.value.id, choferId);
+    await vibrar_exito();
+    toast.mostrarExito(res?.mensaje || 'Chofer asignado correctamente.');
+    await cargarDetalle();
+    emit('pedido_actualizado');
+  } catch (err) {
+    await vibrar_error();
+    toast.mostrarError(err.mensaje || 'No se pudo asignar el chofer.');
+    // El selector quedó con el valor elegido: recargar para reflejar el estado real.
+    await cargarDetalle();
+  } finally {
+    guardandoChofer.value = false;
+  }
+};
 
 const repetirPedido = async () => {
   if (!detalle.value?.detalles || detalle.value.detalles.length === 0) return;
@@ -625,6 +696,7 @@ const cargarDetalle = async () => {
         cantidad: d.cantidad
       }));
       observacionesEdicion.value = detalle.value.observaciones || '';
+      await cargarChoferes();
     }
   } catch (err) {
     error.value = err.mensaje || 'Error al obtener los detalles del pedido.';
@@ -855,5 +927,15 @@ const cerrar = () => {
 .mercury-total-destacado {
   font-size: 1.3rem;
   color: var(--ion-color-primary, #2563eb);
+}
+
+.mercury-chofer-seccion {
+  margin: 12px 0;
+}
+
+.mercury-chofer-aviso {
+  margin: 6px 0 0 0;
+  font-size: 0.8rem;
+  color: var(--ion-color-warning-shade, #b45309);
 }
 </style>

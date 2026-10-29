@@ -10,8 +10,10 @@
 > - ✅ **P0-2** resuelto: se eliminaron los fallbacks al Cliente 1 en `Listar` y `cuenta-corriente`.
 > - ✅ **P0-3** resuelto: el logout vacía el carrito y se agregó marca de dueño para cambios de usuario sin logout.
 > - ✅ **P0-5** resuelto: el cobro valida estado, chofer asignado y tope contra el total; el cliente envía `Idempotency-Key` y `ocurrido_en`.
+> - ✅ **P0-4** resuelto: el listado de pedidos filtra por `ChoferId` para el rol `CHOFER`.
+> - ✅ **P1-7** resuelto: selector de chofer en el detalle, con `GET /api/pedidos/choferes`; despachar exige chofer asignado.
 > - ✅ **P1-13** resuelto: la creación de pedido envía `Idempotency-Key`.
-> - ⏳ **P0-4** pendiente (Fase 3 del plan). **P1-4** queda parcial: el cobro ya envía hora real, los cambios de estado no.
+> - ⏳ **P1-4** queda parcial: el cobro ya envía hora real, los cambios de estado no.
 
 ---
 
@@ -84,6 +86,8 @@ else if (User.IsInRole(RolCodigos.Chofer))
 
 Filtra por estado, no por `ChoferId`. Contradice `CASOS_DE_USO.md:110` ("ve solo los pedidos que tiene asignados"). Expone razón social y montos de toda la cartera.
 
+> ✅ **Resuelto:** el listado agrega `p.ChoferId == User.UsuarioId()` para el rol `CHOFER` y el dispatch exige chofer asignado (`400 chofer_requerido`), por lo que no quedan pedidos huérfanos.
+
 ### P0-5 · Cobros duplicados e inconsistentes
 
 `PedidosController.RegistrarCobroChofer:440-...` no valida:
@@ -103,10 +107,10 @@ La idempotencia por header (`:447-454`) funciona, pero `carrito_store.confirmar_
 | P1-1 | CU-08 | `ActualizarPedido` **borra y recrea** los `DetallePedido`. Se pierden `CantidadPedida`, `CantidadPreparada`, `CantidadRechazada`, `CantidadEntregada` y `MotivoRechazo`, y se re-congelan precios actuales. | `PedidosController.cs:407-424` |
 | P1-2 | CU-11 | El picking **no despacha**: `Confirmado → EnPreparacion`. El documento describe una sola acción que prepara y deja listo para despacho. | `PedidosController.cs:792-...`, `comp_picking_modal.vue:263` |
 | P1-3 | CU-11 | Con faltantes **no se notifica al Admin**, pese a `CASOS_DE_USO.md:105`. Solo se genera notificación al cliente (`PedidoTransicionService:138`). | sin código |
-| P1-4 | CU-16 | `ocurrido_en` se guarda en la cola pero **nunca se envía**. La API sí lo acepta (`CambiarEstadoRequest.OcurridoEn`, `CobroChoferRequest.OcurridoEn`); el faltante es 100 % del cliente. | `pedidos_service.js` `cambiar_estado` / `registrar_cobro_chofer` |
+| P1-4 | CU-16 | `ocurrido_en` se guarda en la cola pero **nunca se envía**. La API sí lo acepta (`CambiarEstadoRequest.OcurridoEn`, `CobroChoferRequest.OcurridoEn`); el faltante es 100 % del cliente. | `pedidos_service.js` `cambiar_estado` / `registrar_cobro_chofer` — 🟡 el cobro ya lo envía; los cambios de estado no |
 | P1-5 | CU-16 | Conflictos no implementados: no hay "gana el chofer" explícito, no hay aviso al Admin, no se detecta pedido reasignado. Solo se marca la acción local como `conflicto`. | `offline_store.js:188-192` |
 | P1-6 | CU-16 | `ActualizarPicking` **bloquea** el picking sobre `Cancelado`, contra la Decisión 16. | `PedidosController.cs:803` |
-| P1-7 | CU-20 | `asignar_chofer` existe en el service pero **no tiene UI**. En la práctica nadie asigna choferes, por lo que el filtro de P0-4 tampoco tendría datos. | `pedidos_service.js`, sin consumidor |
+| P1-7 | CU-20 | `asignar_chofer` existe en el service pero **no tiene UI**. En la práctica nadie asigna choferes, por lo que el filtro de P0-4 tampoco tendría datos. | `pedidos_service.js`, sin consumidor — ✅ resuelto con selector en el detalle y `GET /api/pedidos/choferes` |
 | P1-8 | CU-21 | Falta la transición `(Despachado → NoEntregado)` en la matriz; `(NoEntregado → Despachado)` es solo Admin aunque la UI la ofrece al Chofer. | `PedidoTransicionService.cs:36-41` |
 | P1-9 | CU-05 | La API permite a `OPERARIO` crear/editar/eliminar clientes. Hoy es un ocultamiento de menú, no un control de acceso. | `ClientesController.cs:11` |
 | P1-10 | CU-01 | `/api/sesion/login` **sin rate limiting ni lockout**. No hay `AddRateLimiter` en `Program.cs`. Fuerza bruta trivial. | `Program.cs`, `SesionController.cs:39-60` |
