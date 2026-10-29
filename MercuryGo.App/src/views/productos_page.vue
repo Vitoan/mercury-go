@@ -136,8 +136,11 @@
               <ion-badge v-if="p.en_oferta" color="danger" class="mercury-flotante-badge">
                 🔥 OFERTA
               </ion-badge>
-              <ion-badge :color="p.disponible ? 'success' : 'medium'" class="mercury-flotante-badge">
-                {{ p.disponible ? 'En Stock' : 'Sin Stock' }}
+              <ion-badge
+                :color="!p.disponible || (p.stock_actual !== undefined && p.stock_actual <= 0) ? 'medium' : ((p.stock_actual || 0) <= (p.stock_minimo || 10) ? 'warning' : 'success')"
+                class="mercury-flotante-badge"
+              >
+                {{ !p.disponible || (p.stock_actual !== undefined && p.stock_actual <= 0) ? 'Sin Stock' : `${p.stock_actual} unid.` }}
               </ion-badge>
             </div>
 

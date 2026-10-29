@@ -230,7 +230,13 @@ const enviarComprobante = async () => {
   }
 
   try {
-    const res = await pedidos_service.subir_comprobante_pago(props.pedido.id, archivoSeleccionado.value);
+    let res;
+    if (props.es_cuenta_corriente) {
+      const monto = Number(props.pedido?.total) || 0;
+      res = await pedidos_service.subir_pago_cuenta_corriente(monto, archivoSeleccionado.value, 'Abono a cuenta corriente');
+    } else {
+      res = await pedidos_service.subir_comprobante_pago(props.pedido.id, archivoSeleccionado.value);
+    }
     vibrar_exito();
     emit('comprobante_subido', res);
     cerrar();

@@ -597,6 +597,81 @@ namespace MercuryGo.Api.Migrations
                     b.ToTable("operaciones_procesadas", (string)null);
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.PagoCuentaCorriente", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true)
+                        .HasColumnName("activo");
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("actualizado_en");
+
+                    b.Property<DateTime?>("AuditadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("auditado_en");
+
+                    b.Property<long?>("AuditadoPorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("auditado_por_id");
+
+                    b.Property<long>("ClienteId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cliente_id");
+
+                    b.Property<string>("ComprobanteUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("comprobante_url");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("creado_en");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("Pendiente")
+                        .HasColumnName("estado");
+
+                    b.Property<decimal>("Monto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("monto");
+
+                    b.Property<string>("MotivoRechazo")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("motivo_rechazo");
+
+                    b.Property<string>("Observaciones")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("observaciones");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pagos_cuenta_corriente");
+
+                    b.HasIndex("AuditadoPorId")
+                        .HasDatabaseName("ix_pagos_cuenta_corriente_auditado_por_id");
+
+                    b.HasIndex("ClienteId")
+                        .HasDatabaseName("ix_pagos_cuenta_corriente_cliente_id");
+
+                    b.ToTable("pagos_cuenta_corriente", (string)null);
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Pedido", b =>
                 {
                     b.Property<long>("Id")
@@ -883,6 +958,14 @@ namespace MercuryGo.Api.Migrations
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("precio");
 
+                    b.Property<int>("StockActual")
+                        .HasColumnType("int")
+                        .HasColumnName("stock_actual");
+
+                    b.Property<int>("StockMinimo")
+                        .HasColumnType("int")
+                        .HasColumnName("stock_minimo");
+
                     b.HasKey("Id")
                         .HasName("pk_productos");
 
@@ -903,7 +986,9 @@ namespace MercuryGo.Api.Migrations
                             EnOferta = true,
                             ImagenUrl = "/seed/productos/aceite.jpg",
                             Nombre = "Aceite de Girasol 1.5L",
-                            Precio = 2400.00m
+                            Precio = 2400.00m,
+                            StockActual = 100,
+                            StockMinimo = 10
                         },
                         new
                         {
@@ -916,7 +1001,9 @@ namespace MercuryGo.Api.Migrations
                             EnOferta = false,
                             ImagenUrl = "/seed/productos/harina.jpg",
                             Nombre = "Harina 000 1kg",
-                            Precio = 950.00m
+                            Precio = 950.00m,
+                            StockActual = 100,
+                            StockMinimo = 10
                         },
                         new
                         {
@@ -929,7 +1016,9 @@ namespace MercuryGo.Api.Migrations
                             EnOferta = false,
                             ImagenUrl = "/seed/productos/arroz.jpg",
                             Nombre = "Arroz Largo Fino 1kg",
-                            Precio = 1800.00m
+                            Precio = 1800.00m,
+                            StockActual = 100,
+                            StockMinimo = 10
                         },
                         new
                         {
@@ -942,7 +1031,9 @@ namespace MercuryGo.Api.Migrations
                             EnOferta = false,
                             ImagenUrl = "/seed/productos/fideos.jpg",
                             Nombre = "Fideos Guiseros 500g",
-                            Precio = 1100.00m
+                            Precio = 1100.00m,
+                            StockActual = 100,
+                            StockMinimo = 10
                         },
                         new
                         {
@@ -955,7 +1046,9 @@ namespace MercuryGo.Api.Migrations
                             EnOferta = false,
                             ImagenUrl = "/seed/productos/azucar.jpg",
                             Nombre = "Azúcar Común 1kg",
-                            Precio = 1250.00m
+                            Precio = 1250.00m,
+                            StockActual = 100,
+                            StockMinimo = 10
                         },
                         new
                         {
@@ -968,7 +1061,9 @@ namespace MercuryGo.Api.Migrations
                             EnOferta = true,
                             ImagenUrl = "/seed/productos/yerba.jpg",
                             Nombre = "Yerba Mate 1kg",
-                            Precio = 3400.00m
+                            Precio = 3400.00m,
+                            StockActual = 100,
+                            StockMinimo = 10
                         });
                 });
 
@@ -1127,6 +1222,10 @@ namespace MercuryGo.Api.Migrations
                         .HasColumnType("datetime(6)")
                         .HasColumnName("actualizado_en");
 
+                    b.Property<long?>("ClienteId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cliente_id");
+
                     b.Property<DateTime>("CreadoEn")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("creado_en");
@@ -1160,6 +1259,9 @@ namespace MercuryGo.Api.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_usuarios");
+
+                    b.HasIndex("ClienteId")
+                        .HasDatabaseName("ix_usuarios_cliente_id");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -1208,6 +1310,7 @@ namespace MercuryGo.Api.Migrations
                         {
                             Id = 4L,
                             Activo = true,
+                            ClienteId = 1L,
                             CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Email = "cliente@mercurygo.local",
                             Nombre = "Cliente Autoservicio San Luis",
@@ -1311,6 +1414,26 @@ namespace MercuryGo.Api.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.PagoCuentaCorriente", b =>
+                {
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "AuditadoPor")
+                        .WithMany()
+                        .HasForeignKey("AuditadoPorId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_pagos_cuenta_corriente_usuarios_auditado_por_id");
+
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Cliente", "Cliente")
+                        .WithMany("PagosCuentaCorriente")
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pagos_cuenta_corriente_clientes_cliente_id");
+
+                    b.Navigation("AuditadoPor");
+
+                    b.Navigation("Cliente");
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Pedido", b =>
                 {
                     b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "AuditadoPor")
@@ -1381,11 +1504,19 @@ namespace MercuryGo.Api.Migrations
 
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Usuario", b =>
                 {
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Cliente", "Cliente")
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_usuarios_clientes_cliente_id");
+
                     b.HasOne("MercuryGo.Api.Domain.Entities.Rol", "Rol")
                         .WithMany()
                         .HasForeignKey("RolId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_usuarios_roles_rol_id");
+
+                    b.Navigation("Cliente");
 
                     b.Navigation("Rol");
                 });
@@ -1397,6 +1528,8 @@ namespace MercuryGo.Api.Migrations
 
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.Cliente", b =>
                 {
+                    b.Navigation("PagosCuentaCorriente");
+
                     b.Navigation("Pedidos");
                 });
 

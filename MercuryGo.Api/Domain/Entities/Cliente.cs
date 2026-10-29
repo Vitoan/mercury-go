@@ -13,4 +13,5 @@ public sealed class Cliente : EntityBase
     public bool Activo { get; set; } = true;
 
     public ICollection<Pedido> Pedidos { get; set; } = new List<Pedido>();
+    public ICollection<PagoCuentaCorriente> PagosCuentaCorriente { get; set; } = new List<PagoCuentaCorriente>();
 }

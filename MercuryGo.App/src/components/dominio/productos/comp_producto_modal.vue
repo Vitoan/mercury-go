@@ -111,7 +111,7 @@
           </ion-item>
 
           <!-- Toggle: En Oferta Destacada -->
-          <ion-item class="mercury-form-item" lines="none">
+          <ion-item class="mercury-form-item" lines="inset">
             <ion-label>
               <h3>🔥 En Oferta Especial</h3>
               <p>Se destaca en Inicio y en el filtro de ofertas</p>
@@ -121,6 +121,26 @@
               color="danger"
               :checked="formulario.en_oferta"
               @ionChange="formulario.en_oferta = $event.detail.checked"
+            />
+          </ion-item>
+
+          <!-- Control de Stock (D2) -->
+          <ion-item class="mercury-form-item">
+            <ion-input
+              v-model.number="formulario.stock_actual"
+              type="number"
+              label="Stock Actual (Unidades en Depósito)"
+              label-placement="stacked"
+              placeholder="100"
+            />
+          </ion-item>
+          <ion-item class="mercury-form-item" lines="none">
+            <ion-input
+              v-model.number="formulario.stock_minimo"
+              type="number"
+              label="Stock Mínimo de Alerta"
+              label-placement="stacked"
+              placeholder="10"
             />
           </ion-item>
         </ion-list>
@@ -221,7 +241,9 @@ const formulario = ref({
   descripcion: '',
   precio: 0,
   disponible: true,
-  en_oferta: false
+  en_oferta: false,
+  stock_actual: 100,
+  stock_minimo: 10
 });
 
 const categorias = computed(() => productos_store.categorias);
@@ -244,7 +266,9 @@ watch(
         descripcion: prod.descripcion || '',
         precio: prod.precio || 0,
         disponible: prod.disponible ?? true,
-        en_oferta: prod.en_oferta ?? false
+        en_oferta: prod.en_oferta ?? false,
+        stock_actual: prod.stock_actual ?? 100,
+        stock_minimo: prod.stock_minimo ?? 10
       };
       imagenUrlActual.value = prod.imagen_url || null;
     } else {
@@ -254,7 +278,9 @@ watch(
         descripcion: '',
         precio: 0,
         disponible: true,
-        en_oferta: false
+        en_oferta: false,
+        stock_actual: 100,
+        stock_minimo: 10
       };
       imagenUrlActual.value = null;
     }
@@ -301,6 +327,8 @@ const guardar = async () => {
       precio: Number(formulario.value.precio),
       disponible: Boolean(formulario.value.disponible),
       en_oferta: Boolean(formulario.value.en_oferta),
+      stock_actual: Number(formulario.value.stock_actual ?? 100),
+      stock_minimo: Number(formulario.value.stock_minimo ?? 10),
       imagen_url: imagenUrlActual.value || props.producto?.imagen_url || null
     };
 

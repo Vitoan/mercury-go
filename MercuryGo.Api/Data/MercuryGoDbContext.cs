@@ -21,6 +21,7 @@ public class MercuryGoDbContext : DbContext
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Notificacion> Notificaciones => Set<Notificacion>();
+    public DbSet<PagoCuentaCorriente> PagosCuentaCorriente => Set<PagoCuentaCorriente>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -250,6 +251,29 @@ public class MercuryGoDbContext : DbContext
                   .OnDelete(DeleteBehavior.SetNull);
         });
 
+        // ── PagoCuentaCorriente (D1) ──────────────────────────────────────────
+        modelBuilder.Entity<PagoCuentaCorriente>(entity =>
+        {
+            entity.ToTable("pagos_cuenta_corriente");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Monto).HasPrecision(18, 2).IsRequired();
+            entity.Property(e => e.Estado).HasMaxLength(40).IsRequired().HasDefaultValue("Pendiente");
+            entity.Property(e => e.ComprobanteUrl).HasMaxLength(500);
+            entity.Property(e => e.Observaciones).HasMaxLength(500);
+            entity.Property(e => e.MotivoRechazo).HasMaxLength(500);
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+
+            entity.HasOne(p => p.Cliente)
+                  .WithMany(c => c.PagosCuentaCorriente)
+                  .HasForeignKey(p => p.ClienteId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(p => p.AuditadoPor)
+                  .WithMany()
+                  .HasForeignKey(p => p.AuditadoPorId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
         // ── Rol ───────────────────────────────────────────────────────────────
         modelBuilder.Entity<Rol>(entity =>
         {
@@ -281,6 +305,11 @@ public class MercuryGoDbContext : DbContext
             entity.Property(e => e.Telefono).HasMaxLength(40);
             entity.Property(e => e.Activo).HasDefaultValue(true);
 
+            entity.HasOne(u => u.Cliente)
+                  .WithMany()
+                  .HasForeignKey(u => u.ClienteId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasOne(u => u.Rol)
                   .WithMany()
                   .HasForeignKey(u => u.RolId)
@@ -293,7 +322,7 @@ public class MercuryGoDbContext : DbContext
                 new Usuario { Id = 1, RolId = 1, Nombre = "Administrador Central", Email = "admin@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4001122", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
                 new Usuario { Id = 2, RolId = 2, Nombre = "Operario de Picking", Email = "operario@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4003344", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
                 new Usuario { Id = 3, RolId = 3, Nombre = "Chofer Reparto 01", Email = "chofer@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4005566", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
-                new Usuario { Id = 4, RolId = 4, Nombre = "Cliente Autoservicio San Luis", Email = "cliente@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4007788", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Usuario { Id = 4, RolId = 4, Nombre = "Cliente Autoservicio San Luis", ClienteId = 1, Email = "cliente@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4007788", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) },
                 new Usuario { Id = 5, RolId = null, Nombre = "Usuario Nuevo Pendiente", Email = "nuevo@mercurygo.local", PasswordHash = hashMercury123, Telefono = "266-4009900", Activo = true, CreadoEn = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) }
             );
         });

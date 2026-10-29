@@ -87,6 +87,28 @@ export const pedidos_service = {
     return ajax_service.put(`api/pedidos/${id}/rechazar-comprobante`, { motivo });
   },
 
+  subir_pago_cuenta_corriente(monto, archivo = null, observaciones = '', cliente_id = null) {
+    const formData = new FormData();
+    formData.append('monto', monto);
+    if (archivo) formData.append('archivo', archivo);
+    if (observaciones) formData.append('observaciones', observaciones);
+    if (cliente_id) formData.append('cliente_id', cliente_id);
+    return ajax_service.post('api/pedidos/cuenta-corriente/pagos', formData);
+  },
+
+  listar_pagos_cuenta_corriente() {
+    return ajax_service.get('api/pedidos/cuenta-corriente/pagos');
+  },
+
+  aprobar_pago_cuenta_corriente(id, monto = null) {
+    const cuerpo = monto !== null && monto !== undefined ? { monto: Number(monto) } : null;
+    return ajax_service.put(`api/pedidos/cuenta-corriente/pagos/${id}/aprobar`, cuerpo);
+  },
+
+  rechazar_pago_cuenta_corriente(id, motivo = '') {
+    return ajax_service.put(`api/pedidos/cuenta-corriente/pagos/${id}/rechazar`, { motivo });
+  },
+
   confirmar(id) {
     return ajax_service.post(`api/pedidos/${id}/confirmar`);
   },

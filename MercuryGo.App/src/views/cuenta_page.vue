@@ -105,7 +105,8 @@
       <!-- Modal de Carga de Comprobante de Pago Directo -->
       <comp-comprobante-modal
         :abierto="mostrarModalComprobante"
-        :pedido="{ id: 1, numero: 'PAGO-CTA-CTE', total: cuentaCorriente?.saldo_deudor || 0 }"
+        :pedido="{ numero: 'CTA-CTE', total: cuentaCorriente?.saldo_deudor || 0 }"
+        :es_cuenta_corriente="true"
         @cerrar="mostrarModalComprobante = false"
         @comprobante_subido="alSubirComprobanteCC"
       />

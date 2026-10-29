@@ -53,7 +53,9 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
                 producto.Disponible,
                 producto.EnOferta,
                 categoria.Id,
-                categoria.Nombre
+                categoria.Nombre,
+                producto.StockActual,
+                producto.StockMinimo
             )
         ).ToListAsync(cancellationToken);
 
@@ -110,7 +112,9 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
                 p.Disponible,
                 p.EnOferta,
                 c.Id,
-                c.Nombre
+                c.Nombre,
+                p.StockActual,
+                p.StockMinimo
             )
         ).PaginarAsync(PaginaConsulta.Desde(pagina, tamano), ct);
 
@@ -133,7 +137,9 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
                 p.Disponible,
                 p.EnOferta,
                 categoria.Id,
-                categoria.Nombre
+                categoria.Nombre,
+                p.StockActual,
+                p.StockMinimo
             )
         ).FirstOrDefaultAsync(cancellationToken);
 
@@ -158,6 +164,8 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
             ImagenUrl = NormalizarTexto(request.ImagenUrl),
             Disponible = request.Disponible,
             EnOferta = request.EnOferta,
+            StockActual = request.StockActual ?? 100,
+            StockMinimo = request.StockMinimo ?? 10,
             Activo = true,
             CreadoEn = DateTime.UtcNow
         };
@@ -188,6 +196,8 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
         }
         producto.Disponible = request.Disponible;
         producto.EnOferta = request.EnOferta;
+        if (request.StockActual.HasValue) producto.StockActual = request.StockActual.Value;
+        if (request.StockMinimo.HasValue) producto.StockMinimo = request.StockMinimo.Value;
         producto.ActualizadoEn = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -270,7 +280,9 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
                 p.Disponible,
                 p.EnOferta,
                 c.Id,
-                c.Nombre
+                c.Nombre,
+                p.StockActual,
+                p.StockMinimo
             )
         ).FirstOrDefaultAsync(ct);
     }
@@ -289,7 +301,9 @@ public sealed record GuardarProductoRequest(
     decimal Precio,
     string? ImagenUrl,
     bool Disponible,
-    bool EnOferta = false
+    bool EnOferta = false,
+    int? StockActual = null,
+    int? StockMinimo = null
 );
 
 public sealed record ProductosResumenResponse(int Total, int Disponibles, int NoDisponibles, int EnOferta);
@@ -303,5 +317,7 @@ public sealed record ProductoResumenResponse(
     bool Disponible,
     bool EnOferta,
     long CategoriaId,
-    string CategoriaNombre
+    string CategoriaNombre,
+    int StockActual = 0,
+    int StockMinimo = 0
 );

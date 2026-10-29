@@ -187,6 +187,28 @@ public sealed class PedidosController(
         return Ok(new { pedido = resultado });
     }
 
+    private async Task<Cliente?> ObtenerClienteDeUsuarioAutenticadoAsync(CancellationToken ct)
+    {
+        var usuarioId = User.UsuarioId();
+        if (usuarioId > 0)
+        {
+            var usuario = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct);
+            if (usuario?.ClienteId != null)
+            {
+                var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == usuario.ClienteId.Value && c.Activo, ct);
+                if (cliente != null) return cliente;
+            }
+        }
+
+        var emailUsuario = User.Email();
+        if (!string.IsNullOrWhiteSpace(emailUsuario))
+        {
+            return await db.Clientes.FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct);
+        }
+
+        return null;
+    }
+
     // Creación de orden de carga: LOS PRECIOS NO VIAJAN DESDE EL TELÉFONO.
     // El servidor lee los precios vigentes de la base de datos para preservar la integridad contable.
     [HttpPost]
@@ -210,16 +232,11 @@ public sealed class PedidosController(
         long clienteId;
         if (User.EsCliente())
         {
-            var emailUsuario = User.Email();
-            var propio = await db.Clientes.AsNoTracking()
-                .Where(c => c.Email == emailUsuario && c.Activo)
-                .Select(c => (long?)c.Id)
-                .FirstOrDefaultAsync(ct);
-
+            var propio = await ObtenerClienteDeUsuarioAutenticadoAsync(ct);
             if (propio is null)
                 return StatusCode(403, new { codigo = "cliente_no_vinculado", mensaje = "Tu usuario no está vinculado a un cliente comercial. Contactá al administrador." });
 
-            clienteId = propio.Value;
+            clienteId = propio.Id;
         }
         else
         {
@@ -258,6 +275,11 @@ public sealed class PedidosController(
                 tieneFalloValidacion = true;
                 detalleValidacion.Add($"Producto '{prod.Nombre}' no disponible en catálogo");
             }
+
+            if (prod.StockActual < item.Cantidad)
+            {
+                return BadRequest(new { codigo = "stock_insuficiente", mensaje = $"Stock insuficiente para '{prod.Nombre}'. Stock disponible: {prod.StockActual}, solicitado: {item.Cantidad}." });
+            }
         }
 
         // Generar número de remito correlativo
@@ -293,6 +315,7 @@ public sealed class PedidosController(
         foreach (var item in request.Items)
         {
             var prod = productosDb[item.ProductoId];
+            prod.StockActual -= item.Cantidad; // Descuento atómico de stock (D2)
             db.DetallesPedido.Add(new DetallePedido
             {
                 PedidoId = nuevoPedido.Id,
@@ -666,10 +689,7 @@ public sealed class PedidosController(
     [HttpGet("cuenta-corriente")]
     public async Task<IActionResult> ObtenerCuentaCorriente(CancellationToken ct)
     {
-        // Sin fallback: un usuario sin cliente vinculado no debe ver el saldo de otro.
-        var emailUsuario = User.Email();
-        var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct);
-
+        var cliente = await ObtenerClienteDeUsuarioAutenticadoAsync(ct);
         if (cliente is null)
             return NotFound(new { codigo = "cliente_no_vinculado", mensaje = "Tu usuario no está vinculado a un cliente comercial." });
 
@@ -687,9 +707,15 @@ public sealed class PedidosController(
             })
             .ToListAsync(ct);
 
+        var pagosCuenta = await db.PagosCuentaCorriente
+            .AsNoTracking()
+            .Where(p => p.ClienteId == cliente.Id && p.Activo)
+            .OrderByDescending(p => p.CreadoEn)
+            .ToListAsync(ct);
+
         var totalFacturado = pedidosCliente.Sum(p => p.Total);
-        var totalPagado = 0m;
-        var comprobantesPendientes = 0;
+        var totalPagado = pagosCuenta.Where(p => p.Estado == "Aprobado").Sum(p => p.Monto);
+        var comprobantesPendientes = pagosCuenta.Count(p => p.Estado == "Pendiente");
 
         // Sumar pagos aprobados y calcular pendientes de auditoría
         foreach (var p in pedidosCliente)
@@ -736,7 +762,17 @@ public sealed class PedidosController(
             total_pagado = totalPagado,
             saldo_deudor = saldoDeudor,
             comprobantes_pendientes = comprobantesPendientes,
-            pedidos_pendientes = pedidosCliente.Count(p => p.Estado != EstadoPedido.Entregado)
+            pedidos_pendientes = pedidosCliente.Count(p => p.Estado != EstadoPedido.Entregado),
+            pagos_cuenta_corriente = pagosCuenta.Select(p => new
+            {
+                p.Id,
+                p.Monto,
+                p.Estado,
+                p.ComprobanteUrl,
+                p.Observaciones,
+                p.MotivoRechazo,
+                p.CreadoEn
+            })
         });
     }
 
@@ -766,13 +802,34 @@ public sealed class PedidosController(
             })
             .ToListAsync(ct);
 
+        var todosPagosCuenta = await db.PagosCuentaCorriente
+            .AsNoTracking()
+            .Where(p => p.Activo)
+            .OrderByDescending(p => p.CreadoEn)
+            .ToListAsync(ct);
+
         var resumenPorCliente = clientes.Select(c =>
         {
             var pedidosC = pedidos.Where(p => p.ClienteId == c.Id).ToList();
+            var pagosC = todosPagosCuenta.Where(p => p.ClienteId == c.Id).ToList();
             var totalFacturado = pedidosC.Sum(p => p.Total);
-            var totalPagado = 0m;
-            var pendientesRevision = 0;
+            var totalPagado = pagosC.Where(p => p.Estado == "Aprobado").Sum(p => p.Monto);
+            var pendientesRevision = pagosC.Count(p => p.Estado == "Pendiente");
             var comprobantesPendientes = new List<object>();
+
+            foreach (var pc in pagosC.Where(p => p.Estado == "Pendiente"))
+            {
+                comprobantesPendientes.Add(new
+                {
+                    pago_cuenta_id = pc.Id,
+                    cliente_id = pc.ClienteId,
+                    monto = pc.Monto,
+                    fecha = pc.CreadoEn,
+                    comprobante_url = pc.ComprobanteUrl,
+                    observaciones = pc.Observaciones,
+                    tipo = "cuenta_corriente"
+                });
+            }
 
             foreach (var p in pedidosC)
             {
@@ -1097,6 +1154,175 @@ public sealed class PedidosController(
             despachado,
             requiere_chofer = requiereChofer,
             mensaje
+        });
+    }
+
+
+    // Subir pago directo a Cuenta Corriente con comprobante (D1)
+    [HttpPost("cuenta-corriente/pagos")]
+    public async Task<IActionResult> RegistrarPagoCuentaCorriente(
+        [FromForm] decimal monto,
+        [FromForm] string? observaciones,
+        IFormFile? archivo,
+        CancellationToken ct)
+    {
+        if (monto <= 0)
+            return BadRequest(new { codigo = "monto_invalido", mensaje = "El monto a abonar debe ser mayor a cero." });
+
+        Cliente? cliente;
+        if (User.EsCliente())
+        {
+            cliente = await ObtenerClienteDeUsuarioAutenticadoAsync(ct);
+            if (cliente is null)
+                return StatusCode(403, new { codigo = "cliente_no_vinculado", mensaje = "Tu usuario no está vinculado a un cliente comercial." });
+        }
+        else
+        {
+            var clienteIdForm = Request.Form["cliente_id"].ToString();
+            if (!long.TryParse(clienteIdForm, out var cid) || cid <= 0)
+                return BadRequest(new { codigo = "cliente_requerido", mensaje = "Debe especificar el ID del cliente destino." });
+
+            cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == cid && c.Activo, ct);
+            if (cliente is null)
+                return NotFound(new { codigo = "cliente_no_encontrado", mensaje = "El cliente no existe o está inactivo." });
+        }
+
+        string? comprobanteUrl = null;
+        if (archivo is not null && archivo.Length > 0)
+        {
+            var extensionesValidas = new[] { ".pdf", ".jpg", ".jpeg", ".png", ".webp" };
+            var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+            if (archivo.Length > 5_000_000 || !extensionesValidas.Contains(extension))
+                return BadRequest(new { codigo = "archivo_invalido", mensaje = "El comprobante debe ser un archivo PDF o imagen (JPG, PNG, WEBP) menor o igual a 5 MB." });
+
+            var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+            var carpeta = Path.Combine(webRoot, "uploads", "comprobantes");
+            Directory.CreateDirectory(carpeta);
+
+            var nombreArchivo = $"{Guid.NewGuid():N}{extension}";
+            var rutaFisica = Path.Combine(carpeta, nombreArchivo);
+            await using var stream = System.IO.File.Create(rutaFisica);
+            await archivo.CopyToAsync(stream, ct);
+            comprobanteUrl = $"/uploads/comprobantes/{nombreArchivo}";
+        }
+
+        var pago = new PagoCuentaCorriente
+        {
+            ClienteId = cliente.Id,
+            Monto = monto,
+            Estado = "Pendiente",
+            ComprobanteUrl = comprobanteUrl,
+            Observaciones = NormalizarTexto(observaciones),
+            Activo = true,
+            CreadoEn = DateTime.UtcNow
+        };
+
+        db.PagosCuentaCorriente.Add(pago);
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            pago_id = pago.Id,
+            cliente_id = pago.ClienteId,
+            monto = pago.Monto,
+            estado = pago.Estado,
+            comprobante_url = pago.ComprobanteUrl,
+            mensaje = "Comprobante de pago a cuenta corriente registrado exitosamente. En proceso de verificación."
+        });
+    }
+
+    // Listar pagos de cuenta corriente
+    [HttpGet("cuenta-corriente/pagos")]
+    public async Task<IActionResult> ListarPagosCuentaCorriente(CancellationToken ct)
+    {
+        IQueryable<PagoCuentaCorriente> query = db.PagosCuentaCorriente.AsNoTracking().Where(p => p.Activo);
+
+        if (User.EsCliente())
+        {
+            var cliente = await ObtenerClienteDeUsuarioAutenticadoAsync(ct);
+            if (cliente is null)
+                return StatusCode(403, new { codigo = "cliente_no_vinculado", mensaje = "Tu usuario no está vinculado a un cliente comercial." });
+
+            query = query.Where(p => p.ClienteId == cliente.Id);
+        }
+
+        var pagos = await query
+            .OrderByDescending(p => p.CreadoEn)
+            .Select(p => new
+            {
+                p.Id,
+                p.ClienteId,
+                p.Monto,
+                p.Estado,
+                p.ComprobanteUrl,
+                p.Observaciones,
+                p.MotivoRechazo,
+                p.AuditadoPorId,
+                p.AuditadoEn,
+                p.CreadoEn
+            })
+            .ToListAsync(ct);
+
+        return Ok(new { pagos });
+    }
+
+    // Aprobar pago a cuenta corriente (Exclusivo ADMIN)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPut("cuenta-corriente/pagos/{id:long}/aprobar")]
+    public async Task<IActionResult> AprobarPagoCuentaCorriente(long id, [FromBody] AprobarComprobanteRequest? request, CancellationToken ct)
+    {
+        var pago = await db.PagosCuentaCorriente.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pago is null)
+            return NotFound(new { codigo = "pago_no_encontrado", mensaje = "El pago a cuenta corriente no existe o fue dado de baja." });
+
+        if (request?.Monto.HasValue == true && request.Monto.Value > 0)
+        {
+            pago.Monto = request.Monto.Value;
+        }
+
+        pago.Estado = "Aprobado";
+        pago.AuditadoPorId = User.UsuarioId();
+        pago.AuditadoEn = DateTime.UtcNow;
+        pago.ActualizadoEn = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Pago a cuenta corriente #{pago.Id} aprobado exitosamente por ${pago.Monto:N2}.",
+            pago_id = pago.Id,
+            cliente_id = pago.ClienteId,
+            monto = pago.Monto,
+            estado = pago.Estado
+        });
+    }
+
+    // Rechazar pago a cuenta corriente (Exclusivo ADMIN)
+    [Authorize(Roles = RolCodigos.Admin)]
+    [HttpPut("cuenta-corriente/pagos/{id:long}/rechazar")]
+    public async Task<IActionResult> RechazarPagoCuentaCorriente(long id, [FromBody] RechazarComprobanteRequest request, CancellationToken ct)
+    {
+        var pago = await db.PagosCuentaCorriente.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pago is null)
+            return NotFound(new { codigo = "pago_no_encontrado", mensaje = "El pago a cuenta corriente no existe o fue dado de baja." });
+
+        var motivo = string.IsNullOrWhiteSpace(request?.Motivo) ? "Comprobante no acreditado en cuenta bancaria" : request.Motivo.Trim();
+
+        pago.Estado = "Rechazado";
+        pago.MotivoRechazo = motivo;
+        pago.AuditadoPorId = User.UsuarioId();
+        pago.AuditadoEn = DateTime.UtcNow;
+        pago.ActualizadoEn = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            mensaje = $"Pago a cuenta corriente #{pago.Id} rechazado: {motivo}",
+            pago_id = pago.Id,
+            cliente_id = pago.ClienteId,
+            estado = pago.Estado,
+            motivo_rechazo = pago.MotivoRechazo
         });
     }
 
