@@ -130,6 +130,9 @@ export function usePedidosWorkflow(toast) {
 
   const ejecutarCambioEstado = async (nuevoEstado) => {
     if (!pedidoSeleccionado.value) return;
+    // La hora del evento se captura al tocar, no después del GPS: si el
+    // dispositivo tarda en ubicarse, la marca de tiempo sigue siendo la real.
+    const ocurridoEn = new Date().toISOString();
     try {
       let lat = null;
       let lng = null;
@@ -145,7 +148,7 @@ export function usePedidosWorkflow(toast) {
         }
       }
 
-      const res = await pedidos_store.cambiar_estado(pedidoSeleccionado.value.id, nuevoEstado, lat, lng);
+      const res = await pedidos_store.cambiar_estado(pedidoSeleccionado.value.id, nuevoEstado, lat, lng, ocurridoEn);
       vibrar_exito();
 
       const offline = use_offline_store();
@@ -291,8 +294,8 @@ export function usePedidosWorkflow(toast) {
       });
     }
 
-    // Acciones de Reintento para NoEntregado
-    if (esChoferOAdmin && estadoActual === 'NoEntregado') {
+    // Acciones de Reintento para NoEntregado (solo el Admin reautoriza el despacho)
+    if (sesion_store.es_admin && estadoActual === 'NoEntregado') {
       botones.push({
         text: '🔄 Reintentar Entrega (▶ Despachado)',
         handler: async () => {

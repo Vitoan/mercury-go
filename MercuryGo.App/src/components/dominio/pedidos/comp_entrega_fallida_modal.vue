@@ -78,6 +78,7 @@ import {
 import { pedidos_service } from '@/services/pedidos_service';
 import { use_offline_store } from '@/stores/offline_store';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
+import { nueva_clave_idempotencia } from '@/utils/idempotencia';
 
 const props = defineProps({
   abierto: { type: Boolean, default: false },
@@ -101,12 +102,15 @@ watch(
 const confirmarNoEntrega = async () => {
   if (!props.pedido || !motivo.value) return;
   enviando.value = true;
+  // Hora del intento fallido en el dispositivo: vale también para la cola offline.
+  const ocurridoEn = new Date().toISOString();
   try {
     const offline = use_offline_store();
     if (offline.sin_conexion) {
       offline.encolar_accion('NO_ENTREGADO', props.pedido.id, {
         motivo: motivo.value,
-        nota: nota.value
+        nota: nota.value,
+        ocurrido_en: ocurridoEn
       });
       await vibrar_exito();
       emit('entrega_fallida_registrada', {
@@ -115,7 +119,14 @@ const confirmarNoEntrega = async () => {
       cerrar();
       return;
     }
-    const res = await pedidos_service.registrar_no_entregado(props.pedido.id, motivo.value, nota.value);
+    const res = await pedidos_service.registrar_no_entregado(
+      props.pedido.id,
+      motivo.value,
+      nota.value,
+      null,
+      nueva_clave_idempotencia(),
+      ocurridoEn
+    );
     await vibrar_exito();
     emit('entrega_fallida_registrada', res);
     cerrar();

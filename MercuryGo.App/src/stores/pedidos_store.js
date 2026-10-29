@@ -126,21 +126,21 @@ export const usePedidosStore = defineStore('pedidos', () => {
     return res;
   }
 
-  async function cambiar_estado(id, nuevoEstado, latitud = null, longitud = null) {
+  async function cambiar_estado(id, nuevoEstado, latitud = null, longitud = null, ocurrido_en = null) {
     const offline = use_offline_store();
     if (offline.sin_conexion) {
-      offline.encolar(id, nuevoEstado, latitud, longitud);
+      offline.encolar(id, nuevoEstado, latitud, longitud, ocurrido_en);
       pedidos.value = pedidos.value.map(con_cambios_sin_enviar);
       return { id, estado: nuevoEstado, sin_enviar: true };
     }
     try {
-      const res = await pedidos_service.cambiar_estado(id, nuevoEstado, latitud, longitud);
+      const res = await pedidos_service.cambiar_estado(id, nuevoEstado, latitud, longitud, null, ocurrido_en);
       await cargar(true);
       return res;
     } catch (err) {
       if (!err.estado_http || err.estado_http === 0) {
         offline.marcar_desconectado();
-        offline.encolar(id, nuevoEstado, latitud, longitud);
+        offline.encolar(id, nuevoEstado, latitud, longitud, ocurrido_en);
         pedidos.value = pedidos.value.map(con_cambios_sin_enviar);
         return { id, estado: nuevoEstado, sin_enviar: true };
       }

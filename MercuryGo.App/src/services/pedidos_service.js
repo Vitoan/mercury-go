@@ -21,12 +21,13 @@ export const pedidos_service = {
     return ajax_service.post('api/pedidos', pedido, { headers });
   },
 
-  cambiar_estado(id, estado, latitud = null, longitud = null, idempotency_key = null) {
+  cambiar_estado(id, estado, latitud = null, longitud = null, idempotency_key = null, ocurrido_en = null) {
     const payload = { estado };
     if (latitud !== null && longitud !== null) {
       payload.latitud = latitud;
       payload.longitud = longitud;
     }
+    if (ocurrido_en) payload.ocurrido_en = ocurrido_en;
     const opciones = idempotency_key ? { idempotency_key } : {};
     return ajax_service.put(`api/pedidos/${id}/estado`, payload, opciones);
   },
@@ -103,25 +104,22 @@ export const pedidos_service = {
     return ajax_service.get('api/pedidos/choferes');
   },
 
-  registrar_no_entregado(id, motivo, nota = null, foto_url = null, idempotency_key = null) {
+  registrar_no_entregado(id, motivo, nota = null, foto_url = null, idempotency_key = null, ocurrido_en = null) {
     const opciones = idempotency_key ? { idempotency_key } : {};
-    return ajax_service.post(`api/pedidos/${id}/no-entregado`, { motivo, nota, foto_url }, opciones);
+    const cuerpo = { motivo, nota, foto_url };
+    if (ocurrido_en) cuerpo.ocurrido_en = ocurrido_en;
+    return ajax_service.post(`api/pedidos/${id}/no-entregado`, cuerpo, opciones);
   },
 
   reintentar_entrega(id) {
     return ajax_service.post(`api/pedidos/${id}/reintentar-entrega`);
   },
 
-  registrar_entrega_parcial(id, lineas, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null, idempotency_key = null) {
+  registrar_entrega_parcial(id, lineas, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null, idempotency_key = null, ocurrido_en = null) {
     const opciones = idempotency_key ? { idempotency_key } : {};
-    return ajax_service.post(`api/pedidos/${id}/entrega-parcial`, {
-      lineas,
-      motivo,
-      latitud,
-      longitud,
-      foto_url,
-      firma_url
-    }, opciones);
+    const cuerpo = { lineas, motivo, latitud, longitud, foto_url, firma_url };
+    if (ocurrido_en) cuerpo.ocurrido_en = ocurrido_en;
+    return ajax_service.post(`api/pedidos/${id}/entrega-parcial`, cuerpo, opciones);
   },
 
   ajustar_cobro(cobro_id, nuevo_monto, motivo) {

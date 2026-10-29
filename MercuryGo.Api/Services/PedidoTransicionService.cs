@@ -32,8 +32,10 @@ public sealed class PedidoTransicionService(MercuryGoDbContext db) : IPedidoTran
         // CU-13: Entrega final
         [(EstadoPedido.EnPuerta, EstadoPedido.Entregado)] = [RolCodigos.Chofer, RolCodigos.Admin],
 
-        // CU-21: Entrega fallida
+        // CU-21: Entrega fallida (también directo desde Despachado: el chofer puede
+        // no llegar a marcar "En Puerta" antes de fallar la entrega)
         [(EstadoPedido.EnPuerta, EstadoPedido.NoEntregado)] = [RolCodigos.Chofer, RolCodigos.Admin],
+        [(EstadoPedido.Despachado, EstadoPedido.NoEntregado)] = [RolCodigos.Chofer, RolCodigos.Admin],
         [(EstadoPedido.EnPuerta, EstadoPedido.Cancelado)] = [RolCodigos.Admin],
 
         // CU-21: Reintento de entrega desde NoEntregado

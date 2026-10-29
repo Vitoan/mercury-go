@@ -128,8 +128,9 @@ export const use_offline_store = defineStore('offline', {
     },
 
     // Compatibilidad retroactiva con la llamada previa de encolar estado
-    encolar: function (pedido_id, estado, latitud = null, longitud = null) {
-      return this.encolar_accion(estado.toUpperCase(), pedido_id, { estado }, latitud, longitud);
+    encolar: function (pedido_id, estado, latitud = null, longitud = null, ocurrido_en = null) {
+      const payload = ocurrido_en ? { estado, ocurrido_en } : { estado };
+      return this.encolar_accion(estado.toUpperCase(), pedido_id, payload, latitud, longitud);
     },
 
     limpiar_enviadas: function () {
@@ -219,7 +220,7 @@ export const use_offline_store = defineStore('offline', {
     },
 
     ejecutar_despacho_api: async function (accion) {
-      const { tipo, pedido_id, payload, lat, lng, id } = accion;
+      const { tipo, pedido_id, payload, lat, lng, id, ocurrido_en } = accion;
 
       switch (tipo) {
         case 'ENTREGAR':
@@ -229,7 +230,7 @@ export const use_offline_store = defineStore('offline', {
         case 'CONFIRMADO':
         case 'CANCELADO': {
           const estadoDestino = payload?.estado || (tipo === 'EN_PUERTA' ? 'EnPuerta' : tipo === 'ENTREGAR' ? 'Entregado' : tipo);
-          return await pedidos_service.cambiar_estado(pedido_id, estadoDestino, lat, lng, id);
+          return await pedidos_service.cambiar_estado(pedido_id, estadoDestino, lat, lng, id, payload?.ocurrido_en || ocurrido_en);
         }
 
         case 'NO_ENTREGADO': {
@@ -238,7 +239,8 @@ export const use_offline_store = defineStore('offline', {
             payload?.motivo || 'ClienteAusente',
             payload?.nota,
             payload?.foto_url,
-            id
+            id,
+            payload?.ocurrido_en || ocurrido_en
           );
         }
 
@@ -261,7 +263,8 @@ export const use_offline_store = defineStore('offline', {
             lng,
             payload?.foto_url,
             payload?.firma_url,
-            id
+            id,
+            payload?.ocurrido_en || ocurrido_en
           );
         }
 
@@ -305,7 +308,7 @@ export const use_offline_store = defineStore('offline', {
 
         default: {
           if (payload?.estado) {
-            return await pedidos_service.cambiar_estado(pedido_id, payload.estado, lat, lng, id);
+            return await pedidos_service.cambiar_estado(pedido_id, payload.estado, lat, lng, id, payload?.ocurrido_en || ocurrido_en);
           }
           throw new Error(`Tipo de acción no soportado: ${tipo}`);
         }

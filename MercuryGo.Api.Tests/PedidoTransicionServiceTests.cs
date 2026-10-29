@@ -176,4 +176,63 @@ public class PedidoTransicionServiceTests
         Assert.True(resultado.Exito);
         Assert.Equal(EstadoPedido.Despachado, pedido.Estado);
     }
+
+    [Fact]
+    public async Task Chofer_PuedeMarcarNoEntregado_DesdeDespachado()
+    {
+        // Arrange (P1-8: el chofer puede fallar la entrega sin pasar por EnPuerta)
+        using var db = CrearContextoEnMemoria("Test_NoEntregado_DesdeDespachado");
+        var servicio = new PedidoTransicionService(db);
+        var pedido = new Pedido
+        {
+            Id = 6,
+            Numero = "PED-006",
+            Estado = EstadoPedido.Despachado,
+            FechaPedido = DateTime.UtcNow
+        };
+        db.Pedidos.Add(pedido);
+        await db.SaveChangesAsync();
+
+        var contexto = new ContextoTransicion(
+            UsuarioId: 5,
+            RolCodigo: RolCodigos.Chofer
+        );
+
+        // Act
+        var resultado = await servicio.TransicionarAsync(pedido, EstadoPedido.NoEntregado, contexto);
+
+        // Assert
+        Assert.True(resultado.Exito);
+        Assert.Equal(EstadoPedido.NoEntregado, pedido.Estado);
+    }
+
+    [Fact]
+    public async Task Chofer_NoPuedeReintentarEntrega_DesdeNoEntregado()
+    {
+        // Arrange (CU-21: el reintento lo autoriza el Admin)
+        using var db = CrearContextoEnMemoria("Test_Reintento_Chofer_Rechazado");
+        var servicio = new PedidoTransicionService(db);
+        var pedido = new Pedido
+        {
+            Id = 7,
+            Numero = "PED-007",
+            Estado = EstadoPedido.NoEntregado,
+            FechaPedido = DateTime.UtcNow
+        };
+        db.Pedidos.Add(pedido);
+        await db.SaveChangesAsync();
+
+        var contexto = new ContextoTransicion(
+            UsuarioId: 5,
+            RolCodigo: RolCodigos.Chofer
+        );
+
+        // Act
+        var resultado = await servicio.TransicionarAsync(pedido, EstadoPedido.Despachado, contexto);
+
+        // Assert
+        Assert.False(resultado.Exito);
+        Assert.Equal("rol_no_autorizado", resultado.CodigoError);
+        Assert.Equal(EstadoPedido.NoEntregado, pedido.Estado);
+    }
 }

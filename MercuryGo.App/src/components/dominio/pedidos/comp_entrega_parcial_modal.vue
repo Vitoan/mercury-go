@@ -106,6 +106,7 @@ import { pedidos_service } from '@/services/pedidos_service';
 import { use_offline_store } from '@/stores/offline_store';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { geolocalizacion_service } from '@/services/geolocalizacion_service';
+import { nueva_clave_idempotencia } from '@/utils/idempotencia';
 
 const props = defineProps({
   abierto: { type: Boolean, default: false },
@@ -151,6 +152,8 @@ watch(
 const confirmarEntregaParcial = async () => {
   if (!props.pedido || totalRechazado.value === 0) return;
   enviando.value = true;
+  // Hora del evento antes del GPS; vale igual para el envío directo y la cola.
+  const ocurridoEn = new Date().toISOString();
   try {
     let lat = null;
     let lng = null;
@@ -171,7 +174,8 @@ const confirmarEntregaParcial = async () => {
     if (offline.sin_conexion) {
       offline.encolar_accion('ENTREGA_PARCIAL', props.pedido.id, {
         lineas: payloadLineas,
-        motivo: motivo.value
+        motivo: motivo.value,
+        ocurrido_en: ocurridoEn
       }, lat, lng);
       await vibrar_exito();
       emit('entrega_parcial_registrada', {
@@ -186,7 +190,11 @@ const confirmarEntregaParcial = async () => {
       payloadLineas,
       motivo.value,
       lat,
-      lng
+      lng,
+      null,
+      null,
+      nueva_clave_idempotencia(),
+      ocurridoEn
     );
 
     await vibrar_exito();

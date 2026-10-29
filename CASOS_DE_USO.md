@@ -122,7 +122,7 @@ Aplican a todos los casos de uso, por eso no se repiten en cada uno.
 - Toma un pedido confirmado (pasa a `EnPreparacion`), gestiona artículos con marcado de faltantes y confirma el picking.
 - Front: `pedidos_page.vue`, `comp_picking_modal.vue`, `vibracion_service.js`.
 - API: `PUT /api/pedidos/{id}/picking` con `items[{ producto_id, estado_item, cantidad_preparada }]`.
-- Regla: si el picking queda incompleto, se registran faltantes y el pedido se ajusta a lo preparado.
+- Regla: si el picking queda incompleto, se registran faltantes y el pedido se ajusta a lo preparado. Si el pedido fue cancelado mientras el operario preparaba sin red, el picking se guarda igual pero la orden sigue `Cancelado` y no se tocan sus importes.
 - **Brecha:** el picking no cambia a `Despachado` (eso requiere el `PUT /estado`), y no se avisa al Admin cuando hay faltantes.
 
 ### Reparto
@@ -145,12 +145,11 @@ Aplican a todos los casos de uso, por eso no se repiten en cada uno.
 - API: `GET /api/pedidos/choferes` (solo rol `CHOFER` activos) y `PUT /api/pedidos/{id}/chofer` con `{ chofer_id }`.
 - Reglas: el usuario destino debe existir, estar activo y tener rol `CHOFER` (`400 chofer_invalido`); no se puede despachar un pedido sin chofer asignado (`400 chofer_requerido`).
 
-**CU-21 Registrar entrega fallida y reintentar** — `CHOFER`, `ADMIN` · 🟡
-- Desde `EnPuerta`, el chofer registra "No entregado" con motivo, nota y foto opcional.
-- Reintento: el Admin pasa el pedido de `NoEntregado` a `Despachado`.
+**CU-21 Registrar entrega fallida y reintentar** — `CHOFER`, `ADMIN` · ✅
+- Desde `Despachado` o `EnPuerta`, el chofer registra "No entregado" con motivo, nota y foto opcional.
+- Reintento: el Admin pasa el pedido de `NoEntregado` a `Despachado` (`POST /api/pedidos/{id}/reintentar-entrega`, solo Admin); la UI ya no le ofrece el botón al chofer.
 - Front: `comp_entrega_fallida_modal.vue`, `usePedidosWorkflow.js`.
 - API: `POST /api/pedidos/{id}/no-entregado`, `POST /api/pedidos/{id}/reintentar-entrega`.
-- **Brecha:** falta `Despachado → NoEntregado`; el reintento es solo Admin, pero la UI lo ofrece al Chofer.
 
 **CU-23 Prueba de entrega** — `CHOFER` · 🟡
 - Al entregar, coordenadas GPS y, en entrega parcial, foto y/o firma opcionales, con fecha y hora del evento.
@@ -175,8 +174,8 @@ Aplican a todos los casos de uso, por eso no se repiten en cada uno.
 - Sin internet, la app muestra los datos guardados y un banner amarillo. Los cambios de estado se encolan con el badge "Sin enviar" y se envían solos al volver la conexión.
 - Front: `offline_store.js` (`encolar_accion`, `sincronizar`), `copia_local_service.js`, `@capacitor/network`.
 - Reglas de conflicto: si el Admin canceló mientras tanto, gana la acción del chofer; si el pedido fue reasignado, también gana el chofer; si el Operario hizo picking de un pedido cancelado, se guarda el picking y el pedido sigue `Cancelado`. En todos los casos se avisa al Admin.
-- Cola: las acciones enviadas se conservan hasta cerrar sesión.
-- **Brechas:** `CREAR_PEDIDO` está soportado en la sincronización pero nunca se encola; `ocurrido_en` no se envía; los avisos al Admin no existen.
+- Cola: las acciones enviadas se conservan hasta cerrar sesión. Cada acción viaja con su `ocurrido_en` (hora del dispositivo al confirmarla) en cambios de estado, entrega fallida, entrega parcial y cobro.
+- **Brechas:** `CREAR_PEDIDO` está soportado en la sincronización pero nunca se encola; los avisos al Admin no existen.
 
 ### Usuarios y cuenta
 
@@ -205,6 +204,7 @@ stateDiagram-v2
     EnPreparacion --> Cancelado : CU-09 (Admin)
     Despachado --> EnPuerta : CU-12
     Despachado --> Entregado : CU-13 (sin paso previo por EnPuerta)
+    Despachado --> NoEntregado : CU-21
     Despachado --> Cancelado : CU-09 (Admin)
     EnPuerta --> Entregado : CU-13
     EnPuerta --> NoEntregado : CU-21
@@ -226,7 +226,7 @@ stateDiagram-v2
 | Despachado → Entregado | Chofer / Admin | CU-13 | ✅ |
 | EnPuerta → Entregado | Chofer / Admin | CU-13 | ✅ |
 | EnPuerta → NoEntregado | Chofer / Admin | CU-21 | ✅ |
-| Despachado → NoEntregado | Chofer / Admin | CU-21 | 🔴 falta |
+| Despachado → NoEntregado | Chofer / Admin | CU-21 | ✅ |
 | NoEntregado → Despachado | Admin | CU-21 | ✅ (solo Admin) |
 | → Cancelado (hasta antes de Entregado) | Admin; el Cliente solo solicita | CU-09 | ✅ |
 | Cancelado → Entregado | Chofer / Admin, solo por sincronización offline | CU-16 | ✅ |
@@ -270,7 +270,7 @@ stateDiagram-v2
 | 13 | CU-20 a CU-23 y estado `NoEntregado` | Aprobados | ✅ CU-20 con UI y API |
 | 14 | Ítems rechazados en la puerta | El chofer los marca y el pedido se ajusta | ✅ |
 | 15 | Prueba de entrega | Foto y firma siempre opcionales | 🟡 solo en entrega parcial |
-| 16 | Picking offline sobre pedido cancelado | Se guarda el picking; el pedido sigue `Cancelado` | 🔴 la API lo bloquea |
+| 16 | Picking offline sobre pedido cancelado | Se guarda el picking; el pedido sigue `Cancelado` | ✅ |
 | 17 | Entrega offline de pedido reasignado | Gana el chofer | 🔴 sin implementar |
 | 18 | Crear pedido sin conexión | Permitido, como borrador que se valida al sincronizar | 🔴 sin implementar |
 | 19 | Borrador que falla crédito o stock | Pasa a `Pendiente` igual y el Admin decide | 🟡 `ValidacionFallida`, sin crédito ni stock |

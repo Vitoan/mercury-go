@@ -939,8 +939,13 @@ public sealed class PedidosController(
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
 
-        if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
-            return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede realizar picking sobre un pedido finalizado o cancelado." });
+        if (pedido.Estado == EstadoPedido.Entregado)
+            return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede realizar picking sobre un pedido finalizado." });
+
+        // Decisión 16: si el pedido se canceló mientras el operario preparaba sin red,
+        // el picking se guarda igual (es trabajo físico real), pero la orden sigue
+        // Cancelada y no se tocan sus importes.
+        var pedidoCancelado = pedido.Estado == EstadoPedido.Cancelado;
 
         var detalles = await (
             from d in db.DetallesPedido
@@ -964,9 +969,11 @@ public sealed class PedidosController(
                     esCompleto = false;
                     faltantes.Add($"{item.ProductoNombre} (prep. {pick.CantidadPreparada}/{item.d.Cantidad})");
 
-                    // Decisión 5: si el picking queda incompleto, se ajusta la cantidad definitiva de la orden
+                    // Decisión 5: si el picking queda incompleto, se ajusta la cantidad
+                    // definitiva de la orden. Sobre una orden cancelada no se toca el
+                    // importe: solo se registra lo que efectivamente se preparó.
                     var diferencia = item.d.Cantidad - item.d.CantidadPreparada;
-                    if (diferencia > 0)
+                    if (!pedidoCancelado && diferencia > 0)
                     {
                         item.d.Cantidad = item.d.CantidadPreparada;
                     }
@@ -1008,9 +1015,11 @@ public sealed class PedidosController(
             picking_resultado = pedido.PickingResultado,
             faltantes,
             observaciones = pedido.Observaciones,
-            mensaje = esCompleto
-                ? "Picking completado exitosamente. Todo listo para despacho."
-                : "Picking registrado con faltantes. Pedido ajustado a lo preparado."
+            mensaje = pedidoCancelado
+                ? "Picking registrado sobre un pedido cancelado. La orden sigue cancelada."
+                : esCompleto
+                    ? "Picking completado exitosamente. Todo listo para despacho."
+                    : "Picking registrado con faltantes. Pedido ajustado a lo preparado."
         });
     }
 
