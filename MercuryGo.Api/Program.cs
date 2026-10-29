@@ -104,6 +104,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<MercuryGo.Api.Services.IPedidoTransicionService, MercuryGo.Api.Services.PedidoTransicionService>();
 builder.Services.AddScoped<MercuryGo.Api.Services.IdempotenciaService>();
 builder.Services.AddScoped<MercuryGo.Api.Services.NotificacionService>();
+builder.Services.AddScoped<MercuryGo.Api.Services.ConflictoOfflineService>();
 builder.Services.AddHostedService<MercuryGo.Api.Services.RetencionArchivosService>();
 
 builder.Services.AddControllers().AddJsonOptions(options => ConfigurarJson(options.JsonSerializerOptions));

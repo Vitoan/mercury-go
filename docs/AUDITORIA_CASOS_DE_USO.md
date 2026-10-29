@@ -19,6 +19,7 @@
 > - ✅ **P1-2** resuelto: al confirmar el picking el pedido pasa a `Despachado` si tiene chofer; si no, queda `EnPreparacion`.
 > - ✅ **P1-3** resuelto: los faltantes de picking notifican en la bandeja a todos los Admin.
 > - ✅ **P1-6** resuelto: el picking sobre `Cancelado` se guarda sin tocar importes ni estado.
+> - ✅ **P1-5** resuelto: los replays offline envían `es_offline`, así aplica la excepción "gana el chofer" de las Decisiones 10 y 17, y `ConflictoOfflineService` avisa a todos los Admin. La cola bloquea las acciones posteriores de una orden en conflicto y permite descartarlas.
 
 ---
 
@@ -113,7 +114,7 @@ La idempotencia por header (`:447-454`) funciona, pero `carrito_store.confirmar_
 | P1-2 | CU-11 | El picking **no despacha**: `Confirmado → EnPreparacion`. El documento describe una sola acción que prepara y deja listo para despacho. | `PedidosController.cs:792-...`, `comp_picking_modal.vue:263` — ✅ resuelto |
 | P1-3 | CU-11 | Con faltantes **no se notifica al Admin**, pese a `CASOS_DE_USO.md:105`. Solo se genera notificación al cliente (`PedidoTransicionService:138`). | sin código — ✅ resuelto con `NotificacionService` |
 | P1-4 | CU-16 | `ocurrido_en` se guarda en la cola pero **nunca se envía**. La API sí lo acepta (`CambiarEstadoRequest.OcurridoEn`, `CobroChoferRequest.OcurridoEn`); el faltante es 100 % del cliente. | `pedidos_service.js` `cambiar_estado` / `registrar_cobro_chofer` — ✅ resuelto |
-| P1-5 | CU-16 | Conflictos no implementados: no hay "gana el chofer" explícito, no hay aviso al Admin, no se detecta pedido reasignado. Solo se marca la acción local como `conflicto`. | `offline_store.js:188-192` |
+| P1-5 | CU-16 | Conflictos no implementados: no hay "gana el chofer" explícito, no hay aviso al Admin, no se detecta pedido reasignado. Solo se marca la acción local como `conflicto`. | `offline_store.js:188-192` — ✅ resuelto: los replays envían `es_offline`, se aplica la excepción de la Decisión 10/17 y `ConflictoOfflineService` avisa a los Admin |
 | P1-6 | CU-16 | `ActualizarPicking` **bloquea** el picking sobre `Cancelado`, contra la Decisión 16. | `PedidosController.cs:803` — ✅ resuelto: se guarda sin tocar importes |
 | P1-7 | CU-20 | `asignar_chofer` existe en el service pero **no tiene UI**. En la práctica nadie asigna choferes, por lo que el filtro de P0-4 tampoco tendría datos. | `pedidos_service.js`, sin consumidor — ✅ resuelto con selector en el detalle y `GET /api/pedidos/choferes` |
 | P1-8 | CU-21 | Falta la transición `(Despachado → NoEntregado)` en la matriz; `(NoEntregado → Despachado)` es solo Admin aunque la UI la ofrece al Chofer. | `PedidoTransicionService.cs:36-41` — ✅ resuelto |

@@ -26,6 +26,17 @@ function base64AArchivo(base64Data, nombreArchivo = 'comprobante.jpg', mimeType 
 
 const clave_cola = 'mercurygo_cola_offline_v2';
 
+// Un rechazo 4xx de negocio no se arregla reintentando: la orden ya cambió en el
+// servidor o el payload no cumple una regla. Se marca como conflicto para que el
+// usuario decida (revisar o descartar) y no se reintente en cada sincronización.
+function clasificar_error(err) {
+  const estadoHttp = err?.estado_http;
+  if (!estadoHttp || estadoHttp === 0) return 'error';
+  if (estadoHttp === 401 || estadoHttp === 403 || estadoHttp === 429) return 'error';
+  if (estadoHttp >= 400 && estadoHttp < 500) return 'conflicto';
+  return 'error';
+}
+
 function generar_uuid_v4() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -150,6 +161,43 @@ export const use_offline_store = defineStore('offline', {
       }
     },
 
+    // Una acción en conflicto frena el resto de la misma orden: si se enviaran
+    // igual, se aplicarían fuera de orden (por ejemplo, entregar después de un
+    // "En puerta" que el servidor rechazó).
+    bloquear_posteriores: function (pedidoId, accionActual) {
+      const indice = this.cola.findIndex((a) => a.id === accionActual.id);
+      if (indice < 0) return;
+
+      const colaActualizada = this.cola.map((a, i) => {
+        const esPosterior = i > indice
+          && a.pedido_id === pedidoId
+          && (a.estado === 'pendiente' || a.estado === 'error');
+        return esPosterior
+          ? { ...a, estado: 'bloqueada', error: 'Bloqueada por un conflicto anterior en la misma orden.' }
+          : a;
+      });
+
+      this.guardar_cola(colaActualizada);
+    },
+
+    // Descarta una acción que el servidor rechazó de forma definitiva y libera
+    // las que estaban esperando detrás en la misma orden.
+    descartar_accion: function (accionId) {
+      const objetivo = this.cola.find((a) => a.id === accionId);
+      if (!objetivo) return;
+
+      const restantes = this.cola
+        .filter((a) => a.id !== accionId)
+        .map((a) => (a.pedido_id === objetivo.pedido_id && a.estado === 'bloqueada'
+          ? { ...a, estado: 'pendiente', error: null }
+          : a));
+
+      this.guardar_cola(restantes);
+      if (this.en_linea) {
+        this.sincronizar();
+      }
+    },
+
     // Ejecución FIFO agrupada por pedido_id
     sincronizar: async function () {
       const token = await obtener_token();
@@ -178,24 +226,16 @@ export const use_offline_store = defineStore('offline', {
             accion.error = null;
             exitoAlMenosUno = true;
           } catch (err) {
-            const estadoHttp = err?.estado_http;
-            const esErrorConexion = !estadoHttp || estadoHttp === 0 || estadoHttp >= 500;
-
-            if (esErrorConexion) {
-              accion.estado = 'error';
-              accion.error = err?.message || 'Error temporal de conexión.';
-              // No continuar con las siguientes acciones de ESTE pedido (garantizar FIFO)
-              break;
-            } else if (estadoHttp === 409 || estadoHttp === 400) {
-              accion.estado = 'conflicto';
-              accion.error = err?.mensaje || err?.message || 'Conflicto de estado en servidor.';
+            const clasificacion = clasificar_error(err);
+            accion.codigo = err?.codigo || null;
+            accion.error = err?.mensaje || err?.message || 'Rechazado por servidor.';
+            // No continuar con las siguientes acciones de ESTE pedido (FIFO).
+            accion.estado = clasificacion;
+            if (clasificacion === 'conflicto') {
               conflictoOcurrido = true;
-              break;
-            } else {
-              accion.estado = 'error';
-              accion.error = err?.mensaje || err?.message || 'Rechazado por servidor.';
-              break;
+              this.bloquear_posteriores(pId, accion);
             }
+            break;
           } finally {
             this.guardar_cola([...this.cola]);
           }
@@ -230,7 +270,7 @@ export const use_offline_store = defineStore('offline', {
         case 'CONFIRMADO':
         case 'CANCELADO': {
           const estadoDestino = payload?.estado || (tipo === 'EN_PUERTA' ? 'EnPuerta' : tipo === 'ENTREGAR' ? 'Entregado' : tipo);
-          return await pedidos_service.cambiar_estado(pedido_id, estadoDestino, lat, lng, id, payload?.ocurrido_en || ocurrido_en);
+          return await pedidos_service.cambiar_estado(pedido_id, estadoDestino, lat, lng, id, payload?.ocurrido_en || ocurrido_en, true);
         }
 
         case 'NO_ENTREGADO': {
@@ -240,7 +280,8 @@ export const use_offline_store = defineStore('offline', {
             payload?.nota,
             payload?.foto_url,
             id,
-            payload?.ocurrido_en || ocurrido_en
+            payload?.ocurrido_en || ocurrido_en,
+            true
           );
         }
 
@@ -264,7 +305,8 @@ export const use_offline_store = defineStore('offline', {
             payload?.foto_url,
             payload?.firma_url,
             id,
-            payload?.ocurrido_en || ocurrido_en
+            payload?.ocurrido_en || ocurrido_en,
+            true
           );
         }
 
@@ -288,7 +330,7 @@ export const use_offline_store = defineStore('offline', {
         }
 
         case 'PICKING_ITEM': {
-          return await pedidos_service.actualizar_picking(pedido_id, payload?.items || [], id);
+          return await pedidos_service.actualizar_picking(pedido_id, payload?.items || [], id, true);
         }
 
         case 'CREAR_PEDIDO': {
@@ -308,7 +350,7 @@ export const use_offline_store = defineStore('offline', {
 
         default: {
           if (payload?.estado) {
-            return await pedidos_service.cambiar_estado(pedido_id, payload.estado, lat, lng, id, payload?.ocurrido_en || ocurrido_en);
+            return await pedidos_service.cambiar_estado(pedido_id, payload.estado, lat, lng, id, payload?.ocurrido_en || ocurrido_en, true);
           }
           throw new Error(`Tipo de acción no soportado: ${tipo}`);
         }

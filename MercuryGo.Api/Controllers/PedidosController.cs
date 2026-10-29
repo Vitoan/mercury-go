@@ -20,7 +20,8 @@ public sealed class PedidosController(
     IWebHostEnvironment env,
     MercuryGo.Api.Services.IPedidoTransicionService transicionService,
     MercuryGo.Api.Services.IdempotenciaService idempotenciaService,
-    MercuryGo.Api.Services.NotificacionService notificacionService) : ControllerBase
+    MercuryGo.Api.Services.NotificacionService notificacionService,
+    MercuryGo.Api.Services.ConflictoOfflineService conflictoOfflineService) : ControllerBase
 {
     // Estados en los que todavía se puede corregir la mercadería del pedido.
     private static readonly EstadoPedido[] EstadosConItemsEditables =
@@ -373,11 +374,14 @@ public sealed class PedidosController(
             OcurridoEn: request.OcurridoEn
         );
 
+        var estadoAnterior = pedido.Estado;
         var resultado = await transicionService.TransicionarAsync(pedido, nuevoEstado, contexto, ct);
         if (!resultado.Exito)
         {
             return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
         }
+
+        await AvisarConflictosOfflineAsync(pedido, estadoAnterior, request.EsOffline, nuevoEstado, ct);
 
         await db.SaveChangesAsync(ct);
 
@@ -1010,7 +1014,14 @@ public sealed class PedidosController(
 
         // Aviso al Admin cuando falta mercadería: sin esto, el faltante solo se ve
         // si alguien abre la orden.
-        if (faltantes.Count > 0)
+        if (request.EsOffline && pedidoCancelado)
+        {
+            // Decisión 16: el picking se guardó, pero sobre una orden que el Admin
+            // ya había cancelado. Un solo aviso, que incluye los faltantes.
+            await conflictoOfflineService.AvisarPickingSobreCanceladoAsync(
+                pedido, User.UsuarioId(), faltantes.Count > 0, request.EsOffline, ct);
+        }
+        else if (faltantes.Count > 0)
         {
             var detalleFaltantes = string.Join("; ", faltantes);
             if (detalleFaltantes.Length > 400)
@@ -1448,9 +1459,13 @@ public sealed class PedidosController(
             OcurridoEn: request.OcurridoEn
         );
 
+        var estadoAnterior = pedido.Estado;
         var resultado = await transicionService.TransicionarAsync(pedido, EstadoPedido.NoEntregado, contexto, ct);
         if (!resultado.Exito)
             return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
+
+        await AvisarConflictosOfflineAsync(
+            pedido, estadoAnterior, request.EsOffline, EstadoPedido.NoEntregado, ct);
 
         var intento = new IntentoEntrega
         {
@@ -1563,9 +1578,13 @@ public sealed class PedidosController(
             OcurridoEn: request.OcurridoEn
         );
 
+        var estadoAnterior = pedido.Estado;
         var resultado = await transicionService.TransicionarAsync(pedido, EstadoPedido.Entregado, contexto, ct);
         if (!resultado.Exito)
             return BadRequest(new { codigo = resultado.CodigoError, mensaje = resultado.MensajeError });
+
+        await AvisarConflictosOfflineAsync(
+            pedido, estadoAnterior, request.EsOffline, EstadoPedido.Entregado, ct);
 
         await db.SaveChangesAsync(ct);
 
@@ -1604,6 +1623,32 @@ public sealed class PedidosController(
         });
     }
 
+    // Avisos al Admin cuando una acción tomada sin red choca con lo que pasó
+    // entretanto en el servidor (Decisiones 10 y 17). La acción se aplica igual
+    // —gana el chofer— pero el Admin tiene que enterarse.
+    private async Task AvisarConflictosOfflineAsync(
+        Pedido pedido,
+        EstadoPedido estadoAnterior,
+        bool esOffline,
+        EstadoPedido estadoNuevo,
+        CancellationToken ct)
+    {
+        if (!esOffline)
+            return;
+
+        var usuarioId = User.UsuarioId();
+        var esChofer = string.Equals(User.RolCodigo(), RolCodigos.Chofer, StringComparison.OrdinalIgnoreCase);
+
+        var avisosCancelacion = await conflictoOfflineService.AvisarEntregaSobreCanceladoAsync(
+            pedido, usuarioId, estadoAnterior, ct);
+
+        if (avisosCancelacion > 0)
+            return;
+
+        await conflictoOfflineService.AvisarChoferReasignadoAsync(
+            pedido, usuarioId, esChofer, estadoNuevo, ct);
+    }
+
     private static IContainer CeldaEncabezado(IContainer c) =>
         c.BorderBottom(1).BorderColor(Colors.Grey.Lighten1).PaddingVertical(5);
 
@@ -1632,7 +1677,7 @@ public sealed record AprobarComprobanteRequest(decimal? Monto);
 public sealed record RechazarComprobanteRequest(string? Motivo);
 public sealed record CambiarEstadoRequest(string Estado, double? Latitud = null, double? Longitud = null, bool EsOffline = false, DateTime? OcurridoEn = null);
 public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);
-public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items);
+public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items, bool EsOffline = false);
 
 public sealed record SolicitarCancelacionRequest(string? Motivo);
 public sealed record ResolverCancelacionRequest(bool Aprobada);

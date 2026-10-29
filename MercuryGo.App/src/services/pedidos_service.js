@@ -21,13 +21,14 @@ export const pedidos_service = {
     return ajax_service.post('api/pedidos', pedido, { headers });
   },
 
-  cambiar_estado(id, estado, latitud = null, longitud = null, idempotency_key = null, ocurrido_en = null) {
+  cambiar_estado(id, estado, latitud = null, longitud = null, idempotency_key = null, ocurrido_en = null, es_offline = false) {
     const payload = { estado };
     if (latitud !== null && longitud !== null) {
       payload.latitud = latitud;
       payload.longitud = longitud;
     }
     if (ocurrido_en) payload.ocurrido_en = ocurrido_en;
+    if (es_offline) payload.es_offline = true;
     const opciones = idempotency_key ? { idempotency_key } : {};
     return ajax_service.put(`api/pedidos/${id}/estado`, payload, opciones);
   },
@@ -50,9 +51,11 @@ export const pedidos_service = {
     return ajax_service.post(`api/pedidos/${id}/comprobante-pago`, formData);
   },
 
-  actualizar_picking(id, items, idempotency_key = null) {
+  actualizar_picking(id, items, idempotency_key = null, es_offline = false) {
     const opciones = idempotency_key ? { idempotency_key } : {};
-    return ajax_service.put(`api/pedidos/${id}/picking`, { items }, opciones);
+    const cuerpo = { items };
+    if (es_offline) cuerpo.es_offline = true;
+    return ajax_service.put(`api/pedidos/${id}/picking`, cuerpo, opciones);
   },
 
   actualizar_pedido(id, datos, idempotency_key = null) {
@@ -104,10 +107,11 @@ export const pedidos_service = {
     return ajax_service.get('api/pedidos/choferes');
   },
 
-  registrar_no_entregado(id, motivo, nota = null, foto_url = null, idempotency_key = null, ocurrido_en = null) {
+  registrar_no_entregado(id, motivo, nota = null, foto_url = null, idempotency_key = null, ocurrido_en = null, es_offline = false) {
     const opciones = idempotency_key ? { idempotency_key } : {};
     const cuerpo = { motivo, nota, foto_url };
     if (ocurrido_en) cuerpo.ocurrido_en = ocurrido_en;
+    if (es_offline) cuerpo.es_offline = true;
     return ajax_service.post(`api/pedidos/${id}/no-entregado`, cuerpo, opciones);
   },
 
@@ -115,10 +119,11 @@ export const pedidos_service = {
     return ajax_service.post(`api/pedidos/${id}/reintentar-entrega`);
   },
 
-  registrar_entrega_parcial(id, items_rechazados, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null, idempotency_key = null, ocurrido_en = null) {
+  registrar_entrega_parcial(id, items_rechazados, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null, idempotency_key = null, ocurrido_en = null, es_offline = false) {
     const opciones = idempotency_key ? { idempotency_key } : {};
     const cuerpo = { items_rechazados, motivo, latitud, longitud, foto_url, firma_url };
     if (ocurrido_en) cuerpo.ocurrido_en = ocurrido_en;
+    if (es_offline) cuerpo.es_offline = true;
     return ajax_service.post(`api/pedidos/${id}/entrega-parcial`, cuerpo, opciones);
   },
 

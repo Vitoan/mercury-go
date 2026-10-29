@@ -18,17 +18,19 @@
             <ion-label>Sin red</ion-label>
           </ion-chip>
 
-          <!-- Botón / Badge de Cola Offline (si hay pendientes) -->
+          <!-- Botón / Badge de Cola Offline (pendientes o conflictos) -->
           <ion-button
-            v-if="offline_store.pendientes_count > 0"
-            title="Envíos pendientes de sincronización"
-            color="warning"
+            v-if="offline_store.pendientes_count > 0 || offline_store.conflictos_count > 0"
+            :title="offline_store.conflictos_count > 0
+              ? 'Hay envíos rechazados por el servidor'
+              : 'Envíos pendientes de sincronización'"
+            :color="offline_store.conflictos_count > 0 ? 'danger' : 'warning'"
             @click="mostrarModalCola = true"
             class="btn-cola-offline"
           >
             <ion-icon slot="icon-only" :icon="syncOutline" :class="{ 'rotando': offline_store.sincronizando }" />
-            <ion-badge color="warning" class="badge-cola">
-              {{ offline_store.pendientes_count }}
+            <ion-badge :color="offline_store.conflictos_count > 0 ? 'danger' : 'warning'" class="badge-cola">
+              {{ offline_store.conflictos_count > 0 ? offline_store.conflictos_count : offline_store.pendientes_count }}
             </ion-badge>
           </ion-button>
 

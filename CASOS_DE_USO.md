@@ -170,12 +170,14 @@ Aplican a todos los casos de uso, por eso no se repiten en cada uno.
 
 ### Modo sin conexión
 
-**CU-16 Trabajar sin conexión y sincronizar** — Todos (clave para `CHOFER` y `OPERARIO`) · 🔴
+**CU-16 Trabajar sin conexión y sincronizar** — Todos (clave para `CHOFER` y `OPERARIO`) · ✅
 - Sin internet, la app muestra los datos guardados y un banner amarillo. Los cambios de estado se encolan con el badge "Sin enviar" y se envían solos al volver la conexión.
-- Front: `offline_store.js` (`encolar_accion`, `sincronizar`), `copia_local_service.js`, `@capacitor/network`.
-- Reglas de conflicto: si el Admin canceló mientras tanto, gana la acción del chofer; si el pedido fue reasignado, también gana el chofer; si el Operario hizo picking de un pedido cancelado, se guarda el picking y el pedido sigue `Cancelado`. En todos los casos se avisa al Admin.
+- Front: `offline_store.js` (`encolar_accion`, `sincronizar`, `descartar_accion`), `copia_local_service.js`, `@capacitor/network`.
+- Las acciones reenviadas desde la cola viajan con `es_offline: true`, así el servidor sabe que la hora y el estado del dispositivo pueden diferir de los del servidor.
+- Reglas de conflicto: si el Admin canceló mientras tanto, gana la acción del chofer; si el pedido fue reasignado, también gana el chofer; si el Operario hizo picking de un pedido cancelado, se guarda el picking y el pedido sigue `Cancelado`. En todos los casos se avisa en la bandeja a todos los `ADMIN` (`ConflictoOfflineService`).
 - Cola: las acciones enviadas se conservan hasta cerrar sesión. Cada acción viaja con su `ocurrido_en` (hora del dispositivo al confirmarla) en cambios de estado, entrega fallida, entrega parcial y cobro.
-- **Brechas:** `CREAR_PEDIDO` está soportado en la sincronización pero nunca se encola; los avisos al Admin no existen.
+- Rechazos: un `4xx` de negocio deja la acción en `conflicto` (no se reintenta en loop) y bloquea las posteriores de la misma orden para no aplicarlas fuera de orden. El usuario puede reintentar o descartar cada conflicto desde `comp_cola_offline_modal.vue`; el Admin ve el contador en rojo en la barra superior.
+- **Brecha:** `CREAR_PEDIDO` está soportado en la sincronización pero nunca se encola (Decisión 18).
 
 ### Usuarios y cuenta
 
@@ -264,14 +266,14 @@ stateDiagram-v2
 | 7 | Aviso al cliente por ajuste | Solo lo ve en el detalle del pedido | ✅ |
 | 8 | Cobro en puerta | Siempre opcional; puede quedar en cuenta corriente | ✅ |
 | 9 | Picking, cobro y comprobante | Campos propios en la base de datos | 🟡 quedan etiquetas en `Observaciones` |
-| 10 | Conflicto offline vs. cancelación | Gana la acción del chofer | 🟡 transición permitida, sin aviso al Admin |
+| 10 | Conflicto offline vs. cancelación | Gana la acción del chofer | ✅ se aplica y avisa al Admin |
 | 11 | Tokens | Almacenamiento seguro (Keychain/Keystore) | ✅ |
 | 12 | Cancelación del Cliente | Solicita y el Admin aprueba | ✅ |
 | 13 | CU-20 a CU-23 y estado `NoEntregado` | Aprobados | ✅ CU-20 con UI y API |
 | 14 | Ítems rechazados en la puerta | El chofer los marca y el pedido se ajusta | ✅ |
 | 15 | Prueba de entrega | Foto y firma siempre opcionales | 🟡 solo en entrega parcial |
 | 16 | Picking offline sobre pedido cancelado | Se guarda el picking; el pedido sigue `Cancelado` | ✅ |
-| 17 | Entrega offline de pedido reasignado | Gana el chofer | 🔴 sin implementar |
+| 17 | Entrega offline de pedido reasignado | Gana el chofer | ✅ se aplica y avisa al Admin |
 | 18 | Crear pedido sin conexión | Permitido, como borrador que se valida al sincronizar | 🔴 sin implementar |
 | 19 | Borrador que falla crédito o stock | Pasa a `Pendiente` igual y el Admin decide | 🟡 `ValidacionFallida`, sin crédito ni stock |
 | 20 | Acciones enviadas en el dispositivo | Se conservan hasta cerrar sesión | ✅ |

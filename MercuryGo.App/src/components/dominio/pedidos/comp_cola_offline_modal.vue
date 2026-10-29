@@ -18,6 +18,13 @@
           <span class="mercury-cola-pendientes">
             {{ offline_store.pendientes_count }} pendiente(s) de envío
           </span>
+          <ion-badge
+            v-if="offline_store.conflictos_count > 0"
+            color="danger"
+            title="Acciones rechazadas por el servidor"
+          >
+            {{ offline_store.conflictos_count }} en conflicto
+          </ion-badge>
         </div>
 
         <div class="mercury-cola-acciones-top">
@@ -72,18 +79,41 @@
 
             <div v-if="accion.error" class="mercury-accion-error">
               <ion-icon :icon="alertCircleOutline" color="danger" />
-              <span>{{ accion.error }}</span>
+              <span>
+                <strong v-if="accion.codigo">{{ accion.codigo }}:</strong>
+                {{ accion.error }}
+              </span>
             </div>
 
-            <div v-if="accion.estado === 'error' || accion.estado === 'conflicto'" class="mercury-accion-botones">
+            <div
+              v-if="accion.estado === 'error' || accion.estado === 'conflicto' || accion.estado === 'bloqueada'"
+              class="mercury-accion-botones"
+            >
               <ion-button size="small" fill="outline" color="primary" @click="reintentar(accion.id)">
                 Reintentar
+              </ion-button>
+              <ion-button
+                v-if="accion.estado === 'conflicto'"
+                size="small"
+                fill="outline"
+                color="danger"
+                @click="descartar(accion.id)"
+              >
+                Descartar
               </ion-button>
             </div>
           </ion-card-content>
         </ion-card>
       </div>
     </ion-content>
+
+    <ion-alert
+      :is-open="alertaDescartar"
+      header="Descartar acción"
+      message="Se quitará de la cola sin enviarla al servidor y se liberarán las acciones que esperaban detrás. No se puede deshacer."
+      :buttons="botonesAlerta"
+      @didDismiss="alertaDescartar = false"
+    />
   </ion-modal>
 </template>
 
@@ -100,9 +130,11 @@ import {
   IonCardContent,
   IonBadge,
   IonIcon,
-  IonSpinner
+  IonSpinner,
+  IonAlert
 } from '@ionic/vue';
 import { checkmarkCircleOutline, alertCircleOutline } from 'ionicons/icons';
+import { computed, ref } from 'vue';
 import { use_offline_store } from '@/stores/offline_store';
 
 const props = defineProps({
@@ -125,6 +157,28 @@ const reintentar = (id) => {
   offline_store.reintentar_accion(id);
 };
 
+const alertaDescartar = ref(false);
+const accionADescartar = ref(null);
+
+const descartar = (id) => {
+  accionADescartar.value = id;
+  alertaDescartar.value = true;
+};
+
+const botonesAlerta = computed(() => [
+  { text: 'Cancelar', role: 'cancel' },
+  {
+    text: 'Descartar',
+    role: 'destructive',
+    handler: () => {
+      if (accionADescartar.value) {
+        offline_store.descartar_accion(accionADescartar.value);
+        accionADescartar.value = null;
+      }
+    }
+  }
+]);
+
 const formatearTipo = (tipo) => {
   switch (tipo) {
     case 'ENTREGAR': return '✔ Confirmación de Entrega';
@@ -143,6 +197,7 @@ const obtenerColorEstado = (estado) => {
     case 'enviada': return 'success';
     case 'enviando': return 'primary';
     case 'conflicto': return 'danger';
+    case 'bloqueada': return 'medium';
     case 'error': return 'warning';
     default: return 'medium';
   }
