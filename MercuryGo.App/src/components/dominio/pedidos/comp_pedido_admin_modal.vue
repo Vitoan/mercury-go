@@ -313,12 +313,12 @@ const crearPedido = async () => {
 
   try {
     const payload = {
-      cliente_id: clienteSeleccionadoId.value,
+      cliente_id: Number(clienteSeleccionadoId.value),
       observaciones: observaciones.value,
       estado: estadoInicial.value,
       items: itemsAgregados.value.map((i) => ({
-        producto_id: i.producto_id,
-        cantidad: i.cantidad
+        producto_id: Number(i.producto_id),
+        cantidad: Number(i.cantidad)
       }))
     };
 
@@ -329,7 +329,7 @@ const crearPedido = async () => {
     cerrar();
   } catch (err) {
     await vibrar_error();
-    errorMensaje.value = err.mensaje || 'No se pudo crear el pedido en el servidor.';
+    errorMensaje.value = err.mensaje || err.message || 'No se pudo crear el pedido en el servidor.';
   } finally {
     guardando.value = false;
   }

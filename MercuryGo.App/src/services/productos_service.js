@@ -6,6 +6,10 @@ export const productos_service = {
     return ajax_service.get('api/productos/resumen', { guardable: true });
   },
 
+  obtener_todos(parametros = {}) {
+    return this.obtener_listado({ tamano: 1000, ...parametros });
+  },
+
   obtener_listado(parametros = {}) {
     const query = construir_query(parametros);
     return ajax_service.get(`api/productos/listado${query}`, { guardable: true });

@@ -406,7 +406,7 @@ const repetirPedido = async () => {
 
   try {
     const resProds = await productos_service.obtener_todos();
-    const prodsActuales = resProds?.productos || [];
+    const prodsActuales = resProds?.productos || (Array.isArray(resProds) ? resProds : []);
     let agregados = 0;
     let omitidos = 0;
 

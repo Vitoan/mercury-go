@@ -145,6 +145,7 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
       const error = new Error(mensaje);
       error.estado_http = respuesta.status;
       error.codigo = codigo;
+      error.mensaje = mensaje;
       throw error;
     }
 
@@ -190,6 +191,7 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
     const err = new Error(normalizado.mensaje);
     err.estado_http = 0;
     err.codigo = normalizado.codigo;
+    err.mensaje = normalizado.mensaje;
     throw err;
   }
 }
