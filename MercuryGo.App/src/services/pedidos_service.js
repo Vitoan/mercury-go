@@ -58,9 +58,11 @@ export const pedidos_service = {
     return ajax_service.put(`api/pedidos/${id}`, datos);
   },
 
-  registrar_cobro_chofer(id, monto, metodo = 'Efectivo', idempotency_key = null) {
+  registrar_cobro_chofer(id, monto, metodo = 'Efectivo', idempotency_key = null, ocurrido_en = null) {
     const opciones = idempotency_key ? { idempotency_key } : {};
-    return ajax_service.post(`api/pedidos/${id}/cobro-chofer`, { monto, metodo }, opciones);
+    const cuerpo = { monto, metodo };
+    if (ocurrido_en) cuerpo.ocurrido_en = ocurrido_en;
+    return ajax_service.post(`api/pedidos/${id}/cobro-chofer`, cuerpo, opciones);
   },
 
   obtener_cuenta_corriente() {

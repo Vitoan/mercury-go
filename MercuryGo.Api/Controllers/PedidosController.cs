@@ -36,13 +36,17 @@ public sealed class PedidosController(
         // Segmentación de pedidos según rol del usuario autenticado
         if (User.EsCliente())
         {
+            // Sin fallback: si el usuario no está vinculado a un cliente comercial,
+            // el listado queda vacío en lugar de mostrar los pedidos de otro cliente.
             var emailUsuario = User.Email();
-            var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct)
-                       ?? await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == 1 && c.Activo, ct);
-            if (cliente is not null)
-            {
-                consulta = consulta.Where(p => p.ClienteId == cliente.Id);
-            }
+            var clienteId = await db.Clientes.AsNoTracking()
+                .Where(c => c.Email == emailUsuario && c.Activo)
+                .Select(c => (long?)c.Id)
+                .FirstOrDefaultAsync(ct);
+
+            consulta = clienteId.HasValue
+                ? consulta.Where(p => p.ClienteId == clienteId.Value)
+                : consulta.Where(p => false);
         }
         else if (User.EsOperario())
         {
@@ -182,10 +186,31 @@ public sealed class PedidosController(
             }
         }
 
-        if (request.ClienteId <= 0)
-            return BadRequest(new { codigo = "cliente_requerido", mensaje = "Debe especificar un cliente comercial válido." });
+        // Un CLIENTE solo puede crear pedidos a su propio nombre: el cliente_id del
+        // body se ignora y se resuelve contra la sesión. Admin y Operario sí eligen.
+        long clienteId;
+        if (User.EsCliente())
+        {
+            var emailUsuario = User.Email();
+            var propio = await db.Clientes.AsNoTracking()
+                .Where(c => c.Email == emailUsuario && c.Activo)
+                .Select(c => (long?)c.Id)
+                .FirstOrDefaultAsync(ct);
 
-        var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == request.ClienteId && c.Activo, ct);
+            if (propio is null)
+                return StatusCode(403, new { codigo = "cliente_no_vinculado", mensaje = "Tu usuario no está vinculado a un cliente comercial. Contactá al administrador." });
+
+            clienteId = propio.Value;
+        }
+        else
+        {
+            if (request.ClienteId <= 0)
+                return BadRequest(new { codigo = "cliente_requerido", mensaje = "Debe especificar un cliente comercial válido." });
+
+            clienteId = request.ClienteId;
+        }
+
+        var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == clienteId && c.Activo, ct);
         if (cliente is null)
             return BadRequest(new { codigo = "cliente_no_encontrado", mensaje = "El cliente seleccionado no existe o está inactivo." });
 
@@ -230,7 +255,7 @@ public sealed class PedidosController(
 
         var nuevoPedido = new Pedido
         {
-            ClienteId = request.ClienteId,
+            ClienteId = clienteId,
             Numero = numeroRemito,
             Estado = estadoInicial,
             FechaPedido = DateTime.UtcNow,
@@ -460,6 +485,38 @@ public sealed class PedidosController(
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
 
+        // Solo se cobra una orden en reparto. El Admin puede registrar el cobro
+        // después de la entrega como ajuste; el Chofer, no.
+        var esAdmin = User.IsInRole(RolCodigos.Admin);
+        var estadosCobrables = esAdmin
+            ? new[] { EstadoPedido.Despachado, EstadoPedido.EnPuerta, EstadoPedido.Entregado }
+            : new[] { EstadoPedido.Despachado, EstadoPedido.EnPuerta };
+
+        if (!estadosCobrables.Contains(pedido.Estado))
+            return BadRequest(new { codigo = "estado_invalido", mensaje = $"No se puede registrar un cobro sobre un pedido en estado '{pedido.Estado}'." });
+
+        // Un chofer solo cobra los pedidos que tiene asignados.
+        if (!esAdmin && pedido.ChoferId.HasValue && pedido.ChoferId.Value != User.UsuarioId())
+            return StatusCode(403, new { codigo = "chofer_no_asignado", mensaje = "El pedido está asignado a otro chofer." });
+
+        // El acumulado de cobros no puede superar el total de la orden.
+        var totalPedido = await db.DetallesPedido
+            .Where(d => d.PedidoId == pedido.Id)
+            .SumAsync(d => (decimal?)(d.Cantidad * d.PrecioUnitario), ct) ?? 0m;
+        var yaCobrado = await db.CobrosPedido
+            .Where(c => c.PedidoId == pedido.Id)
+            .SumAsync(c => (decimal?)c.Monto, ct) ?? 0m;
+
+        const decimal tolerancia = 0.01m;
+        if (yaCobrado + request.Monto > totalPedido + tolerancia)
+        {
+            return BadRequest(new
+            {
+                codigo = "monto_excede_total",
+                mensaje = $"El cobro supera el saldo de la orden. Total: ${totalPedido:N2}, ya cobrado: ${yaCobrado:N2}."
+            });
+        }
+
         var metodo = string.IsNullOrWhiteSpace(request.Metodo) ? "Efectivo" : request.Metodo.Trim();
         var ocurridoEn = request.OcurridoEn ?? DateTime.UtcNow;
 
@@ -512,12 +569,12 @@ public sealed class PedidosController(
     [HttpGet("cuenta-corriente")]
     public async Task<IActionResult> ObtenerCuentaCorriente(CancellationToken ct)
     {
+        // Sin fallback: un usuario sin cliente vinculado no debe ver el saldo de otro.
         var emailUsuario = User.Email();
-        var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct)
-                   ?? await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == 1 && c.Activo, ct);
+        var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct);
 
         if (cliente is null)
-            return NotFound(new { codigo = "cliente_no_encontrado", mensaje = "No se encontró el registro comercial del cliente." });
+            return NotFound(new { codigo = "cliente_no_vinculado", mensaje = "Tu usuario no está vinculado a un cliente comercial." });
 
         var pedidosCliente = await db.Pedidos
             .AsNoTracking()

@@ -83,6 +83,7 @@ import {
 import { pedidos_service } from '@/services/pedidos_service';
 import { use_offline_store } from '@/stores/offline_store';
 import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
+import { nueva_clave_idempotencia } from '@/utils/idempotencia';
 
 const props = defineProps({
   abierto: { type: Boolean, default: false },
@@ -107,14 +108,18 @@ watch(
 );
 
 const confirmarCobro = async () => {
-  if (!props.pedido || monto.value <= 0) return;
+  if (!props.pedido || monto.value <= 0 || enviando.value) return;
   enviando.value = true;
+  // La hora del evento se captura en el dispositivo: es la que vale si el cobro
+  // se registra sin conexión y se sincroniza más tarde.
+  const ocurridoEn = new Date().toISOString();
   try {
     const offline = use_offline_store();
     if (offline.sin_conexion) {
       offline.encolar_accion('COBRO', props.pedido.id, {
         monto: Number(monto.value),
-        metodo: metodo.value
+        metodo: metodo.value,
+        ocurrido_en: ocurridoEn
       });
       await vibrar_exito();
       emit('cobro_registrado', {
@@ -123,7 +128,13 @@ const confirmarCobro = async () => {
       cerrar();
       return;
     }
-    const res = await pedidos_service.registrar_cobro_chofer(props.pedido.id, monto.value, metodo.value);
+    const res = await pedidos_service.registrar_cobro_chofer(
+      props.pedido.id,
+      monto.value,
+      metodo.value,
+      nueva_clave_idempotencia(),
+      ocurridoEn
+    );
     await vibrar_exito();
     emit('cobro_registrado', res);
     cerrar();

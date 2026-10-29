@@ -1,7 +1,8 @@
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { cerrar_sesion, iniciar_sesion, obtener_mi_usuario } from '@/services/sesion_service';
 import { usePedidosStore } from '@/stores/pedidos_store';
+import { useCarritoStore } from '@/stores/carrito_store';
 import { borrar_copias } from '@/services/copia_local_service';
 import { use_offline_store } from '@/stores/offline_store';
 import {
@@ -22,6 +23,17 @@ export const useSesionStore = defineStore('sesion', () => {
   const rol_activo = computed(() => usuario.value?.rol_codigo || null);
   const pendiente_de_habilitacion = computed(() => Boolean(usuario.value) && !usuario.value?.rol_codigo);
   const es_admin = computed(() => usuario.value?.rol_codigo === 'ADMIN');
+  const cliente_id = computed(() => usuario.value?.cliente_id ?? null);
+
+  // El carrito siempre opera con el cliente de la sesión. Se sincroniza en cada
+  // cambio de usuario: al entrar, al restaurar y al cerrar sesión.
+  watch(usuario, (actual) => {
+    try {
+      useCarritoStore().sincronizar_cliente(actual?.cliente_id ?? null);
+    } catch {
+      // Pinia aún no montado
+    }
+  });
 
   async function preparar() {
     restaurando.value = true;
@@ -99,6 +111,12 @@ export const useSesionStore = defineStore('sesion', () => {
     } catch {
       // Ignorar si aún no está inicializado
     }
+    try {
+      // El carrito es del usuario, no del dispositivo: no debe sobrevivir al logout.
+      useCarritoStore().vaciar_carrito();
+    } catch {
+      // Ignorar si aún no está inicializado
+    }
     await borrar_copias();
     try {
       const offlineStore = use_offline_store();
@@ -118,6 +136,7 @@ export const useSesionStore = defineStore('sesion', () => {
     rol_activo,
     pendiente_de_habilitacion,
     es_admin,
+    cliente_id,
     preparar,
     iniciar,
     entrar,

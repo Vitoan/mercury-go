@@ -4,8 +4,10 @@ import { pedidos_service } from '@/services/pedidos_service';
 import { vibrar_exito, vibrar_toque } from '@/services/vibracion_service';
 import { notificaciones_service } from '@/services/notificaciones_service';
 import { use_offline_store } from '@/stores/offline_store';
+import { nueva_clave_idempotencia } from '@/utils/idempotencia';
 
 const CLAVE_CARRITO = 'mercurygo_carrito';
+const CLAVE_DUENO = 'mercurygo_carrito_dueno';
 
 function cargar_carrito_inicial() {
   try {
@@ -18,10 +20,43 @@ function cargar_carrito_inicial() {
 
 export const useCarritoStore = defineStore('carrito', () => {
   const items = ref(cargar_carrito_inicial());
-  const cliente_id = ref(1); // Por defecto cliente principal o se sincroniza con el usuario
+  // El cliente sale de la sesión (sesion_store lo sincroniza). Nunca un id fijo.
+  const cliente_id = ref(null);
   const observaciones = ref('');
   const enviando = ref(false);
   const error = ref(null);
+
+  function sincronizar_cliente(id) {
+    const nuevo = id ? Number(id) : null;
+
+    // El carrito guardado pertenece a quien lo armó. Si cambió el cliente en este
+    // dispositivo (otro usuario sin pasar por logout), se descarta.
+    let dueno = null;
+    try {
+      const guardado = localStorage.getItem(CLAVE_DUENO);
+      dueno = guardado ? Number(guardado) : null;
+    } catch {
+      dueno = null;
+    }
+
+    if (nuevo !== null && dueno !== null && dueno !== nuevo && items.value.length > 0) {
+      items.value = [];
+      observaciones.value = '';
+      guardar_en_storage();
+    }
+
+    try {
+      if (nuevo !== null) {
+        localStorage.setItem(CLAVE_DUENO, String(nuevo));
+      } else {
+        localStorage.removeItem(CLAVE_DUENO);
+      }
+    } catch {
+      // Sin storage disponible (modo privado)
+    }
+
+    cliente_id.value = nuevo;
+  }
 
   function guardar_en_storage() {
     localStorage.setItem(CLAVE_CARRITO, JSON.stringify(items.value));
@@ -86,12 +121,23 @@ export const useCarritoStore = defineStore('carrito', () => {
       throw new Error('El carrito está vacío.');
     }
 
+    if (enviando.value) {
+      throw new Error('El pedido ya se está enviando.');
+    }
+
+    // Para el autoservicio el cliente lo define el servidor desde la sesión.
+    // El id local solo lo usa el Admin, que sí elige a nombre de quién crea.
+    const destino = cliente_id_custom || cliente_id.value;
+    if (!destino) {
+      throw new Error('Tu usuario no está vinculado a un cliente comercial.');
+    }
+
     enviando.value = true;
     error.value = null;
 
     try {
       const payload = {
-        cliente_id: cliente_id_custom || cliente_id.value,
+        cliente_id: destino,
         observaciones: observaciones.value || null,
         items: items.value.map(i => ({
           producto_id: i.producto_id,
@@ -99,7 +145,7 @@ export const useCarritoStore = defineStore('carrito', () => {
         }))
       };
 
-      const res = await pedidos_service.crear(payload);
+      const res = await pedidos_service.crear(payload, nueva_clave_idempotencia());
       vaciar_carrito();
       vibrar_exito();
 
@@ -132,6 +178,7 @@ export const useCarritoStore = defineStore('carrito', () => {
     cantidad_total,
     subtotal_total,
     hay_items,
+    sincronizar_cliente,
     agregar_producto,
     cambiar_cantidad,
     quitar_producto,

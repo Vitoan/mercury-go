@@ -19,7 +19,8 @@ public sealed record UsuarioResponse(
     string? Telefono,
     long? RolId,
     string? RolCodigo,
-    string? RolNombre
+    string? RolNombre,
+    long? ClienteId = null
 );
 
 public sealed record SesionResponse(
@@ -132,7 +133,8 @@ public sealed class SesionController(MercuryGoDbContext db, TokenService tokens)
             usuario.Telefono,
             rol?.Id,
             rol?.Codigo,
-            rol?.Nombre
+            rol?.Nombre,
+            await ResolverClienteIdAsync(usuario, rol, cancellationToken)
         );
 
         return Ok(new { usuario = respuesta });
@@ -163,9 +165,24 @@ public sealed class SesionController(MercuryGoDbContext db, TokenService tokens)
             usuario.Telefono,
             rol?.Id,
             rol?.Codigo,
-            rol?.Nombre
+            rol?.Nombre,
+            await ResolverClienteIdAsync(usuario, rol, cancellationToken)
         );
 
         return new SesionResponse(token, expiraEn, refresh, refreshExpiraEn, usuarioResp);
+    }
+
+    // El vínculo usuario↔cliente comercial se resuelve por email: es la convención
+    // vigente del dominio (Cliente.Email). Sin vínculo, ClienteId queda en null y la
+    // app no puede operar el autoservicio.
+    private async Task<long?> ResolverClienteIdAsync(Usuario usuario, Rol? rol, CancellationToken cancellationToken)
+    {
+        if (rol?.Codigo != RolCodigos.Cliente || string.IsNullOrWhiteSpace(usuario.Email))
+            return null;
+
+        return await db.Clientes.AsNoTracking()
+            .Where(c => c.Email == usuario.Email && c.Activo)
+            .Select(c => (long?)c.Id)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 }

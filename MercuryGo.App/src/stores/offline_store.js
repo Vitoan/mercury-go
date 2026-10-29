@@ -247,7 +247,8 @@ export const use_offline_store = defineStore('offline', {
             pedido_id,
             payload?.monto,
             payload?.metodo || 'Efectivo',
-            id
+            id,
+            payload?.ocurrido_en
           );
         }
 
