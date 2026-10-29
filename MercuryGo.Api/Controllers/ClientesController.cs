@@ -75,6 +75,7 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = RolCodigos.Admin)]
     public async Task<IActionResult> Crear([FromBody] GuardarClienteRequest request, CancellationToken ct)
     {
         var error = Validar(request);
@@ -112,6 +113,7 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
     }
 
     [HttpPut("{id:long}")]
+    [Authorize(Roles = RolCodigos.Admin)]
     public async Task<IActionResult> Actualizar(long id, [FromBody] GuardarClienteRequest request, CancellationToken ct)
     {
         var error = Validar(request);
@@ -150,6 +152,7 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
     // Baja lógica (Soft Delete): un cliente con remitos u órdenes históricas jamás se elimina con DELETE
     // para preservar la integridad referencial y contable.
     [HttpDelete("{id:long}")]
+    [Authorize(Roles = RolCodigos.Admin)]
     public async Task<IActionResult> Eliminar(long id, CancellationToken ct)
     {
         var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == id && c.Activo, ct);

@@ -353,9 +353,18 @@ public sealed class PedidosController(
         if (!Enum.TryParse<EstadoPedido>(request.Estado, true, out var nuevoEstado))
             return BadRequest(new { codigo = "estado_invalido", mensaje = $"El estado '{request.Estado}' no es un estado logístico reconocido." });
 
+        if (!MercuryGo.Api.Utils.ValidadorEvidencia.EsEvidenciaValida(request.FotoUrl) ||
+            !MercuryGo.Api.Utils.ValidadorEvidencia.EsEvidenciaValida(request.FirmaUrl))
+        {
+            return BadRequest(new { codigo = "evidencia_invalida", mensaje = "La evidencia de entrega (foto o firma) tiene un formato inválido o no permitido." });
+        }
+
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue dado de baja." });
+
+        if (!string.IsNullOrWhiteSpace(request.FotoUrl)) pedido.EntregaFotoUrl = request.FotoUrl;
+        if (!string.IsNullOrWhiteSpace(request.FirmaUrl)) pedido.EntregaFirmaUrl = request.FirmaUrl;
 
         // No se despacha sin chofer: si no, el pedido queda fuera de la ruta de todos.
         if (nuevoEstado == EstadoPedido.Despachado
@@ -1446,6 +1455,9 @@ public sealed class PedidosController(
         if (string.IsNullOrWhiteSpace(request?.Motivo))
             return BadRequest(new { codigo = "motivo_requerido", mensaje = "Debe indicar el motivo de la entrega fallida." });
 
+        if (!MercuryGo.Api.Utils.ValidadorEvidencia.EsEvidenciaValida(request.FotoUrl))
+            return BadRequest(new { codigo = "evidencia_invalida", mensaje = "La foto adjunta tiene un formato o URL no permitido." });
+
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
@@ -1536,6 +1548,12 @@ public sealed class PedidosController(
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken ct)
     {
+        if (!MercuryGo.Api.Utils.ValidadorEvidencia.EsEvidenciaValida(request.FotoUrl) ||
+            !MercuryGo.Api.Utils.ValidadorEvidencia.EsEvidenciaValida(request.FirmaUrl))
+        {
+            return BadRequest(new { codigo = "evidencia_invalida", mensaje = "La evidencia de entrega (foto o firma) tiene un formato o URL no permitido." });
+        }
+
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
@@ -1675,7 +1693,7 @@ public sealed record EditarPedidoRequest(List<CrearPedidoItemRequest>? Items, st
 public sealed record CobroChoferRequest(decimal Monto, string? Metodo = "Efectivo", DateTime? OcurridoEn = null);
 public sealed record AprobarComprobanteRequest(decimal? Monto);
 public sealed record RechazarComprobanteRequest(string? Motivo);
-public sealed record CambiarEstadoRequest(string Estado, double? Latitud = null, double? Longitud = null, bool EsOffline = false, DateTime? OcurridoEn = null);
+public sealed record CambiarEstadoRequest(string Estado, double? Latitud = null, double? Longitud = null, bool EsOffline = false, DateTime? OcurridoEn = null, string? FotoUrl = null, string? FirmaUrl = null);
 public sealed record ItemPickingRequest(long ProductoId, string EstadoItem, int CantidadPreparada);
 public sealed record ActualizarPickingRequest(List<ItemPickingRequest> Items, bool EsOffline = false);
 

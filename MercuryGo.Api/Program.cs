@@ -45,6 +45,7 @@ if (string.IsNullOrWhiteSpace(jwtOpciones.Key))
 var tokenService = new TokenService(jwtOpciones);
 builder.Services.AddSingleton(jwtOpciones);
 builder.Services.AddSingleton(tokenService);
+builder.Services.AddSingleton<ILoginRateLimiter, LoginRateLimiterService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

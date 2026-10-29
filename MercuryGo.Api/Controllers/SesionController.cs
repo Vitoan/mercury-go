@@ -33,7 +33,7 @@ public sealed record SesionResponse(
 
 [ApiController]
 [Route("api/sesion")]
-public sealed class SesionController(MercuryGoDbContext db, TokenService tokens) : ControllerBase
+public sealed class SesionController(MercuryGoDbContext db, TokenService tokens, ILoginRateLimiter rateLimiter) : ControllerBase
 {
     private static readonly PasswordHasher<Usuario> Hasher = new();
 
@@ -41,20 +41,35 @@ public sealed class SesionController(MercuryGoDbContext db, TokenService tokens)
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
+
+        if (await rateLimiter.EstaBloqueadoAsync(ip, email))
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                codigo = "demasiados_intentos",
+                mensaje = "Demasiados intentos fallidos. Por seguridad, intente nuevamente en 15 minutos."
+            });
+        }
+
         var usuario = await db.Usuarios.FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
 
         // Mismo mensaje genérico para "no existe" y "clave incorrecta" por seguridad.
         if (usuario is null || !usuario.Activo)
         {
+            await rateLimiter.RegistrarFalloAsync(ip, email);
             return Unauthorized(new { codigo = "credenciales_invalidas", mensaje = "Email o contraseña incorrectos." });
         }
 
         var verificacion = Hasher.VerifyHashedPassword(usuario, usuario.PasswordHash, request.Password ?? string.Empty);
         if (verificacion == PasswordVerificationResult.Failed)
         {
+            await rateLimiter.RegistrarFalloAsync(ip, email);
             return Unauthorized(new { codigo = "credenciales_invalidas", mensaje = "Email o contraseña incorrectos." });
         }
+
+        await rateLimiter.LimpiarAsync(ip, email);
 
         var sesion = await EmitirSesionAsync(usuario, cancellationToken);
         return Ok(new { sesion });
