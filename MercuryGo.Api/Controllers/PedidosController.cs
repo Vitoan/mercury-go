@@ -1639,6 +1639,13 @@ public sealed class PedidosController(
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var op = await idempotenciaService.ObtenerOperacionAsync(idempotencyKey, "CONFIRMAR_PEDIDO", ct);
+            if (op?.ResultadoJson != null)
+                return Content(op.ResultadoJson, "application/json");
+        }
+
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
@@ -1654,13 +1661,27 @@ public sealed class PedidosController(
 
         await db.SaveChangesAsync(ct);
 
-        return Ok(new
+        var respuestaObj = new
         {
             mensaje = $"Pedido {pedido.Numero} confirmado exitosamente.",
             estado = pedido.Estado.ToString(),
             confirmado_por_id = pedido.ConfirmadoPorId,
             confirmado_en = pedido.ConfirmadoEn
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await idempotenciaService.RegistrarOperacionAsync(
+                idempotencyKey,
+                "CONFIRMAR_PEDIDO",
+                User.UsuarioId(),
+                pedido.Id,
+                System.Text.Json.JsonSerializer.Serialize(respuestaObj),
+                ct
+            );
+        }
+
+        return Ok(respuestaObj);
     }
 
     // Solicitud de cancelación por parte del CLIENTE (CU-09 / Decisión 12)
@@ -1787,6 +1808,13 @@ public sealed class PedidosController(
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var op = await idempotenciaService.ObtenerOperacionAsync(idempotencyKey, "ENTREGA_FALLIDA", ct);
+            if (op?.ResultadoJson != null)
+                return Content(op.ResultadoJson, "application/json");
+        }
+
         if (string.IsNullOrWhiteSpace(request?.Motivo))
             return BadRequest(new { codigo = "motivo_requerido", mensaje = "Debe indicar el motivo de la entrega fallida." });
 
@@ -1835,14 +1863,37 @@ public sealed class PedidosController(
             motivo = intento.Motivo
         };
 
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await idempotenciaService.RegistrarOperacionAsync(
+                idempotencyKey,
+                "ENTREGA_FALLIDA",
+                User.UsuarioId(),
+                pedido.Id,
+                System.Text.Json.JsonSerializer.Serialize(respuestaObj),
+                ct
+            );
+        }
+
         return Ok(respuestaObj);
     }
 
     // Reintento o reprogramación de entrega (CU-21 / ADMIN)
     [Authorize(Roles = RolCodigos.Admin)]
     [HttpPost("{id:long}/reintentar-entrega")]
-    public async Task<IActionResult> ReintentarEntrega(long id, [FromBody] ReintentarEntregaRequest? request, CancellationToken ct)
+    public async Task<IActionResult> ReintentarEntrega(
+        long id,
+        [FromBody] ReintentarEntregaRequest? request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var op = await idempotenciaService.ObtenerOperacionAsync(idempotencyKey, "REINTENTAR_ENTREGA", ct);
+            if (op?.ResultadoJson != null)
+                return Content(op.ResultadoJson, "application/json");
+        }
+
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
@@ -1883,6 +1934,13 @@ public sealed class PedidosController(
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var op = await idempotenciaService.ObtenerOperacionAsync(idempotencyKey, "ENTREGA_PARCIAL", ct);
+            if (op?.ResultadoJson != null)
+                return Content(op.ResultadoJson, "application/json");
+        }
+
         if (!MercuryGo.Api.Utils.ValidadorEvidencia.EsEvidenciaValida(request.FotoUrl) ||
             !MercuryGo.Api.Utils.ValidadorEvidencia.EsEvidenciaValida(request.FirmaUrl))
         {

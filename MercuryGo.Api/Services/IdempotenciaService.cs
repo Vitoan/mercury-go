@@ -43,6 +43,14 @@ public sealed class IdempotenciaService(MercuryGoDbContext db)
             ProcesadaEn = DateTime.UtcNow
         });
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Absorber colisión por concurrencia si otra transacción insertó la misma clave simultáneamente
+            db.ChangeTracker.Clear();
+        }
     }
 }
