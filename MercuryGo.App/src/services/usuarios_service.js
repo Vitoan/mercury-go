@@ -21,3 +21,7 @@ export function cambiar_rol_usuario(id, rol_id) {
 export function eliminar_usuario(id) {
   return ajax_service.delete(`/api/usuarios/${encodeURIComponent(id)}`);
 }
+
+export function resetear_password(id, nueva_password) {
+  return ajax_service.put(`/api/usuarios/${encodeURIComponent(id)}/password`, { nueva_password });
+}

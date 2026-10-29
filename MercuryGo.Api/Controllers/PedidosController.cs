@@ -43,19 +43,12 @@ public sealed class PedidosController(
     {
         var consulta = db.Pedidos.AsNoTracking().Where(p => p.Activo);
 
-        // Segmentación de pedidos según rol del usuario autenticado
+        // Segmentación de pedidos según rol del usuario autenticado (Usuario.ClienteId y email)
         if (User.EsCliente())
         {
-            // Sin fallback: si el usuario no está vinculado a un cliente comercial,
-            // el listado queda vacío en lugar de mostrar los pedidos de otro cliente.
-            var emailUsuario = User.Email();
-            var clienteId = await db.Clientes.AsNoTracking()
-                .Where(c => c.Email == emailUsuario && c.Activo)
-                .Select(c => (long?)c.Id)
-                .FirstOrDefaultAsync(ct);
-
-            consulta = clienteId.HasValue
-                ? consulta.Where(p => p.ClienteId == clienteId.Value)
+            var propio = await ObtenerClienteDeUsuarioAutenticadoAsync(ct);
+            consulta = propio != null
+                ? consulta.Where(p => p.ClienteId == propio.Id)
                 : consulta.Where(p => false);
         }
         else if (User.EsOperario())

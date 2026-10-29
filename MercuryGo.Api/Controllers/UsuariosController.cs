@@ -17,6 +17,7 @@ public sealed record CrearUsuarioRequest(
 );
 
 public sealed record CambiarRolRequest(long? RolId);
+public sealed record ResetearPasswordRequest(string? NuevaPassword);
 
 public sealed record RolDto(long Id, string Codigo, string Nombre, string? Descripcion);
 
@@ -155,6 +156,31 @@ public sealed class UsuariosController(MercuryGoDbContext db) : ControllerBase
 
         var respuesta = new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Email, usuario.Telefono, rol?.Id, rol?.Codigo, rol?.Nombre);
         return Ok(new { usuario = respuesta });
+    }
+
+    // Reseteo administrativo de contraseña (CU-17)
+    [HttpPut("{id:long}/password")]
+    public async Task<IActionResult> ResetearPassword(long id, [FromBody] ResetearPasswordRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.NuevaPassword) || request.NuevaPassword.Length < 8)
+            return BadRequest(new { codigo = "password_invalida", mensaje = "La nueva contraseña debe tener al menos 8 caracteres." });
+
+        var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == id && u.Activo, cancellationToken);
+        if (usuario is null)
+            return NotFound(new { codigo = "usuario_no_encontrado", mensaje = "El usuario no existe o fue dado de baja." });
+
+        usuario.PasswordHash = Hasher.HashPassword(usuario, request.NuevaPassword);
+        usuario.ActualizadoEn = DateTime.UtcNow;
+
+        // Revocar todos los refresh tokens activos del usuario para forzar re-login seguro
+        var tokensActivos = await db.RefreshTokens
+            .Where(r => r.UsuarioId == id && r.RevocadoEn == null)
+            .ToListAsync(cancellationToken);
+        tokensActivos.ForEach(t => t.RevocadoEn = DateTimeOffset.UtcNow);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { mensaje = $"Contraseña del usuario '{usuario.Nombre}' restablecida exitosamente." });
     }
 
     // Baja lógica de usuario y revocación inmediata de todas sus sesiones activas

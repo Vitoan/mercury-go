@@ -1,3 +1,4 @@
+import { alertController } from '@ionic/vue';
 import { ref, computed } from 'vue';
 import { pedidos_store } from '@/stores/pedidos_store';
 import { sesion_store } from '@/stores/sesion_store';
@@ -215,6 +216,49 @@ export function usePedidosWorkflow(toast) {
   const alRegistrarEntregaParcial = () => {
     if (toast) toast.mostrarExito('¡Entrega parcial registrada exitosamente!');
     pedidos_store.cargar(true);
+  };
+
+  const abrirSelectorChofer = async (pedido) => {
+    mostrarActionSheet.value = false;
+    try {
+      const res = await pedidos_service.obtener_choferes();
+      const choferes = res.choferes || [];
+      if (choferes.length === 0) {
+        if (toast) toast.mostrarAviso('No hay choferes activos registrados en el sistema.');
+        return;
+      }
+
+      const alert = await alertController.create({
+        header: 'Asignar Chofer de Reparto',
+        subHeader: `Orden ${pedido.numero}`,
+        message: 'Seleccioná el chofer asignado a esta entrega:',
+        inputs: choferes.map((c) => ({
+          type: 'radio',
+          label: c.nombre,
+          value: c.id,
+          checked: pedido.chofer_id === c.id
+        })),
+        buttons: [
+          { text: 'Cancelar', role: 'cancel' },
+          {
+            text: 'Asignar',
+            handler: async (choferId) => {
+              if (!choferId) return false;
+              try {
+                await pedidos_service.asignar_chofer(pedido.id, choferId);
+                if (toast) toast.mostrarExito('¡Chofer asignado exitosamente!');
+                pedidos_store.cargar(true);
+              } catch (err) {
+                if (toast) toast.mostrarError(err.mensaje || 'Error al asignar chofer.');
+              }
+            }
+          }
+        ]
+      });
+      await alert.present();
+    } catch (err) {
+      if (toast) toast.mostrarError('Error al obtener la lista de choferes.');
+    }
   };
 
   const botonesTransicion = computed(() => {

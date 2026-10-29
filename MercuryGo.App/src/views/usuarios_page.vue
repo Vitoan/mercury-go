@@ -196,6 +196,47 @@ const abrirAcciones = (u) => {
     });
   }
 
+  // Opción de reseteo administrativo de contraseña (CU-17)
+  botones.push({
+    text: '🔑 Restablecer Contraseña',
+    handler: async () => {
+      const alert = await alertController.create({
+        header: 'Restablecer Contraseña',
+        subHeader: `Usuario: ${u.nombre}`,
+        message: 'Ingresá la nueva contraseña provisoria (mínimo 8 caracteres):',
+        inputs: [
+          {
+            name: 'password',
+            type: 'password',
+            placeholder: 'Nueva contraseña'
+          }
+        ],
+        buttons: [
+          { text: 'Cancelar', role: 'cancel' },
+          {
+            text: 'Guardar',
+            handler: async (data) => {
+              const pass = (data.password || '').trim();
+              if (pass.length < 8) {
+                toast.mostrarError('La contraseña debe tener al menos 8 caracteres.');
+                return false;
+              }
+              const ok = await usuarios_store.resetear_clave(u.id, pass);
+              if (ok) {
+                await vibrar_exito();
+                toast.mostrarExito(`Contraseña de '${u.nombre}' restablecida exitosamente.`);
+              } else {
+                await vibrar_error();
+                toast.mostrarError(usuarios_store.error || 'Error al restablecer contraseña.');
+              }
+            }
+          }
+        ]
+      });
+      await alert.present();
+    }
+  });
+
   // Opción de baja lógica
   botones.push({
     text: 'Dar de Baja Usuario',

@@ -91,6 +91,20 @@ export const useUsuariosStore = defineStore('usuarios', () => {
     }
   }
 
+  async function resetear_clave(id, nuevaPassword) {
+    guardando.value = true;
+    error.value = null;
+    try {
+      await resetear_password(id, nuevaPassword);
+      return true;
+    } catch (err) {
+      error.value = err.mensaje || 'No se pudo restablecer la contraseña.';
+      return false;
+    } finally {
+      guardando.value = false;
+    }
+  }
+
   async function eliminar(id) {
     guardando.value = true;
     error.value = null;
