@@ -15,6 +15,10 @@
 > - ✅ **P1-1** resuelto: la edición de pedido reconcilia líneas en su lugar y conserva precio histórico y cantidades de picking.
 > - ✅ **P1-13** resuelto: la creación de pedido envía `Idempotency-Key`.
 > - ✅ **P1-4** resuelto: cambios de estado, entrega fallida, entrega parcial y cobro envían `ocurrido_en`; la cola offline lo reenvía.
+> - ✅ **P1-8** resuelto: `Despachado → NoEntregado` habilitado para chofer y admin; el reintento queda solo Admin.
+> - ✅ **P1-2** resuelto: al confirmar el picking el pedido pasa a `Despachado` si tiene chofer; si no, queda `EnPreparacion`.
+> - ✅ **P1-3** resuelto: los faltantes de picking notifican en la bandeja a todos los Admin.
+> - ✅ **P1-6** resuelto: el picking sobre `Cancelado` se guarda sin tocar importes ni estado.
 
 ---
 
@@ -106,8 +110,8 @@ La idempotencia por header (`:447-454`) funciona, pero `carrito_store.confirmar_
 | # | CU | Hallazgo | Evidencia |
 | :--- | :--- | :--- | :--- |
 | P1-1 | CU-08 | `ActualizarPedido` **borra y recrea** los `DetallePedido`. Se pierden `CantidadPedida`, `CantidadPreparada`, `CantidadRechazada`, `CantidadEntregada` y `MotivoRechazo`, y se re-congelan precios actuales. | `PedidosController.cs:407-424` — ✅ resuelto con `PedidoEdicionService` |
-| P1-2 | CU-11 | El picking **no despacha**: `Confirmado → EnPreparacion`. El documento describe una sola acción que prepara y deja listo para despacho. | `PedidosController.cs:792-...`, `comp_picking_modal.vue:263` |
-| P1-3 | CU-11 | Con faltantes **no se notifica al Admin**, pese a `CASOS_DE_USO.md:105`. Solo se genera notificación al cliente (`PedidoTransicionService:138`). | sin código |
+| P1-2 | CU-11 | El picking **no despacha**: `Confirmado → EnPreparacion`. El documento describe una sola acción que prepara y deja listo para despacho. | `PedidosController.cs:792-...`, `comp_picking_modal.vue:263` — ✅ resuelto |
+| P1-3 | CU-11 | Con faltantes **no se notifica al Admin**, pese a `CASOS_DE_USO.md:105`. Solo se genera notificación al cliente (`PedidoTransicionService:138`). | sin código — ✅ resuelto con `NotificacionService` |
 | P1-4 | CU-16 | `ocurrido_en` se guarda en la cola pero **nunca se envía**. La API sí lo acepta (`CambiarEstadoRequest.OcurridoEn`, `CobroChoferRequest.OcurridoEn`); el faltante es 100 % del cliente. | `pedidos_service.js` `cambiar_estado` / `registrar_cobro_chofer` — ✅ resuelto |
 | P1-5 | CU-16 | Conflictos no implementados: no hay "gana el chofer" explícito, no hay aviso al Admin, no se detecta pedido reasignado. Solo se marca la acción local como `conflicto`. | `offline_store.js:188-192` |
 | P1-6 | CU-16 | `ActualizarPicking` **bloquea** el picking sobre `Cancelado`, contra la Decisión 16. | `PedidosController.cs:803` — ✅ resuelto: se guarda sin tocar importes |

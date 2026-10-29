@@ -19,7 +19,8 @@ public sealed class PedidosController(
     MercuryGoDbContext db,
     IWebHostEnvironment env,
     MercuryGo.Api.Services.IPedidoTransicionService transicionService,
-    MercuryGo.Api.Services.IdempotenciaService idempotenciaService) : ControllerBase
+    MercuryGo.Api.Services.IdempotenciaService idempotenciaService,
+    MercuryGo.Api.Services.NotificacionService notificacionService) : ControllerBase
 {
     // Estados en los que todavía se puede corregir la mercadería del pedido.
     private static readonly EstadoPedido[] EstadosConItemsEditables =
@@ -1006,7 +1007,65 @@ public sealed class PedidosController(
         }
 
         pedido.ActualizadoEn = DateTime.UtcNow;
+
+        // Aviso al Admin cuando falta mercadería: sin esto, el faltante solo se ve
+        // si alguien abre la orden.
+        if (faltantes.Count > 0)
+        {
+            var detalleFaltantes = string.Join("; ", faltantes);
+            if (detalleFaltantes.Length > 400)
+                detalleFaltantes = detalleFaltantes[..400] + "…";
+
+            await notificacionService.NotificarRolAsync(
+                RolCodigos.Admin,
+                $"⚠️ Picking incompleto ({pedido.Numero})",
+                $"Faltantes: {detalleFaltantes}",
+                "PEDIDO",
+                pedido.Id,
+                ct);
+        }
+
+        // Terminar el picking deja el pedido listo para salir: si ya tiene chofer,
+        // se despacha en la misma acción (CU-11). Sin chofer queda en preparación.
+        var despachado = false;
+        var requiereChofer = false;
+
+        if (pedido.Estado == EstadoPedido.EnPreparacion)
+        {
+            if (pedido.ChoferId.HasValue)
+            {
+                var contexto = new ContextoTransicion(
+                    UsuarioId: User.UsuarioId(),
+                    RolCodigo: User.RolCodigo() ?? string.Empty,
+                    OcurridoEn: DateTime.UtcNow);
+
+                var transicion = await transicionService.TransicionarAsync(
+                    pedido, EstadoPedido.Despachado, contexto, ct);
+
+                if (!transicion.Exito)
+                    return BadRequest(new { codigo = transicion.CodigoError, mensaje = transicion.MensajeError });
+
+                despachado = true;
+            }
+            else
+            {
+                requiereChofer = true;
+            }
+        }
+
         await db.SaveChangesAsync(ct);
+
+        var mensaje = pedidoCancelado
+            ? "Picking registrado sobre un pedido cancelado. La orden sigue cancelada."
+            : despachado
+                ? esCompleto
+                    ? "Picking completo. Pedido despachado y asignado al chofer."
+                    : "Picking con faltantes. Pedido ajustado y despachado con lo preparado."
+                : requiereChofer
+                    ? "Picking guardado. Asigná un chofer para despachar el pedido."
+                    : esCompleto
+                        ? "Picking completado exitosamente. Todo listo para despacho."
+                        : "Picking registrado con faltantes. Pedido ajustado a lo preparado.";
 
         return Ok(new
         {
@@ -1015,11 +1074,9 @@ public sealed class PedidosController(
             picking_resultado = pedido.PickingResultado,
             faltantes,
             observaciones = pedido.Observaciones,
-            mensaje = pedidoCancelado
-                ? "Picking registrado sobre un pedido cancelado. La orden sigue cancelada."
-                : esCompleto
-                    ? "Picking completado exitosamente. Todo listo para despacho."
-                    : "Picking registrado con faltantes. Pedido ajustado a lo preparado."
+            despachado,
+            requiere_chofer = requiereChofer,
+            mensaje
         });
     }
 

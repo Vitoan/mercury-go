@@ -118,12 +118,11 @@ Aplican a todos los casos de uso, por eso no se repiten en cada uno.
 
 ### Preparación
 
-**CU-11 Preparar pedido (picking)** — `OPERARIO`, `ADMIN` · 🟡
+**CU-11 Preparar pedido (picking)** — `OPERARIO`, `ADMIN` · ✅
 - Toma un pedido confirmado (pasa a `EnPreparacion`), gestiona artículos con marcado de faltantes y confirma el picking.
 - Front: `pedidos_page.vue`, `comp_picking_modal.vue`, `vibracion_service.js`.
 - API: `PUT /api/pedidos/{id}/picking` con `items[{ producto_id, estado_item, cantidad_preparada }]`.
-- Regla: si el picking queda incompleto, se registran faltantes y el pedido se ajusta a lo preparado. Si el pedido fue cancelado mientras el operario preparaba sin red, el picking se guarda igual pero la orden sigue `Cancelado` y no se tocan sus importes.
-- **Brecha:** el picking no cambia a `Despachado` (eso requiere el `PUT /estado`), y no se avisa al Admin cuando hay faltantes.
+- Reglas: si el picking queda incompleto, se registran faltantes, el pedido se ajusta a lo preparado y se notifica en la bandeja a todos los `ADMIN` (`⚠️ Picking incompleto`). Al confirmar, si el pedido ya tiene chofer asignado pasa directo a `Despachado`; si no, queda `EnPreparacion` y la respuesta trae `requiere_chofer: true`. Si el pedido fue cancelado mientras el operario preparaba sin red, el picking se guarda igual pero la orden sigue `Cancelado` y no se tocan sus importes.
 
 ### Reparto
 
@@ -137,6 +136,7 @@ Aplican a todos los casos de uso, por eso no se repiten en cada uno.
 - Front: `comp_cobro_chofer_modal.vue`, `comp_entrega_parcial_modal.vue`, `pedidos_page.vue`.
 - API: `POST /api/pedidos/{id}/cobro-chofer`, `POST /api/pedidos/{id}/entrega-parcial`, `PUT /api/pedidos/{id}/estado` → `Entregado`.
 - Reglas: solo se cobra en `Despachado`, `EnPuerta` o (Admin) `Entregado`; el acumulado no puede superar el total de la orden; se envía `Idempotency-Key` y `ocurrido_en`. Si el pedido tiene chofer asignado, solo ese chofer puede cobrarlo.
+- Entrega parcial: el front envía `items_rechazados[{ producto_id, cantidad_rechazada, motivo }]`; el servidor calcula `cantidad_entregada`, guarda el motivo por línea y reduce el total de la orden.
 - Como el despacho exige chofer asignado (CU-20), en la práctica todo pedido en reparto tiene dueño y la validación de propiedad se aplica siempre.
 
 **CU-20 Asignar chofer** — `OPERARIO`, `ADMIN` · ✅
@@ -256,10 +256,10 @@ stateDiagram-v2
 | # | Tema | Decisión | Estado |
 | :--- | :--- | :--- | :--- |
 | 1 | Confirmar pedido | Lo hace el Admin a mano (CU-19) | ✅ |
-| 2 | Despachar | Lo marca el Operario al terminar el picking | 🟡 el picking no despacha solo |
+| 2 | Despachar | Lo marca el Operario al terminar el picking | ✅ el picking despacha si hay chofer |
 | 3 | Cancelación del Admin | Hasta antes de `Entregado`, incluso en ruta | ✅ |
 | 4 | Cancelar con cobro ya registrado | El Admin ajusta el cobro a mano | 🟡 existe el endpoint, sin UI |
-| 5 | Picking incompleto | Despacha igual y ajusta el pedido a lo preparado | 🟡 ajusta, no despacha |
+| 5 | Picking incompleto | Despacha igual y ajusta el pedido a lo preparado | ✅ ajusta, notifica al Admin y despacha |
 | 6 | Operario y Catálogo | Catálogo habilitado en solo lectura | ✅ |
 | 7 | Aviso al cliente por ajuste | Solo lo ve en el detalle del pedido | ✅ |
 | 8 | Cobro en puerta | Siempre opcional; puede quedar en cuenta corriente | ✅ |

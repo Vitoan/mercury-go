@@ -77,7 +77,14 @@ export function usePedidosWorkflow(toast) {
   };
 
   const alCompletarPicking = (res) => {
-    if (toast) toast.mostrar(res?.mensaje || 'Picking registrado con éxito.', res?.completo ? 'success' : 'warning');
+    if (toast) {
+      const color = res?.despachado
+        ? 'success'
+        : res?.requiere_chofer || res?.estado === 'Cancelado' || !res?.completo
+          ? 'warning'
+          : 'success';
+      toast.mostrar(res?.mensaje || 'Picking registrado con éxito.', color);
+    }
     pedidos_store.cargar(true);
   };
 

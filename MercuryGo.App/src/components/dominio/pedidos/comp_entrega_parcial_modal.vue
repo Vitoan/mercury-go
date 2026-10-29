@@ -163,17 +163,18 @@ const confirmarEntregaParcial = async () => {
       lng = pos.longitud;
     } catch {}
 
-    const payloadLineas = lineas.value.map((l) => ({
-      detalle_id: l.id,
-      cantidad_entregada: l.cantidad_pedida - l.cantidad_rechazada,
-      cantidad_rechazada: l.cantidad_rechazada,
-      motivo_rechazo: l.cantidad_rechazada > 0 ? motivo.value || 'Rechazado por cliente' : null
-    }));
+    const payloadLineas = lineas.value
+      .filter((l) => l.cantidad_rechazada > 0)
+      .map((l) => ({
+        producto_id: l.producto_id,
+        cantidad_rechazada: l.cantidad_rechazada,
+        motivo: motivo.value || 'Rechazado por cliente'
+      }));
 
     const offline = use_offline_store();
     if (offline.sin_conexion) {
       offline.encolar_accion('ENTREGA_PARCIAL', props.pedido.id, {
-        lineas: payloadLineas,
+        items_rechazados: payloadLineas,
         motivo: motivo.value,
         ocurrido_en: ocurridoEn
       }, lat, lng);

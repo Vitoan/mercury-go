@@ -257,7 +257,7 @@ export const use_offline_store = defineStore('offline', {
         case 'ENTREGA_PARCIAL': {
           return await pedidos_service.registrar_entrega_parcial(
             pedido_id,
-            payload?.lineas || [],
+            payload?.items_rechazados || payload?.lineas || [],
             payload?.motivo,
             lat,
             lng,

@@ -115,9 +115,9 @@ export const pedidos_service = {
     return ajax_service.post(`api/pedidos/${id}/reintentar-entrega`);
   },
 
-  registrar_entrega_parcial(id, lineas, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null, idempotency_key = null, ocurrido_en = null) {
+  registrar_entrega_parcial(id, items_rechazados, motivo = null, latitud = null, longitud = null, foto_url = null, firma_url = null, idempotency_key = null, ocurrido_en = null) {
     const opciones = idempotency_key ? { idempotency_key } : {};
-    const cuerpo = { lineas, motivo, latitud, longitud, foto_url, firma_url };
+    const cuerpo = { items_rechazados, motivo, latitud, longitud, foto_url, firma_url };
     if (ocurrido_en) cuerpo.ocurrido_en = ocurrido_en;
     return ajax_service.post(`api/pedidos/${id}/entrega-parcial`, cuerpo, opciones);
   },
