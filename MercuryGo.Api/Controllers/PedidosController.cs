@@ -8,6 +8,7 @@ using QuestPDF.Infrastructure;
 using MercuryGo.Api.Auth;
 using MercuryGo.Api.Data;
 using MercuryGo.Api.Domain.Entities;
+using MercuryGo.Api.Services;
 
 namespace MercuryGo.Api.Controllers;
 
@@ -20,6 +21,13 @@ public sealed class PedidosController(
     MercuryGo.Api.Services.IPedidoTransicionService transicionService,
     MercuryGo.Api.Services.IdempotenciaService idempotenciaService) : ControllerBase
 {
+    // Estados en los que todavía se puede corregir la mercadería del pedido.
+    private static readonly EstadoPedido[] EstadosConItemsEditables =
+    [
+        EstadoPedido.Pendiente,
+        EstadoPedido.Confirmado,
+        EstadoPedido.EnPreparacion
+    ];
 
     // Listado paginado con filtros de texto, estados múltiples ("Pendiente,EnPreparacion") y cliente.
     [HttpGet]
@@ -166,7 +174,12 @@ public sealed class PedidosController(
             pedido.p.LatitudEntrega,
             pedido.p.LongitudEntrega,
             pedido.p.FechaEnPuerta,
-            pedido.p.ChoferId
+            pedido.p.ChoferId,
+            pedido.p.PickingResultado,
+            ItemsEditables: pedido.p.PickingResultado is null
+                && EstadosConItemsEditables.Contains(pedido.p.Estado),
+            ObservacionesEditables: pedido.p.Estado != EstadoPedido.Entregado
+                && pedido.p.Estado != EstadoPedido.Cancelado
         );
 
         return Ok(new { pedido = resultado });
@@ -427,8 +440,21 @@ public sealed class PedidosController(
     // Edición de pedido exclusivo para ADMINISTRADOR
     [Authorize(Roles = RolCodigos.Admin)]
     [HttpPut("{id:long}")]
-    public async Task<IActionResult> ActualizarPedido(long id, [FromBody] EditarPedidoRequest request, CancellationToken ct)
+    public async Task<IActionResult> ActualizarPedido(
+        long id,
+        [FromBody] EditarPedidoRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var op = await idempotenciaService.ObtenerOperacionAsync(idempotencyKey, "EDITAR_PEDIDO", ct);
+            if (op?.ResultadoJson != null)
+            {
+                return Content(op.ResultadoJson, "application/json");
+            }
+        }
+
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
@@ -436,29 +462,60 @@ public sealed class PedidosController(
         if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
             return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede editar un pedido finalizado o cancelado." });
 
-        if (request.Items is not null && request.Items.Count > 0)
+        // Los ítems solo se tocan antes del picking y fuera del reparto: cambiar la
+        // carga de un pedido que ya está en la calle rompe la operación del chofer.
+        var cambiaItems = request.Items is not null && request.Items.Count > 0;
+
+        if (cambiaItems)
         {
-            var productosIds = request.Items.Select(i => i.ProductoId).Distinct().ToList();
-            var productosDb = await db.Productos.Where(p => productosIds.Contains(p.Id) && p.Activo).ToDictionaryAsync(p => p.Id, ct);
-
-            // Eliminar detalles previos
-            var detallesPrevios = await db.DetallesPedido.Where(d => d.PedidoId == id).ToListAsync(ct);
-            db.DetallesPedido.RemoveRange(detallesPrevios);
-
-            foreach (var item in request.Items)
+            if (pedido.PickingResultado is not null || !EstadosConItemsEditables.Contains(pedido.Estado))
             {
-                if (productosDb.TryGetValue(item.ProductoId, out var prod) && item.Cantidad > 0)
+                return BadRequest(new
                 {
-                    db.DetallesPedido.Add(new DetallePedido
-                    {
-                        PedidoId = pedido.Id,
-                        ProductoId = prod.Id,
-                        Cantidad = item.Cantidad,
-                        PrecioUnitario = prod.Precio,
-                        CreadoEn = DateTime.UtcNow
-                    });
-                }
+                    codigo = "items_bloqueados",
+                    mensaje = "El pedido ya inició preparación o está en reparto: solo podés editar las observaciones."
+                });
             }
+
+            var detallesActuales = await db.DetallesPedido.Where(d => d.PedidoId == id).ToListAsync(ct);
+
+            var productosIds = request.Items!.Select(i => i.ProductoId).Distinct().ToList();
+            var productosDb = await db.Productos
+                .Where(p => productosIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, ct);
+
+            var resultado = PedidoEdicionService.Reconciliar(
+                pedido.Id,
+                detallesActuales,
+                request.Items!.Select(i => new ItemEdicionPedido(i.ProductoId, i.Cantidad)).ToList(),
+                productosDb);
+
+            if (resultado.Error is not null)
+            {
+                return BadRequest(new
+                {
+                    codigo = resultado.Error.Codigo,
+                    mensaje = resultado.Error.Mensaje
+                });
+            }
+
+            // La edición no puede dejar la orden por debajo de lo que ya se cobró.
+            var yaCobrado = await db.CobrosPedido
+                .Where(c => c.PedidoId == pedido.Id)
+                .SumAsync(c => (decimal?)c.Monto, ct) ?? 0m;
+
+            const decimal tolerancia = 0.01m;
+            if (yaCobrado > 0m && resultado.TotalResultante + tolerancia < yaCobrado)
+            {
+                return BadRequest(new
+                {
+                    codigo = "total_menor_a_cobrado",
+                    mensaje = $"La orden no puede quedar en ${resultado.TotalResultante:N2}: ya se cobraron ${yaCobrado:N2}."
+                });
+            }
+
+            db.DetallesPedido.RemoveRange(resultado.Eliminados);
+            db.DetallesPedido.AddRange(resultado.Agregados);
         }
 
         if (request.Observaciones is not null)
@@ -469,7 +526,21 @@ public sealed class PedidosController(
         pedido.ActualizadoEn = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return Ok(new { mensaje = "Pedido actualizado correctamente.", id = pedido.Id });
+        var respuesta = new { mensaje = "Pedido actualizado correctamente.", id = pedido.Id };
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await idempotenciaService.RegistrarOperacionAsync(
+                idempotencyKey,
+                "EDITAR_PEDIDO",
+                User.UsuarioId(),
+                pedido.Id,
+                System.Text.Json.JsonSerializer.Serialize(respuesta),
+                ct
+            );
+        }
+
+        return Ok(respuesta);
     }
 
     // Registro de cobro en destino por parte del CHOFER (Efectivo o Transferencia / CU-13 / Decisión 9)
@@ -1535,7 +1606,9 @@ public sealed record PedidoDetalleResponse(
     string? ComprobanteUrl = null,
     string? CancelacionEstado = null,
     bool ValidacionFallida = false,
-    string? ValidacionDetalle = null
+    string? ValidacionDetalle = null,
+    bool ItemsEditables = true,
+    bool ObservacionesEditables = true
 );
 
 public sealed record ClientePedidoResponse(long Id, string RazonSocial, string Cuit);

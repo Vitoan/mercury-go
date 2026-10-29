@@ -88,10 +88,11 @@ Aplican a todos los casos de uso, por eso no se repiten en cada uno.
 - Reglas: el servidor congela precios desde la base; valida productos activos y disponibles; genera `PED-000042`; estado inicial `Pendiente`. Si un producto no está disponible, el pedido se crea igual con `ValidacionFallida = true` y su detalle.
 - **Brecha:** el borrador offline no está implementado. El servidor ya resuelve el cliente desde la sesión (ignora `cliente_id` de un `CLIENTE`) y rechaza el autoservicio sin vínculo comercial.
 
-**CU-08 Editar pedido** — `ADMIN` · 🟡
-- Cambia cantidades, agrega o quita productos mientras el pedido no esté `Entregado` ni `Cancelado`.
-- Front: `comp_detalle_pedido_modal.vue`. API: `PUT /api/pedidos/{id}`. Recalcula totales desde el servidor.
-- **Brecha:** la implementación borra y recrea los detalles, perdiendo cantidades de picking y rechazo.
+**CU-08 Editar pedido** — `ADMIN` · ✅
+- Cambia cantidades, agrega o quita productos mientras el pedido no haya iniciado el picking y siga en `Pendiente`, `Confirmado` o `EnPreparacion`. En `Despachado`, `EnPuerta` o `NoEntregado` solo se editan las observaciones.
+- Front: `comp_detalle_pedido_modal.vue` (el botón depende de `observaciones_editables` y los steppers de `items_editables`).
+- API: `PUT /api/pedidos/{id}` con header opcional `Idempotency-Key`.
+- Reglas: se actualizan las líneas en su lugar, conservando el precio histórico y la cantidad preparada; un producto nuevo entra al precio vigente. El total no puede quedar por debajo de lo ya cobrado (`400 total_menor_a_cobrado`). Productos inválidos, duplicados o cantidades ≤ 0 se rechazan con error explícito.
 
 **CU-09 Cancelar pedido** — `ADMIN` (cancela), `CLIENTE` (solicita) · 🟡
 - Anula el pedido. El Cliente solicita y el Admin resuelve.

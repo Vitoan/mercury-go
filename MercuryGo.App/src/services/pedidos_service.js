@@ -54,8 +54,9 @@ export const pedidos_service = {
     return ajax_service.put(`api/pedidos/${id}/picking`, { items }, opciones);
   },
 
-  actualizar_pedido(id, datos) {
-    return ajax_service.put(`api/pedidos/${id}`, datos);
+  actualizar_pedido(id, datos, idempotency_key = null) {
+    const opciones = idempotency_key ? { idempotency_key } : {};
+    return ajax_service.put(`api/pedidos/${id}`, datos, opciones);
   },
 
   registrar_cobro_chofer(id, monto, metodo = 'Efectivo', idempotency_key = null, ocurrido_en = null) {

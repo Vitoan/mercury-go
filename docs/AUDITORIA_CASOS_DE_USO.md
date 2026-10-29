@@ -12,6 +12,7 @@
 > - ✅ **P0-5** resuelto: el cobro valida estado, chofer asignado y tope contra el total; el cliente envía `Idempotency-Key` y `ocurrido_en`.
 > - ✅ **P0-4** resuelto: el listado de pedidos filtra por `ChoferId` para el rol `CHOFER`.
 > - ✅ **P1-7** resuelto: selector de chofer en el detalle, con `GET /api/pedidos/choferes`; despachar exige chofer asignado.
+> - ✅ **P1-1** resuelto: la edición de pedido reconcilia líneas en su lugar y conserva precio histórico y cantidades de picking.
 > - ✅ **P1-13** resuelto: la creación de pedido envía `Idempotency-Key`.
 > - ⏳ **P1-4** queda parcial: el cobro ya envía hora real, los cambios de estado no.
 
@@ -104,7 +105,7 @@ La idempotencia por header (`:447-454`) funciona, pero `carrito_store.confirmar_
 
 | # | CU | Hallazgo | Evidencia |
 | :--- | :--- | :--- | :--- |
-| P1-1 | CU-08 | `ActualizarPedido` **borra y recrea** los `DetallePedido`. Se pierden `CantidadPedida`, `CantidadPreparada`, `CantidadRechazada`, `CantidadEntregada` y `MotivoRechazo`, y se re-congelan precios actuales. | `PedidosController.cs:407-424` |
+| P1-1 | CU-08 | `ActualizarPedido` **borra y recrea** los `DetallePedido`. Se pierden `CantidadPedida`, `CantidadPreparada`, `CantidadRechazada`, `CantidadEntregada` y `MotivoRechazo`, y se re-congelan precios actuales. | `PedidosController.cs:407-424` — ✅ resuelto con `PedidoEdicionService` |
 | P1-2 | CU-11 | El picking **no despacha**: `Confirmado → EnPreparacion`. El documento describe una sola acción que prepara y deja listo para despacho. | `PedidosController.cs:792-...`, `comp_picking_modal.vue:263` |
 | P1-3 | CU-11 | Con faltantes **no se notifica al Admin**, pese a `CASOS_DE_USO.md:105`. Solo se genera notificación al cliente (`PedidoTransicionService:138`). | sin código |
 | P1-4 | CU-16 | `ocurrido_en` se guarda en la cola pero **nunca se envía**. La API sí lo acepta (`CambiarEstadoRequest.OcurridoEn`, `CobroChoferRequest.OcurridoEn`); el faltante es 100 % del cliente. | `pedidos_service.js` `cambiar_estado` / `registrar_cobro_chofer` — 🟡 el cobro ya lo envía; los cambios de estado no |

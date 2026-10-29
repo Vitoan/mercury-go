@@ -200,7 +200,7 @@
             <div class="mercury-cabecera-fila">
               <ion-card-title>Mercadería Incluida</ion-card-title>
               <ion-button
-                v-if="esAdmin && !modoEdicion && !offline_store.sin_conexion && detalle.estado !== 'Entregado' && detalle.estado !== 'Cancelado'"
+                v-if="esAdmin && !modoEdicion && !offline_store.sin_conexion && detalle.observaciones_editables"
                 size="small"
                 fill="clear"
                 color="secondary"
@@ -222,7 +222,7 @@
                 </ion-label>
 
                 <!-- Si está en modo edición, mostrar stepper -->
-                <div v-if="modoEdicion" slot="end" class="mercury-stepper">
+                <div v-if="modoEdicion && detalle.items_editables" slot="end" class="mercury-stepper">
                   <ion-button size="small" fill="clear" color="medium" @click="decrementar(item)">
                     <ion-icon :icon="removeCircleOutline" />
                   </ion-button>
@@ -241,6 +241,9 @@
             </ion-list>
 
             <div v-if="modoEdicion" class="mercury-edicion-obs">
+              <p v-if="!detalle.items_editables" class="mercury-edicion-aviso">
+                El pedido ya inició preparación o está en reparto: solo podés editar las observaciones.
+              </p>
               <ion-item lines="inset">
                 <ion-label position="stacked">Modificar Observaciones</ion-label>
                 <ion-textarea v-model="observacionesEdicion" :rows="2" />
@@ -328,6 +331,7 @@ import { compartir_archivo } from '@/services/compartir_service';
 import { geolocalizacion_service } from '@/services/geolocalizacion_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
+import { nueva_clave_idempotencia } from '@/utils/idempotencia';
 import { useToast } from '@/composables/useToast';
 
 const toast = useToast();
@@ -747,14 +751,15 @@ const eliminarItem = (item) => {
 const guardarCambiosEdicion = async () => {
   guardandoEdicion.value = true;
   try {
-    const payload = {
-      items: itemsEdicion.value.map((i) => ({
+    const payload = { observaciones: observacionesEdicion.value };
+    // Si el pedido ya está en preparación o reparto, el servidor solo acepta observaciones.
+    if (detalle.value?.items_editables) {
+      payload.items = itemsEdicion.value.map((i) => ({
         producto_id: i.producto_id,
         cantidad: i.cantidad
-      })),
-      observaciones: observacionesEdicion.value
-    };
-    await pedidos_service.actualizar_pedido(props.pedidoId, payload);
+      }));
+    }
+    await pedidos_service.actualizar_pedido(props.pedidoId, payload, nueva_clave_idempotencia());
     await vibrar_exito();
     toast.mostrarExito('¡Pedido actualizado con éxito!');
     modoEdicion.value = false;
@@ -937,5 +942,14 @@ const cerrar = () => {
   margin: 6px 0 0 0;
   font-size: 0.8rem;
   color: var(--ion-color-warning-shade, #b45309);
+}
+
+.mercury-edicion-aviso {
+  margin: 0 0 10px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ion-color-warning-tint, #fef3c7);
+  color: var(--ion-color-warning-shade, #b45309);
+  font-size: 0.8rem;
 }
 </style>
