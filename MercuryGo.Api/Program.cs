@@ -146,11 +146,20 @@ Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "productos"));
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "comprobantes"));
 Directory.CreateDirectory(Path.Combine(webRootPath, "seed", "productos"));
 
-// Las imágenes del catálogo y archivos se sirven desde wwwroot con cabeceras CORS para WebView/Android
+// Las imágenes del catálogo se sirven públicamente; comprobantes bancarios quedan restringidos (P0-3)
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
     {
+        // Denegar acceso anónimo directo a comprobantes bancarios y transferencias
+        if (ctx.Context.Request.Path.StartsWithSegments("/uploads/comprobantes", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            ctx.Context.Response.ContentLength = 0;
+            ctx.Context.Response.Body = Stream.Null;
+            return;
+        }
+
         ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
         ctx.Context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
         ctx.Context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");

@@ -41,6 +41,14 @@ export const pedidos_service = {
     return ajax_service.blob(`/api/pedidos/${id}/comprobante`);
   },
 
+  descargar_archivo_comprobante(id) {
+    return ajax_service.blob(`/api/pedidos/${id}/comprobante-pago/archivo`);
+  },
+
+  descargar_archivo_pago_cuenta(id) {
+    return ajax_service.blob(`/api/pedidos/cuenta-corriente/pagos/${id}/archivo`);
+  },
+
   obtener_qr_url(id) {
     return ajax_service.blob(`/api/pedidos/${id}/qr`);
   },

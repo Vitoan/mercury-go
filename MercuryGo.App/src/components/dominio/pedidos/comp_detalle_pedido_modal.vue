@@ -543,10 +543,17 @@ const comprobanteInfo = computed(() => {
   };
 });
 
-const abrirComprobanteAdjunto = () => {
-  if (comprobanteInfo.value?.url) {
+const abrirComprobanteAdjunto = async () => {
+  if (comprobanteInfo.value?.url && props.pedidoId) {
     vibrar_toque();
-    window.open(comprobanteInfo.value.url, '_blank');
+    try {
+      toast.mostrarInfo('Descargando comprobante protegido...');
+      const blob = await pedidos_service.descargar_archivo_comprobante(props.pedidoId);
+      const urlBlob = URL.createObjectURL(blob);
+      window.open(urlBlob, '_blank');
+    } catch (err) {
+      toast.mostrarError(err.mensaje || 'Error al descargar el comprobante adjunto.');
+    }
   }
 };
 

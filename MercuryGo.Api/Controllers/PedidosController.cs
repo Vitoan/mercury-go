@@ -147,6 +147,9 @@ public sealed class PedidosController(
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El remito/orden de carga no existe o fue cancelado." });
 
+        if (!await PuedeAccederAlPedidoAsync(pedido.p, ct))
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "acceso_denegado", mensaje = "No tenés autorización para consultar esta orden de carga." });
+
         var detalles = await (
             from d in db.DetallesPedido.AsNoTracking()
             join prod in db.Productos.AsNoTracking() on d.ProductoId equals prod.Id
@@ -207,6 +210,27 @@ public sealed class PedidosController(
         }
 
         return null;
+    }
+
+    private async Task<bool> PuedeAccederAlPedidoAsync(Pedido pedido, CancellationToken ct)
+    {
+        if (User.IsInRole(RolCodigos.Admin) || User.IsInRole(RolCodigos.Operario))
+            return true;
+
+        if (User.IsInRole(RolCodigos.Chofer))
+        {
+            var usuarioId = User.UsuarioId();
+            return (pedido.ChoferId.HasValue && pedido.ChoferId.Value == usuarioId)
+                || pedido.Estado == EstadoPedido.Despachado;
+        }
+
+        if (User.EsCliente())
+        {
+            var cliente = await ObtenerClienteDeUsuarioAutenticadoAsync(ct);
+            return cliente != null && pedido.ClienteId == cliente.Id;
+        }
+
+        return false;
     }
 
     // Creación de orden de carga: LOS PRECIOS NO VIAJAN DESDE EL TELÉFONO.
@@ -282,9 +306,8 @@ public sealed class PedidosController(
             }
         }
 
-        // Generar número de remito correlativo
-        var totalPedidos = await db.Pedidos.CountAsync(ct);
-        var numeroRemito = $"PED-{(totalPedidos + 1):D6}";
+        // Generación de número de remito transaccional sin carreras de concurrencia (P0-5)
+        var numeroTemporal = $"TMP-{Guid.NewGuid():N}";
 
         var estadoInicial = EstadoPedido.Pendiente;
         if (!tieneFalloValidacion && !string.IsNullOrWhiteSpace(request.Estado) &&
@@ -297,7 +320,7 @@ public sealed class PedidosController(
         var nuevoPedido = new Pedido
         {
             ClienteId = clienteId,
-            Numero = numeroRemito,
+            Numero = numeroTemporal,
             Estado = estadoInicial,
             FechaPedido = DateTime.UtcNow,
             Observaciones = NormalizarTexto(request.Observaciones),
@@ -311,6 +334,9 @@ public sealed class PedidosController(
 
         db.Pedidos.Add(nuevoPedido);
         await db.SaveChangesAsync(ct);
+
+        // Correlativo formal garantizado por secuencia autonumérica sin colisión
+        nuevoPedido.Numero = $"PED-{nuevoPedido.Id:D6}";
 
         foreach (var item in request.Items)
         {
@@ -495,6 +521,7 @@ public sealed class PedidosController(
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
 
         if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
             return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede editar un pedido finalizado o cancelado." });
@@ -1326,6 +1353,89 @@ public sealed class PedidosController(
         });
     }
 
+
+    // Descarga segura y autenticada de comprobante de pago de un pedido (P0-3)
+    [HttpGet("{id:long}/comprobante-pago/archivo")]
+    public async Task<IActionResult> ObtenerArchivoComprobantePago(long id, CancellationToken ct)
+    {
+        var pedido = await db.Pedidos.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pedido is null)
+            return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El remito/orden no existe o fue cancelado." });
+
+        if (!await PuedeAccederAlPedidoAsync(pedido, ct))
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "acceso_denegado", mensaje = "No tenés autorización para consultar los comprobantes de esta orden." });
+
+        var rutaRelativa = pedido.ComprobanteUrl;
+        if (string.IsNullOrWhiteSpace(rutaRelativa))
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(pedido.Observaciones ?? string.Empty, @"/uploads/comprobantes/[^\s\]]+");
+            if (match.Success)
+            {
+                rutaRelativa = match.Value;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(rutaRelativa))
+            return NotFound(new { codigo = "sin_comprobante", mensaje = "Esta orden no tiene ningún comprobante de pago adjunto." });
+
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var rutaLimpia = rutaRelativa.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var rutaFisica = Path.Combine(webRoot, rutaLimpia);
+
+        if (!System.IO.File.Exists(rutaFisica))
+            return NotFound(new { codigo = "archivo_no_encontrado", mensaje = "El archivo físico del comprobante no existe en el servidor." });
+
+        var extension = Path.GetExtension(rutaFisica).ToLowerInvariant();
+        var contentType = extension switch
+        {
+            ".pdf" => "application/pdf",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+
+        return PhysicalFile(rutaFisica, contentType, Path.GetFileName(rutaFisica));
+    }
+
+    // Descarga segura y autenticada de comprobante de pago directo a cuenta corriente (P0-3)
+    [HttpGet("cuenta-corriente/pagos/{id:long}/archivo")]
+    public async Task<IActionResult> ObtenerArchivoPagoCuentaCorriente(long id, CancellationToken ct)
+    {
+        var pago = await db.PagosCuentaCorriente.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
+        if (pago is null)
+            return NotFound(new { codigo = "pago_no_encontrado", mensaje = "El pago a cuenta corriente no existe o fue dado de baja." });
+
+        if (User.EsCliente())
+        {
+            var cliente = await ObtenerClienteDeUsuarioAutenticadoAsync(ct);
+            if (cliente is null || cliente.Id != pago.ClienteId)
+                return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "acceso_denegado", mensaje = "No tenés autorización para ver este comprobante." });
+        }
+
+        if (string.IsNullOrWhiteSpace(pago.ComprobanteUrl))
+            return NotFound(new { codigo = "sin_comprobante", mensaje = "Este abono no contiene un comprobante adjunto." });
+
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var rutaLimpia = pago.ComprobanteUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var rutaFisica = Path.Combine(webRoot, rutaLimpia);
+
+        if (!System.IO.File.Exists(rutaFisica))
+            return NotFound(new { codigo = "archivo_no_encontrado", mensaje = "El archivo físico del comprobante no existe en el servidor." });
+
+        var extension = Path.GetExtension(rutaFisica).ToLowerInvariant();
+        var contentType = extension switch
+        {
+            ".pdf" => "application/pdf",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+
+        return PhysicalFile(rutaFisica, contentType, Path.GetFileName(rutaFisica));
+    }
+
     // Subida de comprobante de transferencia bancaria (PDF o Foto: JPG, PNG, WEBP hasta 5 MB)
     [HttpPost("{id:long}/comprobante-pago")]
     public async Task<IActionResult> SubirComprobantePago(long id, IFormFile? archivo, CancellationToken ct)
@@ -1341,6 +1451,9 @@ public sealed class PedidosController(
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (!await PuedeAccederAlPedidoAsync(pedido, ct))
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "acceso_denegado", mensaje = "No tenés autorización para adjuntar comprobantes a esta orden." });
 
         var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
         var carpetaComprobantes = Path.Combine(webRoot, "uploads", "comprobantes");
@@ -1388,6 +1501,9 @@ public sealed class PedidosController(
 
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (!await PuedeAccederAlPedidoAsync(pedido.p, ct))
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "acceso_denegado", mensaje = "No tenés autorización para descargar el remito de esta orden." });
 
         var detalles = await (
             from d in db.DetallesPedido.AsNoTracking()
