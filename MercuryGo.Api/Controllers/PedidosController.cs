@@ -656,46 +656,64 @@ public sealed class PedidosController(
         if (!esAdmin && pedido.ChoferId.HasValue && pedido.ChoferId.Value != User.UsuarioId())
             return StatusCode(403, new { codigo = "chofer_no_asignado", mensaje = "El pedido está asignado a otro chofer." });
 
-        // El acumulado de cobros no puede superar el total de la orden.
-        var totalPedido = await db.DetallesPedido
-            .Where(d => d.PedidoId == pedido.Id)
-            .SumAsync(d => (decimal?)(d.Cantidad * d.PrecioUnitario), ct) ?? 0m;
-        var yaCobrado = await db.CobrosPedido
-            .Where(c => c.PedidoId == pedido.Id)
-            .SumAsync(c => (decimal?)c.Monto, ct) ?? 0m;
-
-        const decimal tolerancia = 0.01m;
-        if (yaCobrado + request.Monto > totalPedido + tolerancia)
+        CobroPedido nuevoCobro;
+        var esRelacional = db.Database.IsRelational();
+        await using var tx = esRelacional ? await db.Database.BeginTransactionAsync(ct) : null;
+        try
         {
-            return BadRequest(new
+            // El acumulado de cobros no puede superar el total de la orden.
+            var totalPedido = await db.DetallesPedido
+                .Where(d => d.PedidoId == pedido.Id)
+                .SumAsync(d => (decimal?)(d.Cantidad * d.PrecioUnitario), ct) ?? 0m;
+            var yaCobrado = await db.CobrosPedido
+                .Where(c => c.PedidoId == pedido.Id)
+                .SumAsync(c => (decimal?)c.Monto, ct) ?? 0m;
+
+            const decimal tolerancia = 0.01m;
+            if (yaCobrado + request.Monto > totalPedido + tolerancia)
             {
-                codigo = "monto_excede_total",
-                mensaje = $"El cobro supera el saldo de la orden. Total: ${totalPedido:N2}, ya cobrado: ${yaCobrado:N2}."
-            });
+                return BadRequest(new
+                {
+                    codigo = "monto_excede_total",
+                    mensaje = $"El cobro supera el saldo de la orden. Total: ${totalPedido:N2}, ya cobrado: ${yaCobrado:N2}."
+                });
+            }
+
+            var metodo = string.IsNullOrWhiteSpace(request.Metodo) ? "Efectivo" : request.Metodo.Trim();
+            var ocurridoEn = request.OcurridoEn ?? DateTime.UtcNow;
+
+            // 1. Guardar en tabla relacional estructurada
+            nuevoCobro = new CobroPedido
+            {
+                PedidoId = pedido.Id,
+                Monto = request.Monto,
+                Metodo = metodo,
+                RegistradoPorId = User.UsuarioId(),
+                OcurridoEn = ocurridoEn,
+                RecibidoEn = DateTime.UtcNow
+            };
+            db.CobrosPedido.Add(nuevoCobro);
+
+            // 2. Preservar etiqueta en Observaciones para total retrocompatibilidad
+            var logCobro = $"[Cobro Chofer: ${request.Monto:N2} ({metodo})]";
+            var obs = pedido.Observaciones ?? string.Empty;
+            pedido.Observaciones = string.IsNullOrWhiteSpace(obs) ? logCobro : $"{obs} · {logCobro}";
+            pedido.ActualizadoEn = DateTime.UtcNow;
+
+            await db.SaveChangesAsync(ct);
+            if (tx != null)
+            {
+                await tx.CommitAsync(ct);
+            }
         }
-
-        var metodo = string.IsNullOrWhiteSpace(request.Metodo) ? "Efectivo" : request.Metodo.Trim();
-        var ocurridoEn = request.OcurridoEn ?? DateTime.UtcNow;
-
-        // 1. Guardar en tabla relacional estructurada
-        var nuevoCobro = new CobroPedido
+        catch
         {
-            PedidoId = pedido.Id,
-            Monto = request.Monto,
-            Metodo = metodo,
-            RegistradoPorId = User.UsuarioId(),
-            OcurridoEn = ocurridoEn,
-            RecibidoEn = DateTime.UtcNow
-        };
-        db.CobrosPedido.Add(nuevoCobro);
-
-        // 2. Preservar etiqueta en Observaciones para total retrocompatibilidad
-        var logCobro = $"[Cobro Chofer: ${request.Monto:N2} ({metodo})]";
-        var obs = pedido.Observaciones ?? string.Empty;
-        pedido.Observaciones = string.IsNullOrWhiteSpace(obs) ? logCobro : $"{obs} · {logCobro}";
-        pedido.ActualizadoEn = DateTime.UtcNow;
-
-        await db.SaveChangesAsync(ct);
+            if (tx != null)
+            {
+                await tx.RollbackAsync(ct);
+            }
+            throw;
+        }
 
         var respuestaObj = new
         {

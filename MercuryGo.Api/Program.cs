@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Net;
@@ -46,6 +47,7 @@ var tokenService = new TokenService(jwtOpciones);
 builder.Services.AddSingleton(jwtOpciones);
 builder.Services.AddSingleton(tokenService);
 builder.Services.AddSingleton<ILoginRateLimiter, LoginRateLimiterService>();
+builder.Services.AddMemoryCache();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -69,7 +71,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             // Una baja o cambio de rol toma efecto instantáneamente.
             OnTokenValidated = async contexto =>
             {
-                var db = contexto.HttpContext.RequestServices.GetRequiredService<MercuryGoDbContext>();
                 var usuarioId = contexto.Principal?.UsuarioId() ?? 0;
                 if (usuarioId <= 0)
                 {
@@ -77,22 +78,40 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     return;
                 }
 
-                var usuario = await db.Usuarios.AsNoTracking()
-                    .Where(u => u.Id == usuarioId)
-                    .Select(u => new { u.Activo, u.RolId })
-                    .FirstOrDefaultAsync(contexto.HttpContext.RequestAborted);
+                var cache = contexto.HttpContext.RequestServices.GetService<IMemoryCache>();
+                var cacheKey = $"auth_usr_estado_{usuarioId}";
 
-                if (usuario is null || !usuario.Activo)
+                UsuarioEstadoCache? estado = null;
+
+                if (cache is null || !cache.TryGetValue(cacheKey, out estado) || estado is null)
+                {
+                    var db = contexto.HttpContext.RequestServices.GetRequiredService<MercuryGoDbContext>();
+                    var usuario = await db.Usuarios.AsNoTracking()
+                        .Where(u => u.Id == usuarioId)
+                        .Select(u => new { u.Activo, u.RolId })
+                        .FirstOrDefaultAsync(contexto.HttpContext.RequestAborted);
+
+                    if (usuario is null || !usuario.Activo)
+                    {
+                        contexto.Fail("El usuario fue dado de baja.");
+                        return;
+                    }
+
+                    var rolActual = usuario.RolId.HasValue
+                        ? await db.Roles.AsNoTracking().Where(r => r.Id == usuario.RolId.Value && r.Activo).Select(r => r.Codigo).FirstOrDefaultAsync(contexto.HttpContext.RequestAborted)
+                        : null;
+
+                    estado = new UsuarioEstadoCache(usuario.Activo, rolActual);
+                    cache?.Set(cacheKey, estado, TimeSpan.FromSeconds(60));
+                }
+
+                if (!estado.Activo)
                 {
                     contexto.Fail("El usuario fue dado de baja.");
                     return;
                 }
 
-                var rolActual = usuario.RolId.HasValue
-                    ? await db.Roles.AsNoTracking().Where(r => r.Id == usuario.RolId.Value && r.Activo).Select(r => r.Codigo).FirstOrDefaultAsync(contexto.HttpContext.RequestAborted)
-                    : null;
-
-                if (rolActual != contexto.Principal?.RolCodigo())
+                if (estado.RolCodigo != contexto.Principal?.RolCodigo())
                 {
                     contexto.Fail("El rol del usuario cambió; vuelva a iniciar sesión.");
                 }
@@ -228,3 +247,6 @@ static bool EsIpPrivada(IPAddress ip)
         bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31
     );
 }
+
+
+public sealed record UsuarioEstadoCache(bool Activo, string? RolCodigo);

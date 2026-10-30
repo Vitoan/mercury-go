@@ -24,7 +24,7 @@ public sealed record RolDto(long Id, string Codigo, string Nombre, string? Descr
 [ApiController]
 [Authorize(Roles = RolCodigos.Admin)]
 [Route("api/usuarios")]
-public sealed class UsuariosController(MercuryGoDbContext db) : ControllerBase
+public sealed class UsuariosController(MercuryGoDbContext db, Microsoft.Extensions.Caching.Memory.IMemoryCache? cache = null) : ControllerBase
 {
     private static readonly PasswordHasher<Usuario> Hasher = new();
 
@@ -177,6 +177,7 @@ public sealed class UsuariosController(MercuryGoDbContext db) : ControllerBase
             .Where(r => r.UsuarioId == id && r.RevocadoEn == null)
             .ToListAsync(cancellationToken);
         tokensActivos.ForEach(t => t.RevocadoEn = DateTimeOffset.UtcNow);
+        cache?.Remove($"auth_usr_estado_{id}");
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -202,6 +203,7 @@ public sealed class UsuariosController(MercuryGoDbContext db) : ControllerBase
             .Where(r => r.UsuarioId == id && r.RevocadoEn == null)
             .ToListAsync(cancellationToken);
         tokensActivos.ForEach(t => t.RevocadoEn = DateTimeOffset.UtcNow);
+        cache?.Remove($"auth_usr_estado_{id}");
 
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new { eliminado = true });

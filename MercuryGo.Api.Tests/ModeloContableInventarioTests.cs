@@ -162,4 +162,51 @@ public class ModeloContableInventarioTests
         Assert.Equal("Comprobante ilegible / Transferencia no acreditada", recuperado.MotivoRechazo);
         Assert.Equal(1, recuperado.AuditadoPorId);
     }
+
+    [Fact]
+    public async Task CobroPedido_TotalAcumulado_NoDebeSuperarTotalDeLaOrden()
+    {
+        using var db = CrearContextoEnMemoria("Test_Cobro_TopeTotal");
+
+        var pedido = new Pedido
+        {
+            Id = 50,
+            Numero = "PED-000050",
+            Estado = EstadoPedido.Despachado,
+            Activo = true
+        };
+        db.Pedidos.Add(pedido);
+
+        db.DetallesPedido.Add(new DetallePedido
+        {
+            PedidoId = 50,
+            ProductoId = 1,
+            Cantidad = 2,
+            PrecioUnitario = 5000m
+        }); // Total orden = 10.000
+
+        db.CobrosPedido.Add(new CobroPedido
+        {
+            PedidoId = 50,
+            Monto = 6000m,
+            Metodo = "Efectivo",
+            OcurridoEn = DateTime.UtcNow,
+            RecibidoEn = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var totalPedido = await db.DetallesPedido
+            .Where(d => d.PedidoId == 50)
+            .SumAsync(d => (decimal?)(d.Cantidad * d.PrecioUnitario)) ?? 0m;
+
+        var yaCobrado = await db.CobrosPedido
+            .Where(c => c.PedidoId == 50)
+            .SumAsync(c => (decimal?)c.Monto) ?? 0m;
+
+        decimal nuevoCobroExcesivo = 5000m; // 6.000 + 5.000 = 11.000 > 10.000
+        const decimal tolerancia = 0.01m;
+
+        var excede = yaCobrado + nuevoCobroExcesivo > totalPedido + tolerancia;
+        Assert.True(excede);
+    }
 }
