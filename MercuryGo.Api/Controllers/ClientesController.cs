@@ -1,3 +1,4 @@
+using MercuryGo.Api.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -81,12 +82,12 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
         var error = Validar(request);
         if (error is not null) return BadRequest(error);
 
-        var cuitLimpio = NormalizarTexto(request.Cuit) ?? string.Empty;
+        var cuitLimpio = TextoUtil.Normalizar(request.Cuit) ?? string.Empty;
         var cuitDuplicado = await db.Clientes.AnyAsync(c => c.Cuit == cuitLimpio && c.Activo, ct);
         if (cuitDuplicado)
             return BadRequest(new { codigo = "cliente_cuit_duplicado", mensaje = "Ya existe un cliente o comercio registrado con ese CUIT." });
 
-        var telefonoLimpio = NormalizarTexto(request.Telefono);
+        var telefonoLimpio = TextoUtil.Normalizar(request.Telefono);
         if (!string.IsNullOrEmpty(telefonoLimpio))
         {
             var telefonoDuplicado = await db.Clientes.AnyAsync(c => c.Telefono == telefonoLimpio && c.Activo, ct);
@@ -99,9 +100,9 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
             RazonSocial = request.RazonSocial.Trim(),
             Cuit = cuitLimpio,
             Telefono = telefonoLimpio,
-            Email = NormalizarTexto(request.Email),
-            Direccion = NormalizarTexto(request.Direccion),
-            Localidad = NormalizarTexto(request.Localidad),
+            Email = TextoUtil.Normalizar(request.Email),
+            Direccion = TextoUtil.Normalizar(request.Direccion),
+            Localidad = TextoUtil.Normalizar(request.Localidad),
             Activo = true,
             CreadoEn = DateTime.UtcNow
         };
@@ -123,12 +124,12 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
         if (cliente is null)
             return NotFound(new { codigo = "cliente_no_encontrado", mensaje = "El cliente no existe o ya fue dado de baja." });
 
-        var cuitLimpio = NormalizarTexto(request.Cuit) ?? string.Empty;
+        var cuitLimpio = TextoUtil.Normalizar(request.Cuit) ?? string.Empty;
         var cuitDuplicado = await db.Clientes.AnyAsync(c => c.Cuit == cuitLimpio && c.Activo && c.Id != id, ct);
         if (cuitDuplicado)
             return BadRequest(new { codigo = "cliente_cuit_duplicado", mensaje = "Ya existe otro cliente registrado con ese número de CUIT." });
 
-        var telefonoLimpio = NormalizarTexto(request.Telefono);
+        var telefonoLimpio = TextoUtil.Normalizar(request.Telefono);
         if (!string.IsNullOrEmpty(telefonoLimpio))
         {
             var telefonoDuplicado = await db.Clientes.AnyAsync(c => c.Telefono == telefonoLimpio && c.Activo && c.Id != id, ct);
@@ -139,9 +140,9 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
         cliente.RazonSocial = request.RazonSocial.Trim();
         cliente.Cuit = cuitLimpio;
         cliente.Telefono = telefonoLimpio;
-        cliente.Email = NormalizarTexto(request.Email);
-        cliente.Direccion = NormalizarTexto(request.Direccion);
-        cliente.Localidad = NormalizarTexto(request.Localidad);
+        cliente.Email = TextoUtil.Normalizar(request.Email);
+        cliente.Direccion = TextoUtil.Normalizar(request.Direccion);
+        cliente.Localidad = TextoUtil.Normalizar(request.Localidad);
         cliente.ActualizadoEn = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -181,11 +182,6 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
         return null;
     }
 
-    private static string? NormalizarTexto(string? texto)
-    {
-        var limpio = (texto ?? string.Empty).Trim();
-        return limpio.Length > 0 ? limpio : null;
-    }
 
     private static ClienteListaResponse Proyectar(Cliente c) =>
         new(c.Id, c.RazonSocial, c.Cuit, c.Localidad, c.Direccion, c.Telefono, c.Email);

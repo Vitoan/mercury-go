@@ -1,14 +1,19 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MercuryGo.Api.Auth;
+using MercuryGo.Api.Common;
 using MercuryGo.Api.Data;
 using MercuryGo.Api.Domain.Entities;
+using MercuryGo.Api.Services;
 
 namespace MercuryGo.Api.Controllers;
 
-public abstract class PedidosControllerBase(MercuryGoDbContext db) : ControllerBase
+public abstract class PedidosControllerBase(
+    MercuryGoDbContext db,
+    ConflictoOfflineService? conflictoOfflineService = null) : ControllerBase
 {
     protected readonly MercuryGoDbContext db = db;
+    protected readonly ConflictoOfflineService? conflictoOfflineService = conflictoOfflineService;
 
     protected async Task<Cliente?> ObtenerClienteDeUsuarioAutenticadoAsync(CancellationToken ct)
     {
@@ -53,9 +58,31 @@ public abstract class PedidosControllerBase(MercuryGoDbContext db) : ControllerB
         return false;
     }
 
-    protected static string? NormalizarTexto(string? texto)
+    // Avisos al Admin cuando una acción tomada sin red choca con lo que pasó
+    // entretanto en el servidor (Decisiones 10 y 17). La acción se aplica igual
+    // —gana el chofer— pero el Admin tiene que enterarse.
+    protected async Task AvisarConflictosOfflineAsync(
+        Pedido pedido,
+        EstadoPedido estadoAnterior,
+        bool esOffline,
+        EstadoPedido estadoNuevo,
+        CancellationToken ct)
     {
-        var limpio = (texto ?? string.Empty).Trim();
-        return limpio.Length > 0 ? limpio : null;
+        if (!esOffline || conflictoOfflineService is null)
+            return;
+
+        var usuarioId = User.UsuarioId();
+        var esChofer = string.Equals(User.RolCodigo(), RolCodigos.Chofer, StringComparison.OrdinalIgnoreCase);
+
+        var avisosCancelacion = await conflictoOfflineService.AvisarEntregaSobreCanceladoAsync(
+            pedido, usuarioId, estadoAnterior, ct);
+
+        if (avisosCancelacion > 0)
+            return;
+
+        await conflictoOfflineService.AvisarChoferReasignadoAsync(
+            pedido, usuarioId, esChofer, estadoNuevo, ct);
     }
+
+    protected static string? NormalizarTexto(string? texto) => TextoUtil.Normalizar(texto);
 }

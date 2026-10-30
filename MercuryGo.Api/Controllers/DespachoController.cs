@@ -20,7 +20,7 @@ public sealed class DespachoController(
     MercuryGo.Api.Services.IPedidoTransicionService transicionService,
     MercuryGo.Api.Services.IdempotenciaService idempotenciaService,
     MercuryGo.Api.Services.NotificacionService notificacionService,
-    MercuryGo.Api.Services.ConflictoOfflineService conflictoOfflineService) : PedidosControllerBase(db)
+    MercuryGo.Api.Services.ConflictoOfflineService conflictoOfflineService) : PedidosControllerBase(db, conflictoOfflineService)
 {
     // Registro de picking/preparación de depósito (Operario o Admin)
     [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario}")]
@@ -108,7 +108,7 @@ public sealed class DespachoController(
         {
             // Decisión 16: el picking se guardó, pero sobre una orden que el Admin
             // ya había cancelado. Un solo aviso, que incluye los faltantes.
-            await conflictoOfflineService.AvisarPickingSobreCanceladoAsync(
+            await conflictoOfflineService!.AvisarPickingSobreCanceladoAsync(
                 pedido, User.UsuarioId(), faltantes.Count > 0, request.EsOffline, ct);
         }
         else if (faltantes.Count > 0)
@@ -579,32 +579,6 @@ public sealed class DespachoController(
         });
     }
 
-
-    // Avisos al Admin cuando una acción tomada sin red choca con lo que pasó
-    // entretanto en el servidor (Decisiones 10 y 17). La acción se aplica igual
-    // —gana el chofer— pero el Admin tiene que enterarse.
-    private async Task AvisarConflictosOfflineAsync(
-        Pedido pedido,
-        EstadoPedido estadoAnterior,
-        bool esOffline,
-        EstadoPedido estadoNuevo,
-        CancellationToken ct)
-    {
-        if (!esOffline)
-            return;
-
-        var usuarioId = User.UsuarioId();
-        var esChofer = string.Equals(User.RolCodigo(), RolCodigos.Chofer, StringComparison.OrdinalIgnoreCase);
-
-        var avisosCancelacion = await conflictoOfflineService.AvisarEntregaSobreCanceladoAsync(
-            pedido, usuarioId, estadoAnterior, ct);
-
-        if (avisosCancelacion > 0)
-            return;
-
-        await conflictoOfflineService.AvisarChoferReasignadoAsync(
-            pedido, usuarioId, esChofer, estadoNuevo, ct);
-    }
 
     private static IContainer CeldaEncabezado(IContainer c) =>
         c.BorderBottom(1).BorderColor(Colors.Grey.Lighten1).PaddingVertical(5);

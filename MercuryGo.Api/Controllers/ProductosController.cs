@@ -1,3 +1,4 @@
+using MercuryGo.Api.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -159,9 +160,9 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
         {
             CategoriaId = request.CategoriaId,
             Nombre = request.Nombre.Trim(),
-            Descripcion = NormalizarTexto(request.Descripcion),
+            Descripcion = TextoUtil.Normalizar(request.Descripcion),
             Precio = request.Precio,
-            ImagenUrl = NormalizarTexto(request.ImagenUrl),
+            ImagenUrl = TextoUtil.Normalizar(request.ImagenUrl),
             Disponible = request.Disponible,
             EnOferta = request.EnOferta,
             StockActual = request.StockActual ?? 100,
@@ -188,11 +189,11 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
 
         producto.CategoriaId = request.CategoriaId;
         producto.Nombre = request.Nombre.Trim();
-        producto.Descripcion = NormalizarTexto(request.Descripcion);
+        producto.Descripcion = TextoUtil.Normalizar(request.Descripcion);
         producto.Precio = request.Precio;
         if (request.ImagenUrl is not null)
         {
-            producto.ImagenUrl = NormalizarTexto(request.ImagenUrl);
+            producto.ImagenUrl = TextoUtil.Normalizar(request.ImagenUrl);
         }
         producto.Disponible = request.Disponible;
         producto.EnOferta = request.EnOferta;
@@ -287,11 +288,6 @@ public sealed class ProductosController(MercuryGoDbContext db, IWebHostEnvironme
         ).FirstOrDefaultAsync(ct);
     }
 
-    private static string? NormalizarTexto(string? texto)
-    {
-        var limpio = (texto ?? string.Empty).Trim();
-        return limpio.Length > 0 ? limpio : null;
-    }
 }
 
 public sealed record GuardarProductoRequest(

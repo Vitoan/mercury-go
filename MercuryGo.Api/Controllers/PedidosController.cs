@@ -15,7 +15,7 @@ public sealed class PedidosController(
     MercuryGoDbContext db,
     MercuryGo.Api.Services.IPedidoTransicionService transicionService,
     MercuryGo.Api.Services.IdempotenciaService idempotenciaService,
-    MercuryGo.Api.Services.ConflictoOfflineService conflictoOfflineService) : PedidosControllerBase(db)
+    MercuryGo.Api.Services.ConflictoOfflineService conflictoOfflineService) : PedidosControllerBase(db, conflictoOfflineService)
 {
     // Estados en los que todavía se puede corregir la mercadería del pedido.
     private static readonly EstadoPedido[] EstadosConItemsEditables =
@@ -685,32 +685,6 @@ public sealed class PedidosController(
             estado = pedido.Estado.ToString(),
             cancelacion_estado = pedido.CancelacionEstado
         });
-    }
-
-    // Avisos al Admin cuando una acción tomada sin red choca con lo que pasó
-    // entretanto en el servidor (Decisiones 10 y 17). La acción se aplica igual
-    // —gana el chofer— pero el Admin tiene que enterarse.
-    private async Task AvisarConflictosOfflineAsync(
-        Pedido pedido,
-        EstadoPedido estadoAnterior,
-        bool esOffline,
-        EstadoPedido estadoNuevo,
-        CancellationToken ct)
-    {
-        if (!esOffline)
-            return;
-
-        var usuarioId = User.UsuarioId();
-        var esChofer = string.Equals(User.RolCodigo(), RolCodigos.Chofer, StringComparison.OrdinalIgnoreCase);
-
-        var avisosCancelacion = await conflictoOfflineService.AvisarEntregaSobreCanceladoAsync(
-            pedido, usuarioId, estadoAnterior, ct);
-
-        if (avisosCancelacion > 0)
-            return;
-
-        await conflictoOfflineService.AvisarChoferReasignadoAsync(
-            pedido, usuarioId, esChofer, estadoNuevo, ct);
     }
 
 }
