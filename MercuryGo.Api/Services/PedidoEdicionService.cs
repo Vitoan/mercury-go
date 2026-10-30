@@ -4,7 +4,7 @@ namespace MercuryGo.Api.Services;
 
 // Ítem solicitado en una edición, desacoplado del DTO HTTP para poder probar la
 // reconciliación sin levantar el controller.
-public readonly record struct ItemEdicionPedido(long ProductoId, int Cantidad);
+public readonly record struct ItemEdicionPedido(long ProductoId, int Cantidad, decimal? PrecioUnitario = null);
 
 public sealed record ErrorEdicionPedido(string Codigo, string Mensaje);
 
@@ -41,6 +41,10 @@ public static class PedidoEdicionService
         if (solicitados.Any(i => i.Cantidad <= 0))
             return Falla("cantidad_invalida", $"La cantidad del producto {sinCantidad.ProductoId} debe ser mayor a cero.");
 
+        var precioInvalido = solicitados.FirstOrDefault(i => i.PrecioUnitario.HasValue && i.PrecioUnitario.Value <= 0);
+        if (solicitados.Any(i => i.PrecioUnitario.HasValue && i.PrecioUnitario.Value <= 0))
+            return Falla("precio_invalido", $"El precio del producto {precioInvalido.ProductoId} debe ser mayor a cero.");
+
         foreach (var item in solicitados)
         {
             if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo)
@@ -61,6 +65,11 @@ public static class PedidoEdicionService
                 existente.Cantidad = item.Cantidad;
                 existente.CantidadPedida = item.Cantidad;
 
+                if (item.PrecioUnitario.HasValue && item.PrecioUnitario.Value > 0)
+                {
+                    existente.PrecioUnitario = Math.Round(item.PrecioUnitario.Value, 2);
+                }
+
                 // Si la nueva cantidad es menor a lo ya preparado, se recorta para
                 // no dejar preparado más de lo pedido.
                 if (existente.CantidadPreparada > item.Cantidad)
@@ -69,6 +78,10 @@ public static class PedidoEdicionService
             else
             {
                 var producto = productos[item.ProductoId];
+                var precioFinal = item.PrecioUnitario.HasValue && item.PrecioUnitario.Value > 0
+                    ? Math.Round(item.PrecioUnitario.Value, 2)
+                    : producto.Precio;
+
                 agregados.Add(new DetallePedido
                 {
                     PedidoId = pedidoId,
@@ -76,7 +89,7 @@ public static class PedidoEdicionService
                     Cantidad = item.Cantidad,
                     CantidadPedida = item.Cantidad,
                     CantidadPreparada = item.Cantidad,
-                    PrecioUnitario = producto.Precio,
+                    PrecioUnitario = precioFinal,
                     CreadoEn = DateTime.UtcNow
                 });
             }

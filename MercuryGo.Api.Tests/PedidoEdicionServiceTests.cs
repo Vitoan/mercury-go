@@ -137,4 +137,49 @@ public sealed class PedidoEdicionServiceTests
         Assert.NotNull(resultado.Error);
         Assert.Equal("items_requeridos", resultado.Error!.Codigo);
     }
+
+    [Fact]
+    public void PermiteModificarPrecioUnitarioExistente()
+    {
+        var actuales = new List<DetallePedido> { Detalle(10, 2, 100m) };
+        var productos = new Dictionary<long, Producto> { [10] = Producto(10, 100m) };
+
+        var resultado = PedidoEdicionService.Reconciliar(
+            1, actuales, [new ItemEdicionPedido(10, 2, 85.5m)], productos);
+
+        Assert.Null(resultado.Error);
+        Assert.Equal(85.5m, actuales[0].PrecioUnitario);
+        Assert.Equal(171m, resultado.TotalResultante);
+    }
+
+    [Fact]
+    public void AgregaProductoNuevoConPrecioPersonalizado()
+    {
+        var actuales = new List<DetallePedido> { Detalle(10, 1, 100m) };
+        var productos = new Dictionary<long, Producto>
+        {
+            [10] = Producto(10, 100m),
+            [20] = Producto(20, 250m)
+        };
+
+        var resultado = PedidoEdicionService.Reconciliar(
+            1, actuales, [new ItemEdicionPedido(10, 1), new ItemEdicionPedido(20, 2, 200m)], productos);
+
+        Assert.Null(resultado.Error);
+        var agregado = Assert.Single(resultado.Agregados);
+        Assert.Equal(200m, agregado.PrecioUnitario);
+        Assert.Equal(500m, resultado.TotalResultante);
+    }
+
+    [Fact]
+    public void RechazaPrecioUnitarioInvalido()
+    {
+        var productos = new Dictionary<long, Producto> { [10] = Producto(10, 100m) };
+
+        var resultado = PedidoEdicionService.Reconciliar(
+            1, [], [new ItemEdicionPedido(10, 1, -10m)], productos);
+
+        Assert.NotNull(resultado.Error);
+        Assert.Equal("precio_invalido", resultado.Error!.Codigo);
+    }
 }

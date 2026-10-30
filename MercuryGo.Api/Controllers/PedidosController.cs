@@ -544,7 +544,7 @@ public sealed class PedidosController(
             var resultado = PedidoEdicionService.Reconciliar(
                 pedido.Id,
                 detallesActuales,
-                request.Items!.Select(i => new ItemEdicionPedido(i.ProductoId, i.Cantidad)).ToList(),
+                request.Items!.Select(i => new ItemEdicionPedido(i.ProductoId, i.Cantidad, i.PrecioUnitario)).ToList(),
                 productosDb);
 
             if (resultado.Error is not null)
@@ -2068,7 +2068,7 @@ public sealed class PedidosController(
     }
 }
 
-public sealed record CrearPedidoItemRequest(long ProductoId, int Cantidad);
+public sealed record CrearPedidoItemRequest(long ProductoId, int Cantidad, decimal? PrecioUnitario = null);
 public sealed record CrearPedidoRequest(long ClienteId, string? Observaciones, List<CrearPedidoItemRequest> Items, string? Estado = null);
 public sealed record EditarPedidoRequest(List<CrearPedidoItemRequest>? Items, string? Observaciones);
 public sealed record CobroChoferRequest(decimal Monto, string? Metodo = "Efectivo", DateTime? OcurridoEn = null);

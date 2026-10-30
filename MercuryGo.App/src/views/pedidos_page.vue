@@ -4,9 +4,6 @@
       <ion-button title="Escanear Código QR de Remito" @click="escanearRemitoQr">
         <ion-icon slot="icon-only" :icon="qrCodeOutline" />
       </ion-button>
-      <ion-button v-if="sesion_store.es_admin && !offline_store.sin_conexion" title="Nuevo Pedido Asistido" @click="workflow.mostrarModalNuevoPedido.value = true">
-        <ion-icon slot="icon-only" :icon="addCircleOutline" />
-      </ion-button>
     </template>
 
     <!-- Aviso de modo sin conexión (Semana 8) -->
@@ -223,12 +220,6 @@
       @picking_completado="workflow.alCompletarPicking"
     />
 
-    <!-- Modal de Creación de Pedido Asistido / Teléfono (Admin) -->
-    <comp-pedido-admin-modal
-      :abierto="workflow.mostrarModalNuevoPedido.value"
-      @cerrar="workflow.mostrarModalNuevoPedido.value = false"
-      @pedido_creado="workflow.alCrearPedidoAdmin"
-    />
 
     <!-- Modal de Entrega Fallida (Chofer / Admin) -->
     <comp-entrega-fallida-modal
@@ -292,7 +283,6 @@ import CompEstadoError from '../components/base/comp_estado_error.vue';
 import CompEstadoVacio from '../components/base/comp_estado_vacio.vue';
 import CompComprobanteModal from '../components/dominio/pedidos/comp_comprobante_modal.vue';
 import CompPickingModal from '../components/dominio/pedidos/comp_picking_modal.vue';
-import CompPedidoAdminModal from '../components/dominio/pedidos/comp_pedido_admin_modal.vue';
 import CompDetallePedidoModal from '../components/dominio/pedidos/comp_detalle_pedido_modal.vue';
 import CompCobroChoferModal from '../components/dominio/pedidos/comp_cobro_chofer_modal.vue';
 import CompEntregaFallidaModal from '../components/dominio/pedidos/comp_entrega_fallida_modal.vue';

@@ -217,8 +217,18 @@
                 <ion-icon slot="start" :icon="cubeOutline" color="primary" />
                 <ion-label>
                   <h3>{{ item.producto_nombre }}</h3>
-                  <p>${{ item.precio_unitario?.toLocaleString('es-AR') }} c/u</p>
-                  <p>Subtotal: <strong>${{ (item.precio_unitario * item.cantidad).toLocaleString('es-AR') }}</strong></p>
+                  <div v-if="modoEdicion && detalle.items_editables" class="mercury-edicion-precio-fila">
+                    <span class="mercury-label-precio">Precio $</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      v-model.number="item.precio_unitario"
+                      class="mercury-input-precio"
+                    />
+                  </div>
+                  <p v-else>${{ item.precio_unitario?.toLocaleString('es-AR') }} c/u</p>
+                  <p>Subtotal: <strong>${{ ((item.precio_unitario || 0) * item.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></p>
                 </ion-label>
 
                 <!-- Si está en modo edición, mostrar stepper -->
@@ -239,6 +249,36 @@
                 </div>
               </ion-item>
             </ion-list>
+
+            <!-- Selector para agregar nuevos productos al pedido -->
+            <div v-if="modoEdicion && detalle.items_editables" class="mercury-agregar-item-edicion">
+              <div class="mercury-agregar-item-fila">
+                <ion-select
+                  v-model="productoParaAgregarId"
+                  placeholder="Agregar nuevo producto al pedido…"
+                  interface="action-sheet"
+                  cancel-text="Cancelar"
+                  class="mercury-select-prod-edicion"
+                >
+                  <ion-select-option
+                    v-for="p in productosDisponiblesParaAgregar"
+                    :key="p.id"
+                    :value="p.id"
+                  >
+                    {{ p.nombre }} — ${{ p.precio?.toLocaleString('es-AR') }}
+                  </ion-select-option>
+                </ion-select>
+                <ion-button
+                  size="small"
+                  color="primary"
+                  :disabled="!productoParaAgregarId"
+                  @click="agregarProductoAEdicion"
+                >
+                  <ion-icon slot="start" :icon="addCircleOutline" />
+                  Agregar
+                </ion-button>
+              </div>
+            </div>
 
             <div v-if="modoEdicion" class="mercury-edicion-obs">
               <p v-if="!detalle.items_editables" class="mercury-edicion-aviso">
@@ -352,6 +392,13 @@ const guardandoEdicion = ref(false);
 const procesandoPago = ref(false);
 const itemsEdicion = ref([]);
 const observacionesEdicion = ref('');
+const catalogoProductos = ref([]);
+const productoParaAgregarId = ref(null);
+
+const productosDisponiblesParaAgregar = computed(() => {
+  const idsActuales = new Set(itemsEdicion.value.map((i) => i.producto_id));
+  return catalogoProductos.value.filter((p) => !idsActuales.has(p.id) && p.disponible !== false);
+});
 
 const esAdmin = computed(() => sesion_store.es_admin);
 const esCliente = computed(() => sesion_store.rol_activo === 'CLIENTE');
@@ -716,10 +763,34 @@ const cargarDetalle = async () => {
   }
 };
 
-const activarEdicion = () => {
+const activarEdicion = async () => {
   modoEdicion.value = true;
   vibrar_toque();
+  if (catalogoProductos.value.length === 0) {
+    try {
+      const res = await productos_service.obtener_resumen();
+      catalogoProductos.value = res.productos || [];
+    } catch (e) {
+      console.warn('Error al cargar catálogo para edición:', e);
+    }
+  }
 };
+
+const agregarProductoAEdicion = () => {
+  if (!productoParaAgregarId.value) return;
+  const prod = catalogoProductos.value.find((p) => p.id === productoParaAgregarId.value);
+  if (prod) {
+    itemsEdicion.value.push({
+      producto_id: prod.id,
+      producto_nombre: prod.nombre,
+      precio_unitario: Number(prod.precio) || 0,
+      cantidad: 1
+    });
+    productoParaAgregarId.value = null;
+    vibrar_toque();
+  }
+};
+
 
 const cancelarEdicion = () => {
   modoEdicion.value = false;
@@ -756,6 +827,18 @@ const eliminarItem = (item) => {
 };
 
 const guardarCambiosEdicion = async () => {
+  if (detalle.value?.items_editables) {
+    if (itemsEdicion.value.length === 0) {
+      toast.mostrarAdvertencia('El pedido debe conservar al menos un artículo.');
+      return;
+    }
+    const precioInvalido = itemsEdicion.value.some((i) => !i.precio_unitario || i.precio_unitario <= 0 || isNaN(i.precio_unitario));
+    if (precioInvalido) {
+      toast.mostrarAdvertencia('Todos los productos deben tener un precio unitario mayor a cero.');
+      return;
+    }
+  }
+
   guardandoEdicion.value = true;
   try {
     const payload = { observaciones: observacionesEdicion.value };
@@ -763,7 +846,8 @@ const guardarCambiosEdicion = async () => {
     if (detalle.value?.items_editables) {
       payload.items = itemsEdicion.value.map((i) => ({
         producto_id: i.producto_id,
-        cantidad: i.cantidad
+        cantidad: i.cantidad,
+        precio_unitario: Number(i.precio_unitario)
       }));
     }
     await pedidos_service.actualizar_pedido(props.pedidoId, payload, nueva_clave_idempotencia());
@@ -958,5 +1042,48 @@ const cerrar = () => {
   background: var(--ion-color-warning-tint, #fef3c7);
   color: var(--ion-color-warning-shade, #b45309);
   font-size: 0.8rem;
+}
+
+.mercury-edicion-precio-fila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.mercury-label-precio {
+  font-size: 0.85rem;
+  color: var(--ion-color-step-600, #64748b);
+  font-weight: 500;
+}
+
+.mercury-input-precio {
+  width: 90px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--ion-color-step-300, #cbd5e1);
+  background: var(--ion-background-color, #ffffff);
+  color: var(--ion-text-color, #0f172a);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.mercury-agregar-item-edicion {
+  margin-top: 12px;
+  padding: 8px;
+  background: var(--ion-color-step-50, #f8fafc);
+  border-radius: 8px;
+  border: 1px dashed var(--ion-color-step-300, #cbd5e1);
+}
+
+.mercury-agregar-item-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mercury-select-prod-edicion {
+  flex: 1;
+  font-size: 0.88rem;
 }
 </style>

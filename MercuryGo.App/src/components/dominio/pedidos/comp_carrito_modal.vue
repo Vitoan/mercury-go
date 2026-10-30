@@ -40,6 +40,25 @@
           </ion-item>
         </ion-list>
 
+        <!-- Selector de Cliente para Administrador -->
+        <ion-item v-if="sesion_store.es_admin" lines="inset" style="margin-top: 14px;">
+          <ion-label position="stacked">Cliente del Pedido (Admin) *</ion-label>
+          <ion-select
+            v-model="clienteSeleccionadoId"
+            placeholder="Seleccionar cliente destino..."
+            interface="action-sheet"
+            cancel-text="Cancelar"
+          >
+            <ion-select-option
+              v-for="c in listaClientes"
+              :key="c.id"
+              :value="c.id"
+            >
+              {{ c.razon_social || c.nombre }} (CUIT: {{ c.cuit || 'S/D' }})
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+
         <!-- Observaciones -->
         <ion-item lines="inset" style="margin-top: 14px;">
           <ion-label position="stacked">Observaciones / Datos de Entrega</ion-label>
@@ -92,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import {
   IonModal,
   IonHeader,
@@ -108,10 +127,14 @@ import {
   IonTextarea,
   IonCard,
   IonCardContent,
-  IonSpinner
+  IonSpinner,
+  IonSelect,
+  IonSelectOption
 } from '@ionic/vue';
 import { cartOutline, cubeOutline, trashOutline } from 'ionicons/icons';
 import { carrito_store } from '@/stores/carrito_store';
+import { sesion_store } from '@/stores/sesion_store';
+import { clientes_service } from '@/services/clientes_service';
 
 const props = defineProps({
   abierto: { type: Boolean, default: false }
@@ -125,6 +148,37 @@ const totalEstimado = computed(() => {
 });
 
 const observaciones = ref(carrito_store.observaciones);
+const clienteSeleccionadoId = ref(null);
+const listaClientes = ref([]);
+const cargandoClientes = ref(false);
+
+const cargarClientes = async () => {
+  if (!sesion_store.es_admin) return;
+  cargandoClientes.value = true;
+  try {
+    const res = await clientes_service.obtener_clientes({ tamano: 100 });
+    listaClientes.value = res.clientes || res.items || (Array.isArray(res) ? res : []);
+    if (!clienteSeleccionadoId.value && listaClientes.value.length > 0) {
+      clienteSeleccionadoId.value = listaClientes.value[0].id;
+    }
+  } catch (err) {
+    console.warn('Error al cargar clientes en carrito:', err);
+  } finally {
+    cargandoClientes.value = false;
+  }
+};
+
+watch(() => props.abierto, (val) => {
+  if (val && sesion_store.es_admin) {
+    cargarClientes();
+  }
+});
+
+onMounted(() => {
+  if (sesion_store.es_admin) {
+    cargarClientes();
+  }
+});
 
 watch(() => carrito_store.observaciones, (val) => {
   observaciones.value = val;
@@ -151,9 +205,13 @@ const vaciar = () => {
 };
 
 const enviarPedido = async () => {
+  if (sesion_store.es_admin && !clienteSeleccionadoId.value) {
+    alert('Por favor seleccioná el cliente destino para este pedido.');
+    return;
+  }
   carrito_store.observaciones = observaciones.value;
   try {
-    const res = await carrito_store.confirmar_pedido();
+    const res = await carrito_store.confirmar_pedido(sesion_store.es_admin ? clienteSeleccionadoId.value : null);
     emit('pedido_creado', res);
     cerrar();
   } catch (err) {
