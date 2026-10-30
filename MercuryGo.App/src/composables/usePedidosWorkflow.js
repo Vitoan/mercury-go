@@ -13,7 +13,6 @@ export function usePedidosWorkflow(toast) {
   const mostrarActionSheet = ref(false);
   const mostrarModalComprobante = ref(false);
   const mostrarModalPicking = ref(false);
-  const mostrarModalNuevoPedido = ref(false);
   const mostrarModalDetalle = ref(false);
   const mostrarModalCobro = ref(false);
   const mostrarModalEntregaFallida = ref(false);
@@ -86,11 +85,6 @@ export function usePedidosWorkflow(toast) {
           : 'success';
       toast.mostrar(res?.mensaje || 'Picking registrado con éxito.', color);
     }
-    pedidos_store.cargar(true);
-  };
-
-  const alCrearPedidoAdmin = (res) => {
-    if (toast) toast.mostrarExito(`¡Pedido ${res?.numero || ''} creado con éxito!`);
     pedidos_store.cargar(true);
   };
 
@@ -439,7 +433,6 @@ export function usePedidosWorkflow(toast) {
     mostrarActionSheet,
     mostrarModalComprobante,
     mostrarModalPicking,
-    mostrarModalNuevoPedido,
     mostrarModalDetalle,
     mostrarModalCobro,
     mostrarModalEntregaFallida,
@@ -454,7 +447,6 @@ export function usePedidosWorkflow(toast) {
     alRegistrarEntregaParcial,
     alSubirComprobante,
     alCompletarPicking,
-    alCrearPedidoAdmin,
     compartirComprobante,
     ejecutarCambioEstado,
     botonesTransicion
