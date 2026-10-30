@@ -325,7 +325,11 @@ public sealed class PedidosController(
             CreadoEn = DateTime.UtcNow
         };
 
-        db.Pedidos.Add(nuevoPedido);
+        var esRelacional = db.Database.IsRelational();
+        await using var tx = esRelacional ? await db.Database.BeginTransactionAsync(ct) : null;
+        try
+        {
+            db.Pedidos.Add(nuevoPedido);
         await db.SaveChangesAsync(ct);
 
         // Correlativo formal garantizado por secuencia autonumérica sin colisión
@@ -348,6 +352,19 @@ public sealed class PedidosController(
         }
 
         await db.SaveChangesAsync(ct);
+        if (tx != null)
+        {
+            await tx.CommitAsync(ct);
+        }
+    }
+    catch
+    {
+        if (tx != null)
+        {
+            await tx.RollbackAsync(ct);
+        }
+        throw;
+    }
 
         var respuestaObj = new
         {

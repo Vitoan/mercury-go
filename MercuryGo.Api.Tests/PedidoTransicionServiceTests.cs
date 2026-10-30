@@ -235,4 +235,120 @@ public class PedidoTransicionServiceTests
         Assert.Equal("rol_no_autorizado", resultado.CodigoError);
         Assert.Equal(EstadoPedido.NoEntregado, pedido.Estado);
     }
+
+    [Fact]
+    public async Task Admin_CancelarPedido_RestituyeStockDeProductosCorrectamente()
+    {
+        // Arrange
+        using var db = CrearContextoEnMemoria("Test_Cancelar_RestituyeStock");
+        var servicio = new PedidoTransicionService(db);
+
+        var producto = new Producto
+        {
+            Id = 101,
+            Nombre = "Caja Harina 0000",
+            Precio = 1500m,
+            StockActual = 5,
+            Disponible = true,
+            Activo = true
+        };
+        db.Productos.Add(producto);
+
+        var pedido = new Pedido
+        {
+            Id = 88,
+            Numero = "PED-088",
+            Estado = EstadoPedido.Confirmado,
+            FechaPedido = DateTime.UtcNow,
+            Activo = true
+        };
+        db.Pedidos.Add(pedido);
+
+        var detalle = new DetallePedido
+        {
+            Id = 1,
+            PedidoId = 88,
+            ProductoId = 101,
+            Cantidad = 3,
+            CantidadPedida = 3,
+            PrecioUnitario = 1500m
+        };
+        db.DetallesPedido.Add(detalle);
+        await db.SaveChangesAsync();
+
+        var contexto = new ContextoTransicion(
+            UsuarioId: 1,
+            RolCodigo: RolCodigos.Admin
+        );
+
+        // Act
+        var resultado = await servicio.TransicionarAsync(pedido, EstadoPedido.Cancelado, contexto);
+
+        // Assert
+        Assert.True(resultado.Exito);
+        Assert.Equal(EstadoPedido.Cancelado, pedido.Estado);
+
+        var prodActualizado = await db.Productos.FindAsync(101L);
+        Assert.NotNull(prodActualizado);
+        Assert.Equal(8, prodActualizado.StockActual); // 5 iniciales + 3 restituidas
+        Assert.True(prodActualizado.Disponible);
+    }
+
+    [Fact]
+    public async Task Chofer_EntregarPedido_PreviamenteCancelado_VuelveADescontarStock()
+    {
+        // Arrange
+        using var db = CrearContextoEnMemoria("Test_Offline_Entrega_DescuentaStockRestituido");
+        var servicio = new PedidoTransicionService(db);
+
+        var producto = new Producto
+        {
+            Id = 102,
+            Nombre = "Pack Aceite Girasol",
+            Precio = 2200m,
+            StockActual = 8, // Stock ya restituido por cancelación previa
+            Disponible = true,
+            Activo = true
+        };
+        db.Productos.Add(producto);
+
+        var pedido = new Pedido
+        {
+            Id = 89,
+            Numero = "PED-089",
+            Estado = EstadoPedido.Cancelado,
+            FechaPedido = DateTime.UtcNow,
+            Activo = true
+        };
+        db.Pedidos.Add(pedido);
+
+        var detalle = new DetallePedido
+        {
+            Id = 2,
+            PedidoId = 89,
+            ProductoId = 102,
+            Cantidad = 4,
+            CantidadPedida = 4,
+            PrecioUnitario = 2200m
+        };
+        db.DetallesPedido.Add(detalle);
+        await db.SaveChangesAsync();
+
+        var contexto = new ContextoTransicion(
+            UsuarioId: 5,
+            RolCodigo: RolCodigos.Chofer,
+            EsSincronizacionOffline: true
+        );
+
+        // Act
+        var resultado = await servicio.TransicionarAsync(pedido, EstadoPedido.Entregado, contexto);
+
+        // Assert
+        Assert.True(resultado.Exito);
+        Assert.Equal(EstadoPedido.Entregado, pedido.Estado);
+
+        var prodActualizado = await db.Productos.FindAsync(102L);
+        Assert.NotNull(prodActualizado);
+        Assert.Equal(4, prodActualizado.StockActual); // 8 - 4 re-descontadas por entrega real
+    }
 }

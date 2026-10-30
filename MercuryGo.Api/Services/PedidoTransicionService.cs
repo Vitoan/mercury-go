@@ -124,6 +124,20 @@ public sealed class PedidoTransicionService(MercuryGoDbContext db) : IPedidoTran
 
                 if (estadoAnterior == EstadoPedido.Cancelado)
                 {
+                    var detallesEntregados = await db.DetallesPedido
+                        .Include(d => d.Producto)
+                        .Where(d => d.PedidoId == pedido.Id)
+                        .ToListAsync(ct);
+
+                    foreach (var det in detallesEntregados)
+                    {
+                        if (det.Producto != null)
+                        {
+                            det.Producto.StockActual -= det.Cantidad;
+                            det.Producto.ActualizadoEn = marcaTiempo;
+                        }
+                    }
+
                     var aviso = "[Aviso Sincronización Offline: Entrega registrada por chofer en destino]";
                     pedido.Observaciones = string.IsNullOrWhiteSpace(pedido.Observaciones)
                         ? aviso
@@ -132,7 +146,27 @@ public sealed class PedidoTransicionService(MercuryGoDbContext db) : IPedidoTran
                 break;
 
             case EstadoPedido.Cancelado:
-                // Si el pedido se cancela, se marca la devolución lógica de la orden
+                // Si el pedido se cancela, se restituye el stock reservado de cada producto
+                if (estadoAnterior != EstadoPedido.Cancelado)
+                {
+                    var detalles = await db.DetallesPedido
+                        .Include(d => d.Producto)
+                        .Where(d => d.PedidoId == pedido.Id)
+                        .ToListAsync(ct);
+
+                    foreach (var det in detalles)
+                    {
+                        if (det.Producto != null)
+                        {
+                            det.Producto.StockActual += det.Cantidad;
+                            if (det.Producto.StockActual > 0)
+                            {
+                                det.Producto.Disponible = true;
+                            }
+                            det.Producto.ActualizadoEn = marcaTiempo;
+                        }
+                    }
+                }
                 break;
         }
 
