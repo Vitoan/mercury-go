@@ -132,7 +132,7 @@
         <ion-label>
           <div class="mercury-pedido-cabecera">
             <span class="mercury-pedido-numero">{{ p.numero }}</span>
-            <span class="mercury-pedido-total">${{ p.total.toLocaleString('es-AR') }}</span>
+            <span class="mercury-pedido-total">{{ formatearMoneda(p.total) }}</span>
           </div>
           <h3 class="mercury-pedido-cliente">{{ p.cliente_razon_social }}</h3>
           <p class="mercury-pedido-fecha">📅 {{ formatear_fecha(p.fecha_pedido) }}</p>
@@ -249,6 +249,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, watch } from 'vue';
 import {
   IonItem,

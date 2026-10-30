@@ -65,18 +65,18 @@
             <div class="mercury-cc-balance-caja">
               <span class="mercury-cc-balance-label">Total Adeudado:</span>
               <strong class="mercury-cc-balance-monto">
-                ${{ (cuentaCorriente?.saldo_deudor || 0).toLocaleString('es-AR') }}
+                {{ formatearMoneda(cuentaCorriente?.saldo_deudor) }}
               </strong>
             </div>
 
             <div class="mercury-cc-desglose">
               <div class="mercury-cc-fila">
                 <span>Total Facturado:</span>
-                <span>${{ (cuentaCorriente?.total_facturado || 0).toLocaleString('es-AR') }}</span>
+                <span>{{ formatearMoneda(cuentaCorriente?.total_facturado) }}</span>
               </div>
               <div class="mercury-cc-fila">
                 <span>Comprobantes Acreditados:</span>
-                <span class="text-success">${{ (cuentaCorriente?.total_pagado || 0).toLocaleString('es-AR') }}</span>
+                <span class="text-success">{{ formatearMoneda(cuentaCorriente?.total_pagado) }}</span>
               </div>
               <div v-if="cuentaCorriente?.comprobantes_pendientes > 0" class="mercury-cc-fila">
                 <span>Comprobantes en Revisión:</span>
@@ -163,6 +163,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { 

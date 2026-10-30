@@ -13,7 +13,7 @@
       <div v-if="pedido" class="mercury-cobro-intro">
         <h2>Orden {{ pedido.numero }}</h2>
         <p class="mercury-cobro-cliente">Cliente: <strong>{{ pedido.cliente_razon_social }}</strong></p>
-        <p class="mercury-cobro-total">Importe de la orden: <strong>${{ pedido.total?.toLocaleString('es-AR') }}</strong></p>
+        <p class="mercury-cobro-total">Importe de la orden: <strong>{{ formatearMoneda(pedido.total) }}</strong></p>
       </div>
 
       <ion-card class="mercury-cobro-card">
@@ -59,6 +59,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, watch } from 'vue';
 import {
   IonModal,
@@ -123,7 +124,7 @@ const confirmarCobro = async () => {
       });
       await vibrar_exito();
       emit('cobro_registrado', {
-        mensaje: 'Cobro de $' + Number(monto.value).toLocaleString('es-AR') + ' guardado sin conexión. Se enviará al reconectar.'
+        mensaje: 'Cobro de ' + formatearMoneda(monto.value) + ' guardado sin conexión. Se enviará al reconectar.'
       });
       cerrar();
       return;

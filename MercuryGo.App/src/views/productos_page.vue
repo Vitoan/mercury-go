@@ -175,7 +175,7 @@
             <p class="mercury-producto-desc-texto">{{ p.descripcion || 'Sin descripción adicional' }}</p>
 
             <div class="mercury-producto-acciones-pie">
-              <span class="mercury-producto-precio-grande">${{ p.precio.toLocaleString('es-AR') }}</span>
+              <span class="mercury-producto-precio-grande">{{ formatearMoneda(p.precio) }}</span>
               <ion-button
                 v-if="p.disponible && sesion_store.rol_activo !== 'OPERARIO'"
                 size="small"
@@ -238,6 +238,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {

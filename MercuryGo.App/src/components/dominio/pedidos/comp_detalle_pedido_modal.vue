@@ -227,8 +227,8 @@
                       class="mercury-input-precio"
                     />
                   </div>
-                  <p v-else>${{ item.precio_unitario?.toLocaleString('es-AR') }} c/u</p>
-                  <p>Subtotal: <strong>${{ ((item.precio_unitario || 0) * item.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></p>
+                  <p v-else>{{ formatearMoneda(item.precio_unitario) }} c/u</p>
+                  <p>Subtotal: <strong>{{ formatearMoneda((item.precio_unitario || 0) * item.cantidad, true) }}</strong></p>
                 </ion-label>
 
                 <!-- Si está en modo edición, mostrar stepper -->
@@ -265,7 +265,7 @@
                     :key="p.id"
                     :value="p.id"
                   >
-                    {{ p.nombre }} — ${{ p.precio?.toLocaleString('es-AR') }}
+                    {{ p.nombre }} — {{ formatearMoneda(p.precio) }}
                   </ion-select-option>
                 </ion-select>
                 <ion-button
@@ -302,7 +302,7 @@
 
             <div class="mercury-total-fila">
               <span>Total de la Orden:</span>
-              <strong class="mercury-total-destacado">${{ totalCalculado.toLocaleString('es-AR') }}</strong>
+              <strong class="mercury-total-destacado">{{ formatearMoneda(totalCalculado) }}</strong>
             </div>
           </ion-card-content>
         </ion-card>
@@ -321,6 +321,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, computed, watch } from 'vue';
 import {
   IonModal,

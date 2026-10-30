@@ -12,7 +12,7 @@
     <ion-content class="ion-padding">
       <div v-if="pedido" class="mercury-comprobante-header">
         <h2>Orden {{ pedido.numero }}</h2>
-        <p class="mercury-comprobante-total">Total a transferir: <strong>${{ pedido.total?.toLocaleString('es-AR') }}</strong></p>
+        <p class="mercury-comprobante-total">Total a transferir: <strong>{{ formatearMoneda(pedido.total) }}</strong></p>
       </div>
 
       <!-- Datos bancarios de la distribuidora para la transferencia -->
@@ -104,6 +104,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, computed } from 'vue';
 import {
   IonModal,

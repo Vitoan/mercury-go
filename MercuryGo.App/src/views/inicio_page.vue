@@ -71,7 +71,7 @@
             <p class="mercury-oferta-desc">{{ oferta.descripcion || 'Precio promocional por tiempo limitado.' }}</p>
 
             <div class="mercury-oferta-acciones-pie">
-              <span class="mercury-oferta-precio-grande">${{ oferta.precio?.toLocaleString('es-AR') }}</span>
+              <span class="mercury-oferta-precio-grande">{{ formatearMoneda(oferta.precio) }}</span>
               <ion-button
                 size="small"
                 color="primary"
@@ -107,6 +107,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {

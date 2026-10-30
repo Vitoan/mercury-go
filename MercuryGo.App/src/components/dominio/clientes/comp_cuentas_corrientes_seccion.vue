@@ -7,7 +7,7 @@
           <div class="mercury-metrica-caja">
             <span class="mercury-metrica-label">Deuda Total en Calle:</span>
             <strong class="mercury-metrica-valor text-warning">
-              ${{ metricasFinanzas.deuda_total.toLocaleString('es-AR') }}
+              {{ formatearMoneda(metricasFinanzas.deuda_total) }}
             </strong>
           </div>
           <div class="mercury-metrica-caja">
@@ -38,14 +38,14 @@
               <ion-card-subtitle>CUIT: {{ item.cuit }} · {{ item.localidad || 'General' }}</ion-card-subtitle>
             </div>
             <ion-badge :color="item.saldo_deudor > 0 ? 'warning' : 'success'" class="mercury-badge-deuda">
-              {{ item.saldo_deudor > 0 ? 'Debe: $' + item.saldo_deudor.toLocaleString('es-AR') : 'Al Día' }}
+              {{ item.saldo_deudor > 0 ? 'Debe: ' + formatearMoneda(item.saldo_deudor) : 'Al Día' }}
             </ion-badge>
           </div>
         </ion-card-header>
         <ion-card-content>
           <div class="mercury-cc-totales-fila">
-            <span>Facturado: <strong>${{ item.total_facturado.toLocaleString('es-AR') }}</strong></span>
-            <span>Acreditado: <strong class="text-success">${{ item.total_pagado.toLocaleString('es-AR') }}</strong></span>
+            <span>Facturado: <strong>{{ formatearMoneda(item.total_facturado) }}</strong></span>
+            <span>Acreditado: <strong class="text-success">{{ formatearMoneda(item.total_pagado) }}</strong></span>
           </div>
 
           <!-- Comprobantes pendientes de auditar de este cliente -->
@@ -62,7 +62,7 @@
             >
               <div class="mercury-comp-info">
                 <strong>Orden {{ comp.pedido_numero }}</strong>
-                <span>Monto: ${{ comp.total.toLocaleString('es-AR') }}</span>
+                <span>Monto: {{ formatearMoneda(comp.total) }}</span>
               </div>
               <div class="mercury-comp-botones">
                 <ion-button
@@ -108,6 +108,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, onMounted } from 'vue';
 import {
   IonCard,

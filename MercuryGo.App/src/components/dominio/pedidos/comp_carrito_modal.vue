@@ -26,8 +26,8 @@
             <ion-icon :icon="cubeOutline" slot="start" color="primary" />
             <ion-label>
               <h3>{{ item.nombre }}</h3>
-              <p class="mercury-precio-unitario">${{ item.precio.toLocaleString('es-AR') }} c/u</p>
-              <p class="mercury-subtotal-item">Subtotal: <strong>${{ (item.precio * item.cantidad).toLocaleString('es-AR') }}</strong></p>
+              <p class="mercury-precio-unitario">{{ formatearMoneda(item.precio) }} c/u</p>
+              <p class="mercury-subtotal-item">Subtotal: <strong>{{ formatearMoneda(item.precio * item.cantidad) }}</strong></p>
             </ion-label>
             <div slot="end" class="mercury-control-cantidad">
               <ion-button size="small" fill="outline" color="medium" @click="decrementar(item)">-</ion-button>
@@ -111,6 +111,7 @@
 </template>
 
 <script setup>
+import { formatearMoneda } from '@/utils/formato';
 import { ref, computed, watch, onMounted } from 'vue';
 import {
   IonModal,
