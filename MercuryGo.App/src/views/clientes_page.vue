@@ -84,10 +84,18 @@
               <span class="mercury-avatar-iniciales">{{ obtenerIniciales(c.razon_social) }}</span>
             </ion-avatar>
 
-            <ion-label>
-              <div class="mercury-cliente-cabecera">
-                <h3>{{ c.razon_social }}</h3>
-                <ion-badge color="primary" class="mercury-badge-cuit">CUIT {{ c.cuit }}</ion-badge>
+            <!-- Contenido Principal: Fila de Nombre, Fila de CUIT, Dirección y Contacto -->
+            <ion-label class="mercury-cliente-info">
+              <!-- Nombre / Razón Social a ancho completo para máxima legibilidad -->
+              <h3 class="mercury-cliente-nombre">{{ c.razon_social }}</h3>
+
+              <!-- Placa / Chip de CUIT destacada y claramente legible -->
+              <div class="mercury-cuit-contenedor">
+                <span class="mercury-placa-cuit">
+                  <ion-icon :icon="cardOutline" class="mercury-cuit-icono" />
+                  <strong class="mercury-cuit-etiqueta">CUIT</strong>
+                  <span class="mercury-cuit-numero">{{ c.cuit }}</span>
+                </span>
               </div>
 
               <!-- Dirección / Localidad -->
@@ -97,7 +105,7 @@
               </p>
 
               <!-- Accesos Rápidos de Contacto -->
-              <div class="mercury-cliente-contacto">
+              <div v-if="c.telefono || c.email" class="mercury-cliente-contacto">
                 <a
                   v-if="c.telefono"
                   :href="'tel:' + c.telefono"
@@ -121,15 +129,27 @@
               </div>
             </ion-label>
 
-            <!-- Botones de acción directa (Solo Admin) -->
-            <ion-buttons v-if="sesion_store.es_admin" slot="end" class="mercury-botones-accion">
-              <ion-button fill="clear" color="primary" title="Editar Cliente" @click.stop="abrirEditar(c)">
-                <ion-icon slot="icon-only" :icon="createOutline" />
-              </ion-button>
-              <ion-button fill="clear" color="danger" title="Dar de baja" @click.stop="confirmarBaja(c)">
-                <ion-icon slot="icon-only" :icon="trashOutline" />
-              </ion-button>
-            </ion-buttons>
+            <!-- Botones de Acción Directa para Admin con relieve táctil -->
+            <div v-if="sesion_store.es_admin" slot="end" class="mercury-botones-accion-admin">
+              <button
+                type="button"
+                class="mercury-btn-accion mercury-btn-editar"
+                title="Editar datos del cliente"
+                aria-label="Editar Cliente"
+                @click.stop="abrirEditar(c)"
+              >
+                <ion-icon :icon="createOutline" />
+              </button>
+              <button
+                type="button"
+                class="mercury-btn-accion mercury-btn-baja"
+                title="Dar de baja al cliente"
+                aria-label="Dar de Baja"
+                @click.stop="confirmarBaja(c)"
+              >
+                <ion-icon :icon="trashOutline" />
+              </button>
+            </div>
           </ion-item>
 
           <!-- Opciones al deslizar (Mobile gesture - Solo Admin) -->
@@ -150,7 +170,7 @@
       </comp-lista>
     </div>
 
-    <!-- Botón flotante para registrar un nuevo cliente B2B (Solo Admin) -->
+    <!-- Botón flotante para registrar un nuevo cliente B2B (Solo Admin - Fijo en Esquina Inferior Derecha) -->
     <ion-fab
       v-if="sesion_store.es_admin && vistaActiva === 'clientes'"
       slot="fixed"
@@ -214,7 +234,6 @@ import {
   IonIcon,
   IonBadge,
   IonAvatar,
-  IonButtons,
   IonButton,
   IonFab,
   IonFabButton,
@@ -231,7 +250,8 @@ import {
   walletOutline,
   callOutline,
   mailOutline,
-  locationOutline
+  locationOutline,
+  cardOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -389,66 +409,97 @@ onIonViewWillEnter(() => {
 
 .mercury-cliente-card {
   --padding-start: 12px;
-  --padding-end: 8px;
-  --padding-top: 10px;
-  --padding-bottom: 10px;
+  --padding-end: 12px;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
   --border-color: var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
 }
 
 .mercury-cliente-avatar {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
   margin-right: 12px;
-  background: linear-gradient(135deg, var(--ion-color-primary), var(--ion-color-primary-shade));
+  background: linear-gradient(135deg, var(--ion-color-primary, #2563eb), var(--ion-color-primary-shade, #1d4ed8));
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), 0.25);
+  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.3);
 }
 
 .mercury-avatar-iniciales {
   color: #ffffff;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1rem;
   letter-spacing: 0.5px;
 }
 
-.mercury-cliente-cabecera {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.mercury-cliente-cabecera h3 {
+.mercury-cliente-info {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--ion-color-step-850, #1e293b);
-  line-height: 1.3;
-}
-
-.mercury-badge-cuit {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-}
-
-.mercury-cliente-direccion {
-  margin: 3px 0 6px 0;
-  font-size: 0.85rem;
-  color: var(--ion-color-step-600, #64748b);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 4px;
 }
 
+/* Nombre comercial destacado con alto contraste */
+.mercury-cliente-nombre {
+  margin: 0 0 2px 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ion-text-color, #0f172a);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* Placa dedicada de CUIT */
+.mercury-cuit-contenedor {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.mercury-placa-cuit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ion-color-primary, #2563eb);
+  background: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.08);
+  border: 1px solid rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.2);
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+
+.mercury-cuit-icono {
+  font-size: 0.95rem;
+}
+
+.mercury-cuit-etiqueta {
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: 0.5px;
+}
+
+.mercury-cuit-numero {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+}
+
+.mercury-cliente-direccion {
+  margin: 2px 0 4px 0;
+  font-size: 0.86rem;
+  color: var(--ion-color-step-600, #475569);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.3;
+}
+
 .mercury-mini-icono {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: var(--ion-color-primary);
   flex-shrink: 0;
 }
@@ -463,44 +514,94 @@ onIonViewWillEnter(() => {
 .mercury-chip-contacto {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.78rem;
-  color: var(--ion-color-step-700, #475569);
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ion-color-step-750, #334155);
   background: var(--ion-color-step-100, rgba(0, 0, 0, 0.04));
-  padding: 3px 8px;
-  border-radius: 6px;
+  border: 1px solid var(--ion-color-step-200, rgba(0, 0, 0, 0.08));
+  padding: 4px 10px;
+  border-radius: 8px;
   text-decoration: none;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .mercury-chip-contacto:hover,
 .mercury-chip-contacto:active {
-  background: var(--ion-color-primary-tint, rgba(var(--ion-color-primary-rgb), 0.15));
-  color: var(--ion-color-primary);
+  background: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.12);
+  color: var(--ion-color-primary, #2563eb);
+  border-color: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.3);
 }
 
 .mercury-chip-contacto ion-icon {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--ion-color-primary);
 }
 
-.mercury-botones-accion {
+/* Botones de acción directa para Administrador con relieve y separación */
+.mercury-botones-accion-admin {
   display: flex;
   align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.mercury-btn-accion {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 10px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+
+.mercury-btn-accion:active {
+  transform: scale(0.92);
+}
+
+.mercury-btn-editar {
+  background: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.12);
+  color: var(--ion-color-primary, #2563eb);
+}
+
+.mercury-btn-editar:hover {
+  background: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.22);
+}
+
+.mercury-btn-baja {
+  background: rgba(var(--ion-color-danger-rgb, 220, 38, 38), 0.12);
+  color: var(--ion-color-danger, #dc2626);
+}
+
+.mercury-btn-baja:hover {
+  background: rgba(var(--ion-color-danger-rgb, 220, 38, 38), 0.22);
 }
 
 .mercury-btn-toolbar-nuevo {
   --color: var(--ion-color-primary-contrast, #ffffff);
 }
 
+/* Botón flotante anclado estrictamente en la esquina inferior derecha */
 .mercury-fab-contenedor {
-  margin-bottom: calc(56px + var(--ion-safe-area-bottom, 0px) + 12px);
-  margin-right: 16px;
-  z-index: 999;
+  position: fixed !important;
+  bottom: calc(64px + var(--ion-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+  right: 18px !important;
+  margin: 0 !important;
+  z-index: 1000 !important;
 }
 
 .mercury-fab-admin {
-  --box-shadow: 0 4px 16px rgba(var(--ion-color-primary-rgb), 0.45);
+  --background: var(--ion-color-primary, #2563eb);
+  --color: var(--ion-color-primary-contrast, #ffffff);
+  --box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  width: 56px;
+  height: 56px;
   transition: transform 0.2s ease;
 }
 
@@ -509,6 +610,6 @@ onIonViewWillEnter(() => {
 }
 
 .mercury-espaciador-fab {
-  height: 80px;
+  height: 90px;
 }
 </style>
