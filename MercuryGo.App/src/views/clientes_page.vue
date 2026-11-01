@@ -1,11 +1,28 @@
 <template>
   <comp-page titulo="Clientes Comerciales" :mostrar_actualizar="true" @actualizar="recargar">
+    <!-- Acción rápida de Nuevo Cliente en toolbar para Admin -->
+    <template #acciones>
+      <ion-button
+        v-if="sesion_store.es_admin && vistaActiva === 'clientes'"
+        title="Nuevo Cliente Comercial"
+        class="mercury-btn-toolbar-nuevo"
+        @click="abrirNuevo"
+      >
+        <ion-icon slot="icon-only" :icon="addOutline" />
+      </ion-button>
+    </template>
+
     <!-- Segmentos para alternar entre Gestión de Clientes y Cuentas Corrientes/Deuda -->
     <div class="mercury-segmento-contenedor">
       <ion-segment v-model="vistaActiva" @ionChange="alCambiarVista">
         <ion-segment-button value="clientes">
           <ion-icon :icon="businessOutline" />
-          <ion-label>Clientes</ion-label>
+          <ion-label>
+            Clientes
+            <ion-badge v-if="clientes_store.total > 0" color="medium" class="mercury-badge-seg">
+              {{ clientes_store.total }}
+            </ion-badge>
+          </ion-label>
         </ion-segment-button>
         <ion-segment-button value="finanzas">
           <ion-icon :icon="walletOutline" />
@@ -27,7 +44,7 @@
     />
 
     <!-- VISTA 2: GESTIÓN DE CLIENTES COMERCIALES (ABM) -->
-    <div v-else>
+    <div v-else class="mercury-contenedor-clientes">
       <!-- Buscador con debounce en servidor -->
       <comp-buscador
         v-model="busqueda"
@@ -60,36 +77,63 @@
         :total="clientes_store.total"
         @cargar_mas="clientes_store.cargar_mas"
       >
-        <ion-item-sliding v-for="c in clientes_store.clientes" :key="c.id">
+        <ion-item-sliding v-for="c in clientes_store.clientes" :key="c.id" :disabled="!sesion_store.es_admin">
           <ion-item class="mercury-cliente-card">
-            <ion-icon :icon="businessOutline" slot="start" class="mercury-icono-cliente" />
+            <!-- Avatar con Iniciales Corporativas Dinámicas -->
+            <ion-avatar slot="start" class="mercury-cliente-avatar">
+              <span class="mercury-avatar-iniciales">{{ obtenerIniciales(c.razon_social) }}</span>
+            </ion-avatar>
+
             <ion-label>
               <div class="mercury-cliente-cabecera">
                 <h3>{{ c.razon_social }}</h3>
                 <ion-badge color="primary" class="mercury-badge-cuit">CUIT {{ c.cuit }}</ion-badge>
               </div>
+
+              <!-- Dirección / Localidad -->
               <p v-if="c.localidad || c.direccion" class="mercury-cliente-direccion">
-                📍 {{ c.direccion ? c.direccion + ' · ' : '' }}{{ c.localidad || 'Zona Central' }}
+                <ion-icon :icon="locationOutline" class="mercury-mini-icono" />
+                <span>{{ c.direccion ? c.direccion + ' · ' : '' }}{{ c.localidad || 'Zona Central' }}</span>
               </p>
+
+              <!-- Accesos Rápidos de Contacto -->
               <div class="mercury-cliente-contacto">
-                <span v-if="c.telefono">📞 {{ c.telefono }}</span>
-                <span v-if="c.email">✉️ {{ c.email }}</span>
+                <a
+                  v-if="c.telefono"
+                  :href="'tel:' + c.telefono"
+                  class="mercury-chip-contacto"
+                  title="Llamar al cliente"
+                  @click.stop
+                >
+                  <ion-icon :icon="callOutline" />
+                  <span>{{ c.telefono }}</span>
+                </a>
+                <a
+                  v-if="c.email"
+                  :href="'mailto:' + c.email"
+                  class="mercury-chip-contacto"
+                  title="Enviar correo"
+                  @click.stop
+                >
+                  <ion-icon :icon="mailOutline" />
+                  <span>{{ c.email }}</span>
+                </a>
               </div>
             </ion-label>
 
-            <!-- Botones de acción directa -->
-            <ion-buttons slot="end" class="mercury-botones-accion">
-              <ion-button fill="clear" color="primary" @click.stop="abrirEditar(c)">
+            <!-- Botones de acción directa (Solo Admin) -->
+            <ion-buttons v-if="sesion_store.es_admin" slot="end" class="mercury-botones-accion">
+              <ion-button fill="clear" color="primary" title="Editar Cliente" @click.stop="abrirEditar(c)">
                 <ion-icon slot="icon-only" :icon="createOutline" />
               </ion-button>
-              <ion-button fill="clear" color="danger" @click.stop="confirmarBaja(c)">
+              <ion-button fill="clear" color="danger" title="Dar de baja" @click.stop="confirmarBaja(c)">
                 <ion-icon slot="icon-only" :icon="trashOutline" />
               </ion-button>
             </ion-buttons>
           </ion-item>
 
-          <!-- Opciones al deslizar (Mobile gesture) -->
-          <ion-item-options side="end">
+          <!-- Opciones al deslizar (Mobile gesture - Solo Admin) -->
+          <ion-item-options v-if="sesion_store.es_admin" side="end">
             <ion-item-option color="primary" @click="abrirEditar(c)">
               <ion-icon slot="top" :icon="createOutline" />
               Editar
@@ -100,15 +144,30 @@
             </ion-item-option>
           </ion-item-options>
         </ion-item-sliding>
-      </comp-lista>
 
-      <!-- Botón flotante para registrar un nuevo cliente B2B -->
-      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button color="primary" class="mercury-fab" @click="abrirNuevo">
-          <ion-icon :icon="addOutline" />
-        </ion-fab-button>
-      </ion-fab>
+        <!-- Espaciador para que el último elemento nunca quede tapado por el botón flotante -->
+        <div v-if="sesion_store.es_admin" class="mercury-espaciador-fab"></div>
+      </comp-lista>
     </div>
+
+    <!-- Botón flotante para registrar un nuevo cliente B2B (Solo Admin) -->
+    <ion-fab
+      v-if="sesion_store.es_admin && vistaActiva === 'clientes'"
+      slot="fixed"
+      vertical="bottom"
+      horizontal="end"
+      class="mercury-fab-contenedor"
+    >
+      <ion-fab-button
+        color="primary"
+        class="mercury-fab-admin"
+        title="Nuevo Cliente Comercial"
+        aria-label="Registrar Nuevo Cliente"
+        @click="abrirNuevo"
+      >
+        <ion-icon :icon="addOutline" />
+      </ion-fab-button>
+    </ion-fab>
 
     <!-- Modal de Formulario ABM -->
     <comp-cliente-modal
@@ -154,6 +213,7 @@ import {
   IonLabel,
   IonIcon,
   IonBadge,
+  IonAvatar,
   IonButtons,
   IonButton,
   IonFab,
@@ -168,7 +228,10 @@ import {
   createOutline,
   trashOutline,
   addOutline,
-  walletOutline
+  walletOutline,
+  callOutline,
+  mailOutline,
+  locationOutline
 } from 'ionicons/icons';
 
 import CompPage from '../components/estructura/comp_page.vue';
@@ -181,6 +244,7 @@ import CompClienteModal from '../components/dominio/clientes/comp_cliente_modal.
 import CompCuentasCorrientesSeccion from '../components/dominio/clientes/comp_cuentas_corrientes_seccion.vue';
 
 import { clientes_store } from '@/stores/clientes_store';
+import { sesion_store } from '@/stores/sesion_store';
 import { vibrar_toque } from '@/services/vibracion_service';
 import { useToast } from '@/composables/useToast';
 
@@ -202,6 +266,15 @@ const errorModal = ref('');
 
 const mostrarAlertaBaja = ref(false);
 const clienteAEliminar = ref(null);
+
+const obtenerIniciales = (nombre) => {
+  if (!nombre) return 'CL';
+  const palabras = nombre.trim().split(/\s+/).filter(Boolean);
+  if (palabras.length >= 2) {
+    return (palabras[0][0] + palabras[1][0]).toUpperCase();
+  }
+  return nombre.slice(0, 2).toUpperCase();
+};
 
 const alActualizarMetricas = (nuevasMetricas) => {
   if (nuevasMetricas) {
@@ -305,7 +378,13 @@ onIonViewWillEnter(() => {
 .mercury-badge-seg {
   margin-left: 6px;
   font-size: 0.72rem;
-  padding: 2px 5px;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.mercury-contenedor-clientes {
+  position: relative;
+  min-height: 100%;
 }
 
 .mercury-cliente-card {
@@ -316,16 +395,31 @@ onIonViewWillEnter(() => {
   --border-color: var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
 }
 
-.mercury-icono-cliente {
-  font-size: 1.8rem;
-  color: var(--ion-color-primary);
+.mercury-cliente-avatar {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   margin-right: 12px;
+  background: linear-gradient(135deg, var(--ion-color-primary), var(--ion-color-primary-shade));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), 0.25);
+}
+
+.mercury-avatar-iniciales {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
 }
 
 .mercury-cliente-cabecera {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 4px;
 }
 
@@ -334,26 +428,60 @@ onIonViewWillEnter(() => {
   font-size: 1rem;
   font-weight: 700;
   color: var(--ion-color-step-850, #1e293b);
+  line-height: 1.3;
 }
 
 .mercury-badge-cuit {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
 .mercury-cliente-direccion {
-  margin: 2px 0 4px 0;
+  margin: 3px 0 6px 0;
   font-size: 0.85rem;
   color: var(--ion-color-step-600, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mercury-mini-icono {
+  font-size: 0.9rem;
+  color: var(--ion-color-primary);
+  flex-shrink: 0;
 }
 
 .mercury-cliente-contacto {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  font-size: 0.8rem;
-  color: var(--ion-color-step-500, #94a3b8);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.mercury-chip-contacto {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--ion-color-step-700, #475569);
+  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.04));
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.mercury-chip-contacto:hover,
+.mercury-chip-contacto:active {
+  background: var(--ion-color-primary-tint, rgba(var(--ion-color-primary-rgb), 0.15));
+  color: var(--ion-color-primary);
+}
+
+.mercury-chip-contacto ion-icon {
+  font-size: 0.85rem;
+  color: var(--ion-color-primary);
 }
 
 .mercury-botones-accion {
@@ -361,8 +489,26 @@ onIonViewWillEnter(() => {
   align-items: center;
 }
 
-.mercury-fab {
-  margin-bottom: 56px;
-  margin-right: 12px;
+.mercury-btn-toolbar-nuevo {
+  --color: var(--ion-color-primary-contrast, #ffffff);
+}
+
+.mercury-fab-contenedor {
+  margin-bottom: calc(56px + var(--ion-safe-area-bottom, 0px) + 12px);
+  margin-right: 16px;
+  z-index: 999;
+}
+
+.mercury-fab-admin {
+  --box-shadow: 0 4px 16px rgba(var(--ion-color-primary-rgb), 0.45);
+  transition: transform 0.2s ease;
+}
+
+.mercury-fab-admin:active {
+  transform: scale(0.92);
+}
+
+.mercury-espaciador-fab {
+  height: 80px;
 }
 </style>
