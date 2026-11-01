@@ -128,28 +128,6 @@
                 </a>
               </div>
             </ion-label>
-
-            <!-- Botones de Acción Directa para Admin con relieve táctil -->
-            <div v-if="sesion_store.es_admin" slot="end" class="mercury-botones-accion-admin">
-              <button
-                type="button"
-                class="mercury-btn-accion mercury-btn-editar"
-                title="Editar datos del cliente"
-                aria-label="Editar Cliente"
-                @click.stop="abrirEditar(c)"
-              >
-                <ion-icon :icon="createOutline" />
-              </button>
-              <button
-                type="button"
-                class="mercury-btn-accion mercury-btn-baja"
-                title="Dar de baja al cliente"
-                aria-label="Dar de Baja"
-                @click.stop="confirmarBaja(c)"
-              >
-                <ion-icon :icon="trashOutline" />
-              </button>
-            </div>
           </ion-item>
 
           <!-- Opciones al deslizar (Mobile gesture - Solo Admin) -->
@@ -536,51 +514,6 @@ onIonViewWillEnter(() => {
 .mercury-chip-contacto ion-icon {
   font-size: 0.9rem;
   color: var(--ion-color-primary);
-}
-
-/* Botones de acción directa para Administrador con relieve y separación */
-.mercury-botones-accion-admin {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 8px;
-}
-
-.mercury-btn-accion {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  border-radius: 10px;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.15rem;
-  cursor: pointer;
-  outline: none;
-  transition: transform 0.15s ease, background-color 0.2s ease;
-}
-
-.mercury-btn-accion:active {
-  transform: scale(0.92);
-}
-
-.mercury-btn-editar {
-  background: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.12);
-  color: var(--ion-color-primary, #2563eb);
-}
-
-.mercury-btn-editar:hover {
-  background: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.22);
-}
-
-.mercury-btn-baja {
-  background: rgba(var(--ion-color-danger-rgb, 220, 38, 38), 0.12);
-  color: var(--ion-color-danger, #dc2626);
-}
-
-.mercury-btn-baja:hover {
-  background: rgba(var(--ion-color-danger-rgb, 220, 38, 38), 0.22);
 }
 
 .mercury-btn-toolbar-nuevo {
