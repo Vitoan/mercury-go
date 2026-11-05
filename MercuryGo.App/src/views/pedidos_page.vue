@@ -252,6 +252,7 @@
 <script setup>
 import { formatearMoneda } from '@/utils/formato';
 import { ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   IonItem,
   IonLabel,
@@ -262,7 +263,7 @@ import {
   IonActionSheet,
   IonToast,
   IonNote,
-  onIonViewWillEnter
+  onIonViewWillEnter, onIonViewDidEnter
 } from '@ionic/vue';
 import {
   layersOutline,

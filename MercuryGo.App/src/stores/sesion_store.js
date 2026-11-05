@@ -5,6 +5,7 @@ import { usePedidosStore } from '@/stores/pedidos_store';
 import { useCarritoStore } from '@/stores/carrito_store';
 import { borrar_copias } from '@/services/copia_local_service';
 import { use_offline_store } from '@/stores/offline_store';
+import { notificaciones_service } from '@/services/notificaciones_service';
 import {
   al_expirar,
   borrar_sesion,
@@ -55,6 +56,7 @@ export const useSesionStore = defineStore('sesion', () => {
       }
       const respuesta = await obtener_mi_usuario();
       usuario.value = respuesta?.usuario || null;
+      await notificaciones_service.registrar_dispositivo_en_api();
       return usuario.value;
     } catch (err) {
       const revocada = err?.estado_http === 401;
@@ -81,6 +83,7 @@ export const useSesionStore = defineStore('sesion', () => {
       }
       await guardar_sesion(sesion.token, sesion.expira_en, sesion.refresh_token, sesion.refresh_expira_en);
       usuario.value = sesion.usuario;
+      await notificaciones_service.registrar_dispositivo_en_api();
       return true;
     } catch (err) {
       error.value = err.mensaje || 'Credenciales inválidas.';

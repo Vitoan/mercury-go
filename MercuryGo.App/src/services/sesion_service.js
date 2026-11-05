@@ -8,8 +8,8 @@ export function renovar_sesion(refresh_token) {
   return ajax_service.post('/api/sesion/refresh', { refresh_token });
 }
 
-export function cerrar_sesion(refresh_token, todos = false) {
-  return ajax_service.post('/api/sesion/logout', { refresh_token, todos });
+export function cerrar_sesion(refresh_token, todos = false, token_push = null) {
+  return ajax_service.post('/api/sesion/logout', { refresh_token, todos, token_push });
 }
 
 // Obtiene los datos del usuario logueado (/api/sesion/yo)

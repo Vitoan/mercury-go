@@ -127,12 +127,17 @@ builder.Services.AddScoped<MercuryGo.Api.Services.NotificacionService>();
 builder.Services.AddScoped<MercuryGo.Api.Services.ConflictoOfflineService>();
 builder.Services.AddHostedService<MercuryGo.Api.Services.RetencionArchivosService>();
 
+// Despacho push automático (Semana 9)
+builder.Services.AddSingleton<MercuryGo.Api.Push.EnvioPush>();
+builder.Services.AddScoped<MercuryGo.Api.Push.PushAlGuardar>();
+
 builder.Services.AddControllers().AddJsonOptions(options => ConfigurarJson(options.JsonSerializerOptions));
 builder.Services.ConfigureHttpJsonOptions(options => ConfigurarJson(options.SerializerOptions));
 
-builder.Services.AddDbContext<MercuryGoDbContext>(options =>
+builder.Services.AddDbContext<MercuryGoDbContext>((servicios, options) =>
     options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)))
-           .UseSnakeCaseNamingConvention());
+           .UseSnakeCaseNamingConvention()
+           .AddInterceptors(servicios.GetRequiredService<MercuryGo.Api.Push.PushAlGuardar>()));
 
 builder.Services.AddCors(options => 
 {
