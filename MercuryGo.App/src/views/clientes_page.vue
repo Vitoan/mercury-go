@@ -75,6 +75,7 @@
         :hay_mas="clientes_store.hay_mas"
         :mostrados="clientes_store.mostrados"
         :total="clientes_store.total"
+        :cargar_mas="clientes_store.cargar_mas"
         @cargar_mas="clientes_store.cargar_mas"
       >
         <ion-item-sliding v-for="c in clientes_store.clientes" :key="c.id" :disabled="!sesion_store.es_admin">

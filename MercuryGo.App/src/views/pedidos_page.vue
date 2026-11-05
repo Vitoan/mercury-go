@@ -119,6 +119,7 @@
       :hay_mas="pedidos_store.hay_mas"
       :mostrados="pedidos_store.mostrados"
       :total="pedidos_store.total"
+      :cargar_mas="pedidos_store.cargar_mas"
       @cargar_mas="pedidos_store.cargar_mas"
     >
       <ion-item
@@ -163,7 +164,7 @@
         <!-- Badge de estado clickeable para abrir opciones de transición y badge offline -->
         <div slot="end" class="mercury-pedido-estado-columna">
           <ion-badge
-            :color="obtener_color_estado(p.estado)"
+            :color="color_estado_pedido(p.estado)"
             class="mercury-badge-estado"
             @click.stop="workflow.abrirOpcionesEstado(p)"
           >
@@ -295,6 +296,7 @@ import { use_offline_store } from '@/stores/offline_store';
 import { useToast } from '@/composables/useToast';
 import { usePedidosWorkflow } from '@/composables/usePedidosWorkflow';
 import { useEscaneoQr } from '@/composables/useEscaneoQr';
+import { color_estado_pedido } from '@/utils/estados';
 
 const pedidos_store = usePedidosStore();
 const sesion_store = useSesionStore();
@@ -338,16 +340,7 @@ const formatear_fecha = (fechaStr) => {
   return d.toLocaleDateString('es-AR') + ' · ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 };
 
-const obtener_color_estado = (estado) => {
-  switch (estado) {
-    case 'Entregado': return 'success';
-    case 'Despachado': return 'primary';
-    case 'EnPreparacion': return 'warning';
-    case 'Confirmado': return 'tertiary';
-    case 'Cancelado': return 'danger';
-    default: return 'medium'; // Pendiente
-  }
-};
+const obtener_color_estado = (estado) => color_estado_pedido(estado);
 
 const tieneSubEtiquetas = (pedido) => {
   return pedido?.observaciones && (

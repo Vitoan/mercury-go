@@ -373,6 +373,7 @@ import { geolocalizacion_service } from '@/services/geolocalizacion_service';
 import { vibrar_toque, vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 import { resolver_url_imagen } from '@/utils/imagenes';
 import { nueva_clave_idempotencia } from '@/utils/idempotencia';
+import { color_estado_pedido } from '@/utils/estados';
 import { useToast } from '@/composables/useToast';
 
 const toast = useToast();

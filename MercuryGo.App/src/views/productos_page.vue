@@ -114,6 +114,7 @@
       :hay_mas="productos_store.hay_mas"
       :mostrados="productos_store.mostrados"
       :total="productos_store.total"
+      :cargar_mas="productos_store.cargar_mas"
       @cargar_mas="productos_store.cargar_mas"
     >
       <div class="mercury-productos-grid">

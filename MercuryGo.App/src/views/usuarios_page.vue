@@ -37,6 +37,7 @@
         :hay_mas="usuarios_store.hay_mas.value"
         :mostrados="usuarios_store.usuarios.length"
         :total="usuarios_store.total.value"
+        :cargar_mas="usuarios_store.cargar_mas"
         @cargar_mas="usuarios_store.cargar_mas"
       >
         <ion-item

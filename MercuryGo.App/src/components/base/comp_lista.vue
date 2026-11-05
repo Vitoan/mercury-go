@@ -1,24 +1,25 @@
 <template>
   <div class="mercury-contenedor-lista">
-    <ion-list class="mercury-lista-items">
+    <ion-list class="mercury-lista-items" lines="none">
       <slot />
     </ion-list>
 
-    <!-- El botón 'Ver más' solo aparece si la API confirma que hay_mas.
-         No se deduce de la cantidad descargada (evita falsos positivos). -->
-    <div v-if="hay_mas" class="mercury-acciones-paginacion ion-padding">
-      <ion-button
-        expand="block"
-        fill="outline"
-        size="default"
-        class="mercury-boton-ver-mas"
-        :disabled="cargando"
-        @click="$emit('cargar_mas')"
-      >
-        <ion-spinner v-if="cargando" name="crescent" />
-        <span v-else>Cargar más registros</span>
-      </ion-button>
-    </div>
+    <!-- Scroll infinito normalizado (Semana 9):
+         Sensor al pie de lista que solicita la siguiente página al alcanzar el umbral.
+         Se desactiva automáticamente si no hay más registros (:disabled="!hay_mas")
+         para evitar spinners infinitos o consultas innecesarias a la red. -->
+    <ion-infinite-scroll
+      threshold="120px"
+      :disabled="!hay_mas"
+      @ionInfinite="al_scrollear"
+    >
+      <div class="mercury-cargando-mas">
+        <template v-if="pidiendo || cargando">
+          <ion-spinner name="crescent" />
+          <span>Cargando más...</span>
+        </template>
+      </div>
+    </ion-infinite-scroll>
 
     <p v-if="total > 0" class="mercury-pie-conteo">
       Mostrando <strong>{{ mostrados }}</strong> de <strong>{{ total }}</strong> registros
@@ -27,11 +28,12 @@
 </template>
 
 <script setup>
-import { IonList, IonButton, IonSpinner } from '@ionic/vue';
+import { ref } from 'vue';
+import { IonList, IonInfiniteScroll, IonSpinner } from '@ionic/vue';
 
-// Componente base genérico para listas paginadas:
-// Recibe si hay más páginas y avisa cuándo pedirlas. No conoce la entidad ni cómo se pide a la red.
-defineProps({
+// Componente base genérico para listas paginadas normalizadas:
+// Maneja el sensor de scroll infinito y notifica al contenedor para cargar más.
+const props = defineProps({
   cargando: {
     type: Boolean,
     default: false
@@ -47,10 +49,33 @@ defineProps({
   total: {
     type: Number,
     default: 0
+  },
+  cargar_mas: {
+    type: Function,
+    default: null
   }
 });
 
-defineEmits(['cargar_mas']);
+const emit = defineEmits(['cargar_mas']);
+const pidiendo = ref(false);
+
+const al_scrollear = async (evento) => {
+  pidiendo.value = true;
+  try {
+    if (typeof props.cargar_mas === 'function') {
+      await props.cargar_mas();
+    } else {
+      emit('cargar_mas');
+    }
+  } catch (error) {
+    console.error('Error al cargar más registros:', error);
+  } finally {
+    pidiendo.value = false;
+    if (evento?.target?.complete) {
+      evento.target.complete();
+    }
+  }
+};
 </script>
 
 <style scoped>
@@ -63,16 +88,16 @@ defineEmits(['cargar_mas']);
   padding: 0;
 }
 
-.mercury-acciones-paginacion {
-  padding-top: 12px;
-  padding-bottom: 4px;
-}
-
-.mercury-boton-ver-mas {
-  --border-radius: 8px;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0.3px;
+.mercury-cargando-mas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 0;
+  color: var(--ion-color-step-600, #94a3b8);
+  font-size: 0.85rem;
+  font-weight: 500;
+  min-height: 48px;
 }
 
 .mercury-pie-conteo {
@@ -80,6 +105,6 @@ defineEmits(['cargar_mas']);
   font-size: 0.8rem;
   color: var(--ion-color-step-600, #94a3b8);
   margin-top: 6px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 </style>
