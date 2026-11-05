@@ -47,6 +47,8 @@ _ReSharper*/
 !.env.release
 *.local
 google-services.json
+firebase-service-account.json
+*firebase*.json
 keystore.properties
 *.jks
 *.keystore
@@ -56,3 +58,4 @@ publish/
 
 # CodeGraph
 .codegraph/
+graphify-out/
