@@ -439,6 +439,46 @@ namespace MercuryGo.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.DispositivoPush", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("actualizado_en");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("creado_en");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("token");
+
+                    b.Property<long>("UsuarioId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dispositivos_push");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dispositivos_push_token");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("ix_dispositivos_push_usuario_id");
+
+                    b.ToTable("dispositivos_push", (string)null);
+                });
+
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.IntentoEntrega", b =>
                 {
                     b.Property<long>("Id")
@@ -1369,6 +1409,18 @@ namespace MercuryGo.Api.Migrations
                     b.Navigation("Pedido");
 
                     b.Navigation("Producto");
+                });
+
+            modelBuilder.Entity("MercuryGo.Api.Domain.Entities.DispositivoPush", b =>
+                {
+                    b.HasOne("MercuryGo.Api.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dispositivos_push_usuarios_usuario_id");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("MercuryGo.Api.Domain.Entities.IntentoEntrega", b =>

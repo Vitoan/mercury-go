@@ -10,7 +10,7 @@ namespace MercuryGo.Api.Controllers;
 
 public sealed record LoginRequest(string? Email, string? Password);
 public sealed record RefreshRequest(string? RefreshToken);
-public sealed record LogoutRequest(string? RefreshToken, bool Todos = false);
+public sealed record LogoutRequest(string? RefreshToken, bool Todos = false, string? TokenPush = null);
 
 public sealed record UsuarioResponse(
     long Id,
@@ -106,7 +106,20 @@ public sealed class SesionController(MercuryGoDbContext db, TokenService tokens,
     {
         var hash = TokenService.HashRefresh(request.RefreshToken ?? string.Empty);
         var guardado = await db.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == hash, cancellationToken);
-        if (guardado is null) return Ok(new { cerrada = true });
+        if (guardado is null)
+        {
+            if (!string.IsNullOrWhiteSpace(request.TokenPush))
+            {
+                var disp = await db.DispositivosPush
+                    .FirstOrDefaultAsync(x => x.Token == request.TokenPush, cancellationToken);
+                if (disp is not null)
+                {
+                    db.DispositivosPush.Remove(disp);
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+            }
+            return Ok(new { cerrada = true });
+        }
 
         if (request.Todos)
         {
@@ -114,10 +127,27 @@ public sealed class SesionController(MercuryGoDbContext db, TokenService tokens,
                 .Where(x => x.UsuarioId == guardado.UsuarioId && x.RevocadoEn == null)
                 .ToListAsync(cancellationToken);
             vigentes.ForEach(token => token.RevocadoEn = DateTimeOffset.UtcNow);
+
+            // Revocar todos los dispositivos push del usuario
+            var dispositivos = await db.DispositivosPush
+                .Where(x => x.UsuarioId == guardado.UsuarioId)
+                .ToListAsync(cancellationToken);
+            db.DispositivosPush.RemoveRange(dispositivos);
         }
         else
         {
             guardado.RevocadoEn = DateTimeOffset.UtcNow;
+
+            // Desvincular el token push del dispositivo actual para que no siga recibiendo avisos
+            if (!string.IsNullOrWhiteSpace(request.TokenPush))
+            {
+                var disp = await db.DispositivosPush
+                    .FirstOrDefaultAsync(x => x.Token == request.TokenPush, cancellationToken);
+                if (disp is not null)
+                {
+                    db.DispositivosPush.Remove(disp);
+                }
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

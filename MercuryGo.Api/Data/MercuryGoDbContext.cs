@@ -22,6 +22,7 @@ public class MercuryGoDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Notificacion> Notificaciones => Set<Notificacion>();
     public DbSet<PagoCuentaCorriente> PagosCuentaCorriente => Set<PagoCuentaCorriente>();
+    public DbSet<DispositivoPush> DispositivosPush => Set<DispositivoPush>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -355,6 +356,20 @@ public class MercuryGoDbContext : DbContext
             entity.HasOne(n => n.Usuario)
                   .WithMany()
                   .HasForeignKey(n => n.UsuarioId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── DispositivoPush (Semana 9) ──────────────────────────────────────────
+        modelBuilder.Entity<DispositivoPush>(entity =>
+        {
+            entity.ToTable("dispositivos_push");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Token).HasMaxLength(255).IsRequired();
+            entity.HasIndex(e => e.Token).IsUnique();
+
+            entity.HasOne(d => d.Usuario)
+                  .WithMany()
+                  .HasForeignKey(d => d.UsuarioId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }
