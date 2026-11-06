@@ -217,12 +217,23 @@ public sealed class SesionController(MercuryGoDbContext db, TokenService tokens,
         return new SesionResponse(token, expiraEn, refresh, refreshExpiraEn, usuarioResp);
     }
 
-    // El vínculo usuario↔cliente comercial se resuelve por email: es la convención
-    // vigente del dominio (Cliente.Email). Sin vínculo, ClienteId queda en null y la
-    // app no puede operar el autoservicio.
+    // El vínculo usuario↔cliente comercial se resuelve prioritariamente por su clave
+    // foránea directa (Usuario.ClienteId). Como fallback retroactivo, por coincidencia
+    // de email (Cliente.Email). Sin vínculo, ClienteId queda en null y la app no
+    // puede operar el autoservicio.
     private async Task<long?> ResolverClienteIdAsync(Usuario usuario, Rol? rol, CancellationToken cancellationToken)
     {
-        if (rol?.Codigo != RolCodigos.Cliente || string.IsNullOrWhiteSpace(usuario.Email))
+        if (rol?.Codigo != RolCodigos.Cliente)
+            return null;
+
+        if (usuario.ClienteId.HasValue && usuario.ClienteId.Value > 0)
+        {
+            var existe = await db.Clientes.AsNoTracking()
+                .AnyAsync(c => c.Id == usuario.ClienteId.Value && c.Activo, cancellationToken);
+            if (existe) return usuario.ClienteId.Value;
+        }
+
+        if (string.IsNullOrWhiteSpace(usuario.Email))
             return null;
 
         return await db.Clientes.AsNoTracking()

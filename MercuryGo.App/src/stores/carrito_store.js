@@ -127,7 +127,15 @@ export const useCarritoStore = defineStore('carrito', () => {
 
     // Para el autoservicio el cliente lo define el servidor desde la sesión.
     // El id local solo lo usa el Admin, que sí elige a nombre de quién crea.
-    const destino = cliente_id_custom || cliente_id.value;
+    let destino = cliente_id_custom || cliente_id.value;
+    if (!destino) {
+      try {
+        const guardado = localStorage.getItem(CLAVE_DUENO);
+        if (guardado) destino = Number(guardado);
+      } catch {
+        // Ignorar fallo de lectura local
+      }
+    }
     if (!destino) {
       throw new Error('Tu usuario no está vinculado a un cliente comercial.');
     }
@@ -135,16 +143,38 @@ export const useCarritoStore = defineStore('carrito', () => {
     enviando.value = true;
     error.value = null;
 
-    try {
-      const payload = {
-        cliente_id: destino,
-        observaciones: observaciones.value || null,
-        items: items.value.map(i => ({
-          producto_id: i.producto_id,
-          cantidad: i.cantidad
-        }))
-      };
+    const payload = {
+      cliente_id: destino,
+      observaciones: observaciones.value || null,
+      items: items.value.map(i => ({
+        producto_id: i.producto_id,
+        cantidad: i.cantidad
+      }))
+    };
 
+    // Si estamos en modo offline, encolar directamente en la cola transaccional
+    if (use_offline_store().sin_conexion) {
+      try {
+        const accion = use_offline_store().encolar_accion('CREAR_PEDIDO', 0, payload);
+        vaciar_carrito();
+        vibrar_exito();
+
+        try {
+          await notificaciones_service.disparar_notificacion_local(
+            'Pedido Encolado (Offline) 📦',
+            'Tu orden fue guardada en el dispositivo y se enviará automáticamente al recuperar conexión.'
+          );
+        } catch (notifErr) {
+          console.warn('[Carrito] Error al emitir notificacion offline:', notifErr);
+        }
+
+        return { offline: true, accion };
+      } finally {
+        enviando.value = false;
+      }
+    }
+
+    try {
       const res = await pedidos_service.crear(payload, nueva_clave_idempotencia());
       vaciar_carrito();
       vibrar_exito();
@@ -162,6 +192,22 @@ export const useCarritoStore = defineStore('carrito', () => {
 
       return res;
     } catch (err) {
+      const esFalloRed = !err?.estado_http || err?.estado_http === 0;
+      if (esFalloRed) {
+        const accion = use_offline_store().encolar_accion('CREAR_PEDIDO', 0, payload);
+        vaciar_carrito();
+        vibrar_exito();
+
+        try {
+          await notificaciones_service.disparar_notificacion_local(
+            'Pedido Encolado (Offline) 📦',
+            'Sin conexión con el servidor. Tu orden quedó encolada y se enviará al reconectar.'
+          );
+        } catch {}
+
+        return { offline: true, accion };
+      }
+
       error.value = err.message || 'No se pudo confirmar el pedido.';
       throw err;
     } finally {
