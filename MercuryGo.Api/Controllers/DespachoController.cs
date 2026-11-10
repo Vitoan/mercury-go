@@ -34,6 +34,9 @@ public sealed class DespachoController(
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
 
+        if (User.IsInRole(RolCodigos.Chofer) && pedido.ChoferId.HasValue && pedido.ChoferId.Value != User.UsuarioId())
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "chofer_no_asignado", mensaje = "No tenés asignada esta orden de carga." });
+
         if (pedido.Estado == EstadoPedido.Entregado)
             return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede realizar picking sobre un pedido finalizado." });
 
@@ -346,6 +349,9 @@ public sealed class DespachoController(
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
 
+        if (User.IsInRole(RolCodigos.Chofer) && pedido.ChoferId.HasValue && pedido.ChoferId.Value != User.UsuarioId())
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "chofer_no_asignado", mensaje = "No tenés asignada esta orden de carga." });
+
         if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
             return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede asignar chofer a un pedido finalizado o cancelado." });
 
@@ -408,6 +414,9 @@ public sealed class DespachoController(
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (User.IsInRole(RolCodigos.Chofer) && pedido.ChoferId.HasValue && pedido.ChoferId.Value != User.UsuarioId())
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "chofer_no_asignado", mensaje = "No tenés asignada esta orden de carga." });
 
         var contexto = new MercuryGo.Api.Services.ContextoTransicion(
             UsuarioId: User.UsuarioId(),
@@ -482,6 +491,9 @@ public sealed class DespachoController(
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
 
+        if (User.IsInRole(RolCodigos.Chofer) && pedido.ChoferId.HasValue && pedido.ChoferId.Value != User.UsuarioId())
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "chofer_no_asignado", mensaje = "No tenés asignada esta orden de carga." });
+
         if (pedido.Estado != EstadoPedido.NoEntregado)
             return BadRequest(new { codigo = "estado_invalido", mensaje = "Solo pedidos en estado NoEntregado admiten reintento de despacho." });
 
@@ -534,6 +546,9 @@ public sealed class DespachoController(
         var pedido = await db.Pedidos.FirstOrDefaultAsync(p => p.Id == id && p.Activo, ct);
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
+
+        if (User.IsInRole(RolCodigos.Chofer) && pedido.ChoferId.HasValue && pedido.ChoferId.Value != User.UsuarioId())
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "chofer_no_asignado", mensaje = "No tenés asignada esta orden de carga." });
 
         var detalles = await db.DetallesPedido
             .Include(d => d.Producto)

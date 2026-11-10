@@ -1,4 +1,7 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using MercuryGo.Api.Auth;
 using MercuryGo.Api.Data;
 using MercuryGo.Api.Domain.Entities;
 using Xunit;
@@ -112,5 +115,37 @@ public class AutorizacionIdorTests
         Assert.Equal("PED-000001", p1.Numero);
         Assert.Equal("PED-000002", p2.Numero);
         Assert.NotEqual(p1.Numero, p2.Numero);
+    }
+
+    [Fact]
+    public void TokenService_EmiteClaim_ClienteId_CuandoUsuarioTieneClienteId()
+    {
+        var tokenService = new TokenService(new JwtOpciones { Key = "MercuryGo_Super_Secret_Key_For_Unit_Testing_32chars!" });
+        var usuario = new Usuario
+        {
+            Id = 15,
+            Nombre = "Cliente Test",
+            Email = "cliente@test.com",
+            ClienteId = 42
+        };
+        var rol = new Rol { Id = 4, Codigo = RolCodigos.Cliente, Nombre = "Cliente" };
+
+        var (tokenStr, _) = tokenService.Emitir(usuario, rol);
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(tokenStr);
+
+        var claimClienteId = jwt.Claims.FirstOrDefault(c => c.Type == TokenService.ClaimClienteId);
+        Assert.NotNull(claimClienteId);
+        Assert.Equal("42", claimClienteId.Value);
+
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(jwt.Claims));
+        Assert.Equal(42L, principal.ClienteId());
+    }
+
+    [Fact]
+    public void ClaimsExtensions_ClienteId_RetornaNull_SiNoExisteClaim()
+    {
+        var principal = new ClaimsPrincipal(new ClaimsIdentity());
+        Assert.Null(principal.ClienteId());
     }
 }

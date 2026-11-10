@@ -53,9 +53,15 @@ keystore.properties
 *.jks
 *.keystore
 appsettings.Production.json
+*.publishSettings
+*.PublishSettings
 *.zip
 publish/
 
 # CodeGraph
 .codegraph/
 graphify-out/
+
+# Elephant-Goldfish Model (EGM)
+EGM.md
+**/EGM.md

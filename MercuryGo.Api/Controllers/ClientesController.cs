@@ -9,13 +9,14 @@ using MercuryGo.Api.Domain.Entities;
 namespace MercuryGo.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario}")]
+[Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario},{RolCodigos.Cliente}")]
 [Route("api/clientes")]
 public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
 {
     // Listado paginado con búsqueda en la base de datos (por Razón Social, CUIT o Teléfono).
     // Cumple con la regla de la cátedra: "buscar y filtrar en la API, nunca en la memoria del teléfono".
     [HttpGet]
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario}")]
     public async Task<IActionResult> Listar(
         [FromQuery] string? busqueda,
         [FromQuery] int? pagina,
@@ -54,6 +55,15 @@ public sealed class ClientesController(MercuryGoDbContext db) : ControllerBase
     [HttpGet("{id:long}")]
     public async Task<IActionResult> Detalle(long id, CancellationToken ct)
     {
+        if (User.EsCliente())
+        {
+            var clienteIdPropio = User.ClienteId();
+            if (!clienteIdPropio.HasValue || clienteIdPropio.Value != id)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "acceso_denegado", mensaje = "No tenés autorización para consultar este cliente comercial." });
+            }
+        }
+
         var cliente = await db.Clientes
             .AsNoTracking()
             .Where(c => c.Id == id && c.Activo)

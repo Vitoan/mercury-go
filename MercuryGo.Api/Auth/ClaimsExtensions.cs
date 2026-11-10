@@ -23,6 +23,12 @@ public static class ClaimsExtensions
         return long.TryParse(valor, out var id) ? id : 0;
     }
 
+    public static long? ClienteId(this ClaimsPrincipal usuario)
+    {
+        var valor = usuario.FindFirstValue(TokenService.ClaimClienteId);
+        return long.TryParse(valor, out var id) ? id : null;
+    }
+
     public static string? RolCodigo(this ClaimsPrincipal usuario)
     {
         return usuario.FindFirstValue(TokenService.ClaimRolCodigo)

@@ -20,6 +20,7 @@ public sealed class JwtOpciones
 public sealed class TokenService(JwtOpciones opciones)
 {
     public const string ClaimRolCodigo = "rol_codigo";
+    public const string ClaimClienteId = "cliente_id";
 
     public SecurityKey ClaveFirma { get; } = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(opciones.Key));
 
@@ -33,6 +34,11 @@ public sealed class TokenService(JwtOpciones opciones)
             new(JwtRegisteredClaimNames.Name, usuario.Nombre),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
         };
+
+        if (usuario.ClienteId.HasValue)
+        {
+            claims.Add(new Claim(ClaimClienteId, usuario.ClienteId.Value.ToString()));
+        }
 
         // Sin rol, el token existe pero no contiene claims de autorización.
         // El usuario está autenticado pero no autorizado.

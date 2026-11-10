@@ -23,4 +23,8 @@
     <PackageReference Include="QuestPDF" Version="2025.7.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="firebase-service-account.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
