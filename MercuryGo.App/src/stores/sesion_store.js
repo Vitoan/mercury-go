@@ -95,6 +95,11 @@ export const useSesionStore = defineStore('sesion', () => {
 
   async function salir(todos = false) {
     try {
+      await notificaciones_service.desregistrar_dispositivo_en_api();
+    } catch {
+      // Ignorar error al desregistrar token push
+    }
+    try {
       const refresh_token = await obtener_refresh_token();
       if (refresh_token) {
         await cerrar_sesion(refresh_token, todos);

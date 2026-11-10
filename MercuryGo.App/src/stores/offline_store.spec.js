@@ -109,6 +109,22 @@ describe('use_offline_store (Cola Offline e Idempotencia)', () => {
     expect(store.cola[0].estado).toBe('pendiente');
   });
 
+  it('pausa la sincronización y mantiene la acción como pendiente ante un error 401', async () => {
+    const store = use_offline_store();
+    const a1 = store.encolar_accion('EN_PUERTA', 700);
+
+    const error401 = new Error('Token expirado');
+    error401.estado_http = 401;
+    pedidos_service.cambiar_estado.mockRejectedValueOnce(error401);
+
+    await store.sincronizar();
+
+    const enCola = store.cola.find((a) => a.id === a1.id);
+    expect(enCola.estado).toBe('pendiente');
+    expect(store.conflictos_count).toBe(0);
+    expect(store.pendientes_count).toBe(1);
+  });
+
   it('no cuenta conflictos ni bloqueadas como pendientes', () => {
     const store = use_offline_store();
     store.guardar_cola([

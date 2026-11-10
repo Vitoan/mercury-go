@@ -56,6 +56,22 @@ export const notificaciones_service = {
     }
   },
 
+  /**
+   * Da de baja el token FCM del dispositivo en el backend al cerrar sesión (DEF-30).
+   * Evita notificaciones huérfanas o cruzadas entre diferentes usuarios en el mismo teléfono.
+   */
+  async desregistrar_dispositivo_en_api() {
+    const t = token_push;
+    if (!t) return;
+
+    try {
+      await ajax_service.delete('/api/dispositivos', { token: t });
+      console.info('[Push] Dispositivo desregistrado de la API.');
+    } catch (err) {
+      console.warn('[Push] Error al desregistrar dispositivo de la API:', err);
+    }
+  },
+
   async preparar_locales() {
     try {
       if (!Capacitor.isPluginAvailable('LocalNotifications')) return;

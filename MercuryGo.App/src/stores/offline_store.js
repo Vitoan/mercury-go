@@ -229,6 +229,14 @@ export const use_offline_store = defineStore('offline', {
             const clasificacion = clasificar_error(err);
             accion.codigo = err?.codigo || null;
             accion.error = err?.mensaje || err?.message || 'Rechazado por servidor.';
+
+            if (err?.estado_http === 401) {
+              // ACT-03 / DEF-31: Sesión expirada o token no renovado.
+              accion.estado = 'pendiente';
+              this.guardar_cola([...this.cola]);
+              break;
+            }
+
             // No continuar con las siguientes acciones de ESTE pedido (FIFO).
             accion.estado = clasificacion;
             if (clasificacion === 'conflicto') {

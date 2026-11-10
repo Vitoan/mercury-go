@@ -49,6 +49,26 @@ public sealed class DispositivosController(MercuryGoDbContext db) : ControllerBa
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new { registrado = true });
     }
+
+    // Baja del token push al cerrar sesión (DEF-30) para evitar que notificaciones
+    // posteriores del usuario lleguen a este dispositivo si otro usuario inicia sesión.
+    [HttpDelete]
+    public async Task<IActionResult> Desregistrar([FromBody] RegistrarDispositivoRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            return BadRequest(new { codigo = "token_requerido", mensaje = "Falta el token del dispositivo." });
+        }
+
+        var dispositivo = await db.DispositivosPush.FirstOrDefaultAsync(x => x.Token == request.Token, cancellationToken);
+        if (dispositivo is not null)
+        {
+            db.DispositivosPush.Remove(dispositivo);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return Ok(new { desregistrado = true });
+    }
 }
 
 public sealed record RegistrarDispositivoRequest(string Token);
