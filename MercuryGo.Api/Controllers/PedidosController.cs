@@ -15,7 +15,8 @@ public sealed class PedidosController(
     MercuryGoDbContext db,
     MercuryGo.Api.Services.IPedidoTransicionService transicionService,
     MercuryGo.Api.Services.IdempotenciaService idempotenciaService,
-    MercuryGo.Api.Services.ConflictoOfflineService conflictoOfflineService) : PedidosControllerBase(db, conflictoOfflineService)
+    MercuryGo.Api.Services.ConflictoOfflineService conflictoOfflineService,
+    MercuryGo.Api.Services.NotificacionService notificacionService) : PedidosControllerBase(db, conflictoOfflineService)
 {
     // Estados en los que todavía se puede corregir la mercadería del pedido.
     private static readonly EstadoPedido[] EstadosConItemsEditables =
@@ -105,18 +106,31 @@ public sealed class PedidosController(
         return Ok(new { pedidos = items, pagina = paginaResponse });
     }
 
-    // Resumen general de conteos por estado (para métricas y badges).
+    // Resumen general de conteos por estado filtrado por rol (para métricas y chips).
     [HttpGet("resumen")]
     public async Task<IActionResult> Resumen(CancellationToken ct)
     {
-        var conteosPorEstado = await db.Pedidos
-            .AsNoTracking()
-            .Where(p => p.Activo)
+        var consulta = db.Pedidos.AsNoTracking().Where(p => p.Activo);
+
+        if (User.EsCliente())
+        {
+            var propio = await ObtenerClienteDeUsuarioAutenticadoAsync(ct);
+            consulta = propio != null
+                ? consulta.Where(p => p.ClienteId == propio.Id)
+                : consulta.Where(p => false);
+        }
+        else if (User.IsInRole(RolCodigos.Chofer))
+        {
+            var choferId = User.UsuarioId();
+            consulta = consulta.Where(p => p.ChoferId == choferId);
+        }
+
+        var conteosPorEstado = await consulta
             .GroupBy(p => p.Estado)
             .Select(g => new { estado = g.Key.ToString(), cantidad = g.Count() })
             .ToListAsync(ct);
 
-        var total = await db.Pedidos.CountAsync(p => p.Activo, ct);
+        var total = await consulta.CountAsync(ct);
 
         return Ok(new { conteos_por_estado = conteosPorEstado, total });
     }
@@ -223,64 +237,59 @@ public sealed class PedidosController(
             return BadRequest(new { codigo = "items_requeridos", mensaje = "La orden de carga debe contener al menos un producto." });
 
         var productosIds = request.Items.Select(i => i.ProductoId).Distinct().ToList();
-        var productosDb = await db.Productos
-            .Where(p => productosIds.Contains(p.Id) && p.Activo)
-            .ToDictionaryAsync(p => p.Id, ct);
-
-        // Validar existencias
-        var tieneFalloValidacion = false;
-        var detalleValidacion = new List<string>();
-
-        foreach (var item in request.Items)
-        {
-            if (!productosDb.TryGetValue(item.ProductoId, out var prod))
-                return BadRequest(new { codigo = "producto_invalido", mensaje = $"El producto con ID {item.ProductoId} no existe o está inactivo." });
-
-            if (item.Cantidad <= 0)
-                return BadRequest(new { codigo = "cantidad_invalida", mensaje = $"La cantidad para '{prod.Nombre}' debe ser mayor a cero." });
-
-            if (!prod.Disponible)
-            {
-                tieneFalloValidacion = true;
-                detalleValidacion.Add($"Producto '{prod.Nombre}' no disponible en catálogo");
-            }
-
-            if (prod.StockActual < item.Cantidad)
-            {
-                return BadRequest(new { codigo = "stock_insuficiente", mensaje = $"Stock insuficiente para '{prod.Nombre}'. Stock disponible: {prod.StockActual}, solicitado: {item.Cantidad}." });
-            }
-        }
-
-        // Generación de número de remito transaccional sin carreras de concurrencia (P0-5)
-        var numeroTemporal = $"TMP-{Guid.NewGuid():N}";
-
-        var estadoInicial = EstadoPedido.Pendiente;
-        if (!tieneFalloValidacion && !string.IsNullOrWhiteSpace(request.Estado) &&
-            Enum.TryParse<EstadoPedido>(request.Estado, true, out var est) && est == EstadoPedido.Confirmado &&
-            User.IsInRole(RolCodigos.Admin))
-        {
-            estadoInicial = EstadoPedido.Confirmado;
-        }
-
-        var nuevoPedido = new Pedido
-        {
-            ClienteId = clienteId,
-            Numero = numeroTemporal,
-            Estado = estadoInicial,
-            FechaPedido = DateTime.UtcNow,
-            Observaciones = NormalizarTexto(request.Observaciones),
-            ValidacionFallida = tieneFalloValidacion,
-            ValidacionDetalle = tieneFalloValidacion ? string.Join(" · ", detalleValidacion) : null,
-            ConfirmadoPorId = estadoInicial == EstadoPedido.Confirmado ? User.UsuarioId() : null,
-            ConfirmadoEn = estadoInicial == EstadoPedido.Confirmado ? DateTime.UtcNow : null,
-            Activo = true,
-            CreadoEn = DateTime.UtcNow
-        };
+        Pedido nuevoPedido;
 
         var esRelacional = db.Database.IsRelational();
         await using var tx = esRelacional ? await db.Database.BeginTransactionAsync(ct) : null;
         try
         {
+            var productosDb = await db.Productos
+                .Where(p => productosIds.Contains(p.Id) && p.Activo)
+                .ToDictionaryAsync(p => p.Id, ct);
+
+            // Validar existencias dentro de la transacción para evitar carreras TOCTOU
+            var tieneFalloValidacion = false;
+            var detalleValidacion = new List<string>();
+
+            foreach (var item in request.Items)
+            {
+                if (!productosDb.TryGetValue(item.ProductoId, out var prod))
+                    return BadRequest(new { codigo = "producto_invalido", mensaje = $"El producto con ID {item.ProductoId} no existe o está inactivo." });
+
+                if (item.Cantidad <= 0)
+                    return BadRequest(new { codigo = "cantidad_invalida", mensaje = $"La cantidad para '{prod.Nombre}' debe ser mayor a cero." });
+
+                if (!prod.Disponible)
+                {
+                    tieneFalloValidacion = true;
+                    detalleValidacion.Add($"Producto '{prod.Nombre}' no disponible en catálogo");
+                }
+
+                if (prod.StockActual < item.Cantidad)
+                    return BadRequest(new { codigo = "stock_insuficiente", mensaje = $"Stock insuficiente para '{prod.Nombre}'. Stock disponible: {prod.StockActual}, solicitado: {item.Cantidad}." });
+            }
+
+            var estadoInicial = !tieneFalloValidacion && !string.IsNullOrWhiteSpace(request.Estado) &&
+                Enum.TryParse<EstadoPedido>(request.Estado, true, out var est) && est == EstadoPedido.Confirmado &&
+                User.IsInRole(RolCodigos.Admin)
+                ? EstadoPedido.Confirmado
+                : EstadoPedido.Pendiente;
+
+            nuevoPedido = new Pedido
+            {
+                ClienteId = clienteId,
+                Numero = $"TMP-{Guid.NewGuid():N}",
+                Estado = estadoInicial,
+                FechaPedido = DateTime.UtcNow,
+                Observaciones = NormalizarTexto(request.Observaciones),
+                ValidacionFallida = tieneFalloValidacion,
+                ValidacionDetalle = tieneFalloValidacion ? string.Join(" · ", detalleValidacion) : null,
+                ConfirmadoPorId = estadoInicial == EstadoPedido.Confirmado ? User.UsuarioId() : null,
+                ConfirmadoEn = estadoInicial == EstadoPedido.Confirmado ? DateTime.UtcNow : null,
+                Activo = true,
+                CreadoEn = DateTime.UtcNow
+            };
+
             db.Pedidos.Add(nuevoPedido);
         await db.SaveChangesAsync(ct);
 
@@ -302,6 +311,15 @@ public sealed class PedidosController(
                 CreadoEn = DateTime.UtcNow
             });
         }
+
+        // Notificar al Administrador sobre el nuevo pedido ingresado
+        await notificacionService.NotificarRolAsync(
+            RolCodigos.Admin,
+            $"🛒 Nuevo pedido ingresado ({nuevoPedido.Numero})",
+            $"El cliente '{cliente.RazonSocial}' registró la orden {nuevoPedido.Numero}.",
+            "PEDIDO",
+            nuevoPedido.Id,
+            ct);
 
         await db.SaveChangesAsync(ct);
         if (tx != null)
@@ -504,8 +522,15 @@ public sealed class PedidosController(
             }
 
             var detallesActuales = await db.DetallesPedido.Where(d => d.PedidoId == id).ToListAsync(ct);
+            var cantidadesPrevias = detallesActuales
+                .GroupBy(d => d.ProductoId)
+                .ToDictionary(g => g.Key, g => g.Sum(d => d.Cantidad));
 
-            var productosIds = request.Items!.Select(i => i.ProductoId).Distinct().ToList();
+            var productosIds = request.Items!.Select(i => i.ProductoId)
+                .Concat(cantidadesPrevias.Keys)
+                .Distinct()
+                .ToList();
+
             var productosDb = await db.Productos
                 .Where(p => productosIds.Contains(p.Id))
                 .ToDictionaryAsync(p => p.Id, ct);
@@ -517,12 +542,30 @@ public sealed class PedidosController(
                 productosDb);
 
             if (resultado.Error is not null)
+                return BadRequest(new { codigo = resultado.Error.Codigo, mensaje = resultado.Error.Mensaje });
+
+            // Validar y reconciliar diferencia de stock físico por producto
+            var cantidadesNuevas = request.Items!.ToDictionary(i => i.ProductoId, i => i.Cantidad);
+            foreach (var prodId in productosIds)
             {
-                return BadRequest(new
+                if (!productosDb.TryGetValue(prodId, out var prod)) continue;
+                var cantAnterior = cantidadesPrevias.GetValueOrDefault(prodId, 0);
+                var cantNueva = cantidadesNuevas.GetValueOrDefault(prodId, 0);
+                var delta = cantNueva - cantAnterior;
+                if (delta == 0) continue;
+
+                if (delta > 0 && prod.StockActual < delta)
                 {
-                    codigo = resultado.Error.Codigo,
-                    mensaje = resultado.Error.Mensaje
-                });
+                    return BadRequest(new
+                    {
+                        codigo = "stock_insuficiente",
+                        mensaje = $"Stock insuficiente para '{prod.Nombre}'. Disponible: {prod.StockActual}, incremento solicitado: {delta}."
+                    });
+                }
+
+                prod.StockActual -= delta;
+                prod.Disponible = prod.StockActual > 0;
+                prod.ActualizadoEn = DateTime.UtcNow;
             }
 
             // La edición no puede dejar la orden por debajo de lo que ya se cobró.
@@ -631,6 +674,9 @@ public sealed class PedidosController(
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
 
+        if (!await PuedeAccederAlPedidoAsync(pedido, ct))
+            return StatusCode(StatusCodes.Status403Forbidden, new { codigo = "acceso_denegado", mensaje = "No tenés permiso para solicitar la cancelación de este pedido." });
+
         if (pedido.Estado == EstadoPedido.Entregado || pedido.Estado == EstadoPedido.Cancelado)
             return BadRequest(new { codigo = "estado_invalido", mensaje = "No se puede solicitar la cancelación de un pedido finalizado o cancelado." });
 
@@ -638,6 +684,15 @@ public sealed class PedidosController(
         pedido.CancelacionMotivo = string.IsNullOrWhiteSpace(request?.Motivo) ? "Solicitado por el cliente" : request.Motivo.Trim();
         pedido.CancelacionSolicitadaPorId = User.UsuarioId();
         pedido.ActualizadoEn = DateTime.UtcNow;
+
+        // Avisar al Administrador para su resolución
+        await notificacionService.NotificarRolAsync(
+            RolCodigos.Admin,
+            $"⚠️ Solicitud de cancelación ({pedido.Numero})",
+            $"El cliente solicitó cancelar el pedido {pedido.Numero}. Motivo: {pedido.CancelacionMotivo}",
+            "PEDIDO",
+            pedido.Id,
+            ct);
 
         await db.SaveChangesAsync(ct);
 

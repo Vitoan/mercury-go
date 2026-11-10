@@ -213,8 +213,11 @@ await using (var scope = app.Services.CreateAsyncScope())
         if (adminUser != null)
         {
             var hasher = new PasswordHasher<Usuario>();
-            adminUser.PasswordHash = hasher.HashPassword(adminUser, adminPassword);
-            await db.SaveChangesAsync();
+            if (hasher.VerifyHashedPassword(adminUser, adminUser.PasswordHash, adminPassword) == PasswordVerificationResult.Failed)
+            {
+                adminUser.PasswordHash = hasher.HashPassword(adminUser, adminPassword);
+                await db.SaveChangesAsync();
+            }
         }
     }
 }

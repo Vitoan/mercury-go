@@ -44,6 +44,17 @@
         </ion-chip>
 
         <ion-chip
+          v-if="obtenerConteo('Confirmado') > 0 || estadoSeleccionado === 'Confirmado'"
+          :color="estadoSeleccionado === 'Confirmado' ? 'success' : 'medium'"
+          :outline="estadoSeleccionado !== 'Confirmado'"
+          class="mercury-chip"
+          @click="filtrarEstado('Confirmado')"
+        >
+          <ion-icon :icon="checkmarkDoneOutline" />
+          <ion-label>Confirmados · {{ obtenerConteo('Confirmado') }}</ion-label>
+        </ion-chip>
+
+        <ion-chip
           :color="estadoSeleccionado === 'EnPreparacion' ? 'warning' : 'medium'"
           :outline="estadoSeleccionado !== 'EnPreparacion'"
           class="mercury-chip"
@@ -271,6 +282,7 @@ import {
   cubeOutline,
   trailSignOutline,
   checkmarkCircleOutline,
+  checkmarkDoneOutline,
   closeCircleOutline,
   documentTextOutline,
   qrCodeOutline,

@@ -361,6 +361,18 @@ public sealed class DespachoController(
 
         pedido.ChoferId = chofer.Id;
         pedido.ActualizadoEn = DateTime.UtcNow;
+
+        // Notificar al chofer sobre la orden asignada a su ruta
+        db.Notificaciones.Add(new Notificacion
+        {
+            UsuarioId = chofer.Id,
+            Titulo = $"🚚 Nueva orden asignada ({pedido.Numero})",
+            Mensaje = $"Se te ha asignado la entrega de la orden {pedido.Numero}.",
+            Tipo = "PEDIDO",
+            ReferenciaId = pedido.Id,
+            CreadoEn = DateTime.UtcNow
+        });
+
         await db.SaveChangesAsync(ct);
 
         return Ok(new
@@ -523,7 +535,10 @@ public sealed class DespachoController(
         if (pedido is null)
             return NotFound(new { codigo = "pedido_no_encontrado", mensaje = "El pedido no existe o fue cancelado." });
 
-        var detalles = await db.DetallesPedido.Where(d => d.PedidoId == id).ToListAsync(ct);
+        var detalles = await db.DetallesPedido
+            .Include(d => d.Producto)
+            .Where(d => d.PedidoId == id)
+            .ToListAsync(ct);
         var mapaRechazos = (request.ItemsRechazados ?? []).ToDictionary(r => r.ProductoId);
 
         foreach (var d in detalles)
@@ -535,10 +550,16 @@ public sealed class DespachoController(
                 d.CantidadEntregada = d.Cantidad - cantRechazada;
                 d.MotivoRechazo = NormalizarTexto(rechazo.Motivo);
 
-                // Devolver unidades lógicas y ajustar total por los productos rechazados en puerta
+                // Devolver unidades al stock físico y ajustar el total facturado de la orden
                 if (cantRechazada > 0)
                 {
-                    d.Cantidad = d.CantidadEntregada.Value; // Ajuste del total de la orden
+                    d.Cantidad = d.CantidadEntregada.Value;
+                    if (d.Producto is not null)
+                    {
+                        d.Producto.StockActual += cantRechazada;
+                        d.Producto.Disponible = d.Producto.StockActual > 0;
+                        d.Producto.ActualizadoEn = DateTime.UtcNow;
+                    }
                 }
             }
             else

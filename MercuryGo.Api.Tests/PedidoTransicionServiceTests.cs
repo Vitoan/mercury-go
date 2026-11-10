@@ -351,4 +351,52 @@ public class PedidoTransicionServiceTests
         Assert.NotNull(prodActualizado);
         Assert.Equal(4, prodActualizado.StockActual); // 8 - 4 re-descontadas por entrega real
     }
+
+    [Fact]
+    public async Task Transicion_NotificaUsuarioVinculadoPorClienteId_AunqueEmailSeaDistinto()
+    {
+        using var db = CrearContextoEnMemoria("Test_Notificacion_Por_ClienteId");
+        var servicio = new PedidoTransicionService(db);
+
+        db.Clientes.Add(new Cliente
+        {
+            Id = 1,
+            RazonSocial = "Distribuidora El Norte S.R.L.",
+            Cuit = "30-71234567-0",
+            Email = "compras@elnorte.com.ar",
+            Activo = true
+        });
+
+        db.Usuarios.Add(new Usuario
+        {
+            Id = 4,
+            Nombre = "Cliente Autoservicio San Luis",
+            Email = "cliente@mercurygo.local",
+            PasswordHash = "hash",
+            ClienteId = 1,
+            Activo = true
+        });
+
+        var pedido = new Pedido
+        {
+            Id = 90,
+            ClienteId = 1,
+            Numero = "PED-000090",
+            Estado = EstadoPedido.Pendiente,
+            Activo = true
+        };
+        db.Pedidos.Add(pedido);
+        await db.SaveChangesAsync();
+
+        var resultado = await servicio.TransicionarAsync(
+            pedido,
+            EstadoPedido.Confirmado,
+            new ContextoTransicion(UsuarioId: 1, RolCodigo: RolCodigos.Admin));
+        await db.SaveChangesAsync();
+
+        Assert.True(resultado.Exito);
+        var notif = await db.Notificaciones.SingleOrDefaultAsync(n => n.ReferenciaId == 90);
+        Assert.NotNull(notif);
+        Assert.Equal(4, notif!.UsuarioId);
+    }
 }

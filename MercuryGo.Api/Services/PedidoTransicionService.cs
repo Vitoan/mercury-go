@@ -178,11 +178,7 @@ public sealed class PedidoTransicionService(MercuryGoDbContext db) : IPedidoTran
 
     private async Task GenerarNotificacionClienteAsync(Pedido pedido, EstadoPedido nuevoEstado, CancellationToken ct)
     {
-        var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == pedido.ClienteId, ct);
-        if (cliente is null || string.IsNullOrWhiteSpace(cliente.Email))
-            return;
-
-        var usuarioCliente = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Email == cliente.Email, ct);
+        var usuarioCliente = await db.ResolverUsuarioDeClienteAsync(pedido.ClienteId, ct);
         if (usuarioCliente is null)
             return;
 

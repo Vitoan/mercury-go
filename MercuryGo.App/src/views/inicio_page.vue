@@ -15,8 +15,18 @@
         <p class="mercury-ofertas-subtitulo">Precios exclusivos de distribución mayorista. Deslizá hacia abajo para ver todas las promociones.</p>
       </div>
 
-      <!-- Estado: Sin ofertas activas -->
-      <div v-if="!productos_store.cargando && ofertas.length === 0" class="mercury-sin-ofertas">
+      <!-- Estado 1: Cargando -->
+      <comp-esqueleto v-if="productos_store.cargando && ofertas.length === 0" />
+
+      <!-- Estado 2: Error al conectar con la API -->
+      <comp-estado-error
+        v-else-if="productos_store.error && ofertas.length === 0"
+        :mensaje="productos_store.error"
+        @reintentar="alActualizar"
+      />
+
+      <!-- Estado 3: Sin ofertas activas (vacío) -->
+      <div v-else-if="ofertas.length === 0" class="mercury-sin-ofertas">
         <ion-icon :icon="flameOutline" class="mercury-icono-vacio" />
         <h3>No hay ofertas activas en este momento</h3>
         <p>Volvé a consultar pronto para ver nuevos precios especiales de distribución.</p>
@@ -73,6 +83,7 @@
             <div class="mercury-oferta-acciones-pie">
               <span class="mercury-oferta-precio-grande">{{ formatearMoneda(oferta.precio) }}</span>
               <ion-button
+                v-if="sesion_store.rol_activo !== 'OPERARIO' && sesion_store.rol_activo !== 'CHOFER'"
                 size="small"
                 color="primary"
                 class="mercury-btn-sumar"
@@ -128,6 +139,8 @@ import {
 } from 'ionicons/icons';
 import CompPage from '../components/estructura/comp_page.vue';
 import CompProductoModal from '../components/dominio/productos/comp_producto_modal.vue';
+import CompEsqueleto from '../components/base/comp_esqueleto.vue';
+import CompEstadoError from '../components/base/comp_estado_error.vue';
 import { productos_store } from '@/stores/productos_store';
 import { carrito_store } from '@/stores/carrito_store';
 import { sesion_store } from '@/stores/sesion_store';

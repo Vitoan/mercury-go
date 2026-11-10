@@ -150,15 +150,18 @@ public sealed class CuentasCorrientesController(
         var pedidosCliente = await db.Pedidos
             .AsNoTracking()
             .Where(p => p.ClienteId == cliente.Id && p.Activo && p.Estado != EstadoPedido.Cancelado)
-            .Select(p => new
-            {
+            .Select(p => new ResumenPedidoContable(
                 p.Id,
                 p.Numero,
+                p.ClienteId,
                 p.Estado,
                 p.FechaPedido,
-                Total = db.DetallesPedido.Where(d => d.PedidoId == p.Id).Sum(d => (decimal?)d.Cantidad * d.PrecioUnitario) ?? 0m,
+                db.DetallesPedido.Where(d => d.PedidoId == p.Id).Sum(d => (decimal?)d.Cantidad * d.PrecioUnitario) ?? 0m,
+                db.CobrosPedido.Where(c => c.PedidoId == p.Id).Sum(c => (decimal?)c.Monto) ?? 0m,
+                p.ComprobanteEstado,
+                p.ComprobanteUrl,
                 p.Observaciones
-            })
+            ))
             .ToListAsync(ct);
 
         var pagosCuenta = await db.PagosCuentaCorriente
@@ -171,38 +174,11 @@ public sealed class CuentasCorrientesController(
         var totalPagado = pagosCuenta.Where(p => p.Estado == "Aprobado").Sum(p => p.Monto);
         var comprobantesPendientes = pagosCuenta.Count(p => p.Estado == "Pendiente");
 
-        // Sumar pagos aprobados y calcular pendientes de auditoría
         foreach (var p in pedidosCliente)
         {
-            var obs = p.Observaciones ?? string.Empty;
-            if (obs.Contains("[Comprobante de pago: APROBADO"))
-            {
-                var matchMonto = System.Text.RegularExpressions.Regex.Match(obs, @"\[Comprobante de pago:\s*APROBADO\s*·\s*\$([\d\.,]+)");
-                if (matchMonto.Success && decimal.TryParse(matchMonto.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var montoAprob))
-                {
-                    totalPagado += montoAprob;
-                }
-                else
-                {
-                    totalPagado += p.Total;
-                }
-            }
-            else if (obs.Contains("[Cobro Chofer:"))
-            {
-                var matchCobro = System.Text.RegularExpressions.Regex.Match(obs, @"\[Cobro Chofer:\s*\$([\d\.,]+)");
-                if (matchCobro.Success && decimal.TryParse(matchCobro.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var montoCobro))
-                {
-                    totalPagado += montoCobro;
-                }
-                else
-                {
-                    totalPagado += p.Total;
-                }
-            }
-            else if (obs.Contains("[Comprobante de pago: PENDIENTE") || obs.Contains("[Comprobante de pago: /uploads/"))
-            {
-                comprobantesPendientes++;
-            }
+            var (pagadoPedido, pendienteUrl) = EvaluarEstadoContablePedido(p);
+            totalPagado += pagadoPedido;
+            if (pendienteUrl is not null) comprobantesPendientes++;
         }
 
         var saldoDeudor = Math.Max(0m, totalFacturado - totalPagado);
@@ -244,16 +220,18 @@ public sealed class CuentasCorrientesController(
         var pedidos = await db.Pedidos
             .AsNoTracking()
             .Where(p => p.Activo && p.Estado != EstadoPedido.Cancelado)
-            .Select(p => new
-            {
+            .Select(p => new ResumenPedidoContable(
                 p.Id,
                 p.Numero,
                 p.ClienteId,
                 p.Estado,
                 p.FechaPedido,
-                Total = db.DetallesPedido.Where(d => d.PedidoId == p.Id).Sum(d => (decimal?)d.Cantidad * d.PrecioUnitario) ?? 0m,
+                db.DetallesPedido.Where(d => d.PedidoId == p.Id).Sum(d => (decimal?)d.Cantidad * d.PrecioUnitario) ?? 0m,
+                db.CobrosPedido.Where(c => c.PedidoId == p.Id).Sum(c => (decimal?)c.Monto) ?? 0m,
+                p.ComprobanteEstado,
+                p.ComprobanteUrl,
                 p.Observaciones
-            })
+            ))
             .ToListAsync(ct);
 
         var todosPagosCuenta = await db.PagosCuentaCorriente
@@ -262,10 +240,13 @@ public sealed class CuentasCorrientesController(
             .OrderByDescending(p => p.CreadoEn)
             .ToListAsync(ct);
 
+        var pedidosPorCliente = pedidos.ToLookup(p => p.ClienteId);
+        var pagosPorCliente = todosPagosCuenta.ToLookup(p => p.ClienteId);
+
         var resumenPorCliente = clientes.Select(c =>
         {
-            var pedidosC = pedidos.Where(p => p.ClienteId == c.Id).ToList();
-            var pagosC = todosPagosCuenta.Where(p => p.ClienteId == c.Id).ToList();
+            var pedidosC = pedidosPorCliente[c.Id];
+            var pagosC = pagosPorCliente[c.Id];
             var totalFacturado = pedidosC.Sum(p => p.Total);
             var totalPagado = pagosC.Where(p => p.Estado == "Aprobado").Sum(p => p.Monto);
             var pendientesRevision = pagosC.Count(p => p.Estado == "Pendiente");
@@ -287,44 +268,18 @@ public sealed class CuentasCorrientesController(
 
             foreach (var p in pedidosC)
             {
-                var obs = p.Observaciones ?? string.Empty;
-                if (obs.Contains("[Comprobante de pago: APROBADO"))
-                {
-                    var matchMonto = System.Text.RegularExpressions.Regex.Match(obs, @"\[Comprobante de pago:\s*APROBADO\s*·\s*\$([\d\.,]+)");
-                    if (matchMonto.Success && decimal.TryParse(matchMonto.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var montoAprob))
-                    {
-                        totalPagado += montoAprob;
-                    }
-                    else
-                    {
-                        totalPagado += p.Total;
-                    }
-                }
-                else if (obs.Contains("[Cobro Chofer:"))
-                {
-                    var matchCobro = System.Text.RegularExpressions.Regex.Match(obs, @"\[Cobro Chofer:\s*\$([\d\.,]+)");
-                    if (matchCobro.Success && decimal.TryParse(matchCobro.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var montoCobro))
-                    {
-                        totalPagado += montoCobro;
-                    }
-                    else
-                    {
-                        totalPagado += p.Total;
-                    }
-                }
-                else if (obs.Contains("[Comprobante de pago: PENDIENTE") || obs.Contains("[Comprobante de pago: /uploads/"))
+                var (pagadoPedido, pendienteUrl) = EvaluarEstadoContablePedido(p);
+                totalPagado += pagadoPedido;
+                if (pendienteUrl is not null)
                 {
                     pendientesRevision++;
-                    var match = System.Text.RegularExpressions.Regex.Match(obs, @"/uploads/comprobantes/[^\s\]]+");
-                    var comprobanteUrl = match.Success ? match.Value : null;
-
                     comprobantesPendientes.Add(new
                     {
                         pedido_id = p.Id,
                         pedido_numero = p.Numero,
                         fecha = p.FechaPedido,
                         total = p.Total,
-                        comprobante_url = comprobanteUrl,
+                        comprobante_url = pendienteUrl == string.Empty ? null : pendienteUrl,
                         observaciones = p.Observaciones
                     });
                 }
@@ -782,4 +737,67 @@ public sealed class CuentasCorrientesController(
         });
     }
 
+    private sealed record ResumenPedidoContable(
+        long Id,
+        string Numero,
+        long ClienteId,
+        EstadoPedido Estado,
+        DateTime FechaPedido,
+        decimal Total,
+        decimal CobradoEstructurado,
+        string? ComprobanteEstado,
+        string? ComprobanteUrl,
+        string? Observaciones);
+
+    // Evalúa en un solo lugar el total abonado de un pedido (priorizando CobrosPedido estructurados)
+    // y si tiene un comprobante pendiente de revisión por el Admin.
+    private static (decimal TotalAbonado, string? ComprobantePendienteUrl) EvaluarEstadoContablePedido(ResumenPedidoContable p)
+    {
+        var obs = p.Observaciones ?? string.Empty;
+        var abonado = p.CobradoEstructurado;
+
+        if (p.ComprobanteEstado == "Aprobado" || obs.Contains("[Comprobante de pago: APROBADO"))
+        {
+            var matchMonto = System.Text.RegularExpressions.Regex.Match(obs, @"\[Comprobante de pago:\s*APROBADO\s*·\s*\$([\d\.,]+)");
+            if (matchMonto.Success && decimal.TryParse(
+                matchMonto.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."),
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var montoAprob))
+            {
+                abonado += montoAprob;
+            }
+            else if (abonado == 0m)
+            {
+                abonado = p.Total;
+            }
+        }
+        else if (abonado == 0m && obs.Contains("[Cobro Chofer:"))
+        {
+            var matchCobro = System.Text.RegularExpressions.Regex.Match(obs, @"\[Cobro Chofer:\s*\$([\d\.,]+)");
+            abonado = matchCobro.Success && decimal.TryParse(
+                matchCobro.Groups[1].Value.Replace(".", string.Empty).Replace(",", "."),
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var montoCobro)
+                ? montoCobro
+                : p.Total;
+        }
+
+        string? pendienteUrl = null;
+        if (p.ComprobanteEstado == "Pendiente" || obs.Contains("[Comprobante de pago: PENDIENTE") || obs.Contains("[Comprobante de pago: /uploads/"))
+        {
+            if (!string.IsNullOrWhiteSpace(p.ComprobanteUrl))
+            {
+                pendienteUrl = p.ComprobanteUrl;
+            }
+            else
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(obs, @"/uploads/comprobantes/[^\s\]]+");
+                pendienteUrl = match.Success ? match.Value : string.Empty;
+            }
+        }
+
+        return (Math.Min(p.Total, abonado), pendienteUrl);
+    }
 }

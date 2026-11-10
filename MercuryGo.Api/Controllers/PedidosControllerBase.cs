@@ -15,27 +15,8 @@ public abstract class PedidosControllerBase(
     protected readonly MercuryGoDbContext db = db;
     protected readonly ConflictoOfflineService? conflictoOfflineService = conflictoOfflineService;
 
-    protected async Task<Cliente?> ObtenerClienteDeUsuarioAutenticadoAsync(CancellationToken ct)
-    {
-        var usuarioId = User.UsuarioId();
-        if (usuarioId > 0)
-        {
-            var usuario = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct);
-            if (usuario?.ClienteId != null)
-            {
-                var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == usuario.ClienteId.Value && c.Activo, ct);
-                if (cliente != null) return cliente;
-            }
-        }
-
-        var emailUsuario = User.Email();
-        if (!string.IsNullOrWhiteSpace(emailUsuario))
-        {
-            return await db.Clientes.FirstOrDefaultAsync(c => c.Email == emailUsuario && c.Activo, ct);
-        }
-
-        return null;
-    }
+    protected Task<Cliente?> ObtenerClienteDeUsuarioAutenticadoAsync(CancellationToken ct) =>
+        db.ResolverClienteDeUsuarioAsync(User.UsuarioId(), User.Email(), ct);
 
     protected async Task<bool> PuedeAccederAlPedidoAsync(Pedido pedido, CancellationToken ct)
     {

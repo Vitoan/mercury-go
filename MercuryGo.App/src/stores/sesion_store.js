@@ -130,6 +130,17 @@ export const useSesionStore = defineStore('sesion', () => {
     await borrar_sesion();
   }
 
+  function bloquear() {
+    usuario.value = null;
+    error.value = null;
+    try {
+      usePedidosStore().resetear_store();
+    } catch {}
+    try {
+      useCarritoStore().vaciar_carrito();
+    } catch {}
+  }
+
   return {
     usuario,
     cargando,
@@ -144,7 +155,8 @@ export const useSesionStore = defineStore('sesion', () => {
     iniciar,
     entrar,
     salir,
-    limpiar
+    limpiar,
+    bloquear
   };
 });
 

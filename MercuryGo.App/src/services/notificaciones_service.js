@@ -2,6 +2,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { ajax_service } from './ajax_service';
+import { obtener_token } from './token_service';
 import router from '@/router';
 
 let inicializado = false;
@@ -44,7 +45,7 @@ export const notificaciones_service = {
     if (!t) return;
 
     // Solo se registra si hay token de autenticación JWT vigente en el cliente
-    const authToken = localStorage.getItem('token');
+    const authToken = await obtener_token();
     if (!authToken) return;
 
     try {

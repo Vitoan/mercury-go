@@ -24,6 +24,45 @@ public class MercuryGoDbContext : DbContext
     public DbSet<PagoCuentaCorriente> PagosCuentaCorriente => Set<PagoCuentaCorriente>();
     public DbSet<DispositivoPush> DispositivosPush => Set<DispositivoPush>();
 
+    // Resuelve el cliente comercial de un usuario (prioriza Usuario.ClienteId y usa Email como fallback)
+    public async Task<Cliente?> ResolverClienteDeUsuarioAsync(long usuarioId, string? emailFallback, CancellationToken ct = default)
+    {
+        if (usuarioId > 0)
+        {
+            var clienteId = await Usuarios.AsNoTracking()
+                .Where(u => u.Id == usuarioId && u.Activo && u.ClienteId != null)
+                .Select(u => u.ClienteId)
+                .FirstOrDefaultAsync(ct);
+
+            if (clienteId is > 0)
+            {
+                var porId = await Clientes.FirstOrDefaultAsync(c => c.Id == clienteId.Value && c.Activo, ct);
+                if (porId is not null) return porId;
+            }
+        }
+
+        return !string.IsNullOrWhiteSpace(emailFallback)
+            ? await Clientes.FirstOrDefaultAsync(c => c.Email == emailFallback && c.Activo, ct)
+            : null;
+    }
+
+    // Resuelve el usuario destinatario de un cliente comercial (prioriza Usuario.ClienteId y usa Email como fallback)
+    public async Task<Usuario?> ResolverUsuarioDeClienteAsync(long clienteId, CancellationToken ct = default)
+    {
+        var porFk = await Usuarios.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.ClienteId == clienteId && u.Activo, ct);
+        if (porFk is not null) return porFk;
+
+        var emailCliente = await Clientes.AsNoTracking()
+            .Where(c => c.Id == clienteId && c.Activo)
+            .Select(c => c.Email)
+            .FirstOrDefaultAsync(ct);
+
+        return !string.IsNullOrWhiteSpace(emailCliente)
+            ? await Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Email == emailCliente && u.Activo, ct)
+            : null;
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

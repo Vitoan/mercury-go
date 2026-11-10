@@ -135,7 +135,8 @@ import {
   IonSpinner,
   IonIcon,
   IonChip,
-  IonLabel
+  IonLabel,
+  onIonViewWillEnter
 } from '@ionic/vue';
 import {
   mailOutline,
@@ -167,11 +168,14 @@ const formularioValido = computed(() => {
   return email.value.trim().length > 0 && password.value.length >= 6;
 });
 
-onMounted(async () => {
+const refrescarBiometria = async () => {
   modoOscuro.value = es_tema_oscuro();
   const tokenGuardado = await restaurar_sesion();
   puede_biometria.value = Boolean(tokenGuardado) && (await biometria_disponible());
-});
+};
+
+onMounted(refrescarBiometria);
+onIonViewWillEnter(refrescarBiometria);
 
 const cambiarTema = () => {
   modoOscuro.value = alternar_tema();

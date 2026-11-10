@@ -30,16 +30,28 @@
             </div>
           </div>
 
-          <ion-button
-            expand="block"
-            color="danger"
-            fill="outline"
-            style="margin-top: 1rem;"
-            @click="confirmarCerrarSesion"
-          >
-            <ion-icon slot="start" :icon="logOutOutline" />
-            Cerrar Sesión
-          </ion-button>
+          <div class="mercury-acciones-sesion">
+            <ion-button
+              expand="block"
+              fill="outline"
+              color="primary"
+              class="mercury-btn-bloquear"
+              @click="bloquearPantalla"
+            >
+              <ion-icon slot="start" :icon="fingerPrintOutline" />
+              Bloquear (Huella)
+            </ion-button>
+            <ion-button
+              expand="block"
+              color="danger"
+              fill="outline"
+              class="mercury-btn-cerrar"
+              @click="confirmarCerrarSesion"
+            >
+              <ion-icon slot="start" :icon="logOutOutline" />
+              Cerrar Sesión
+            </ion-button>
+          </div>
         </ion-card-content>
       </ion-card>
 
@@ -175,7 +187,7 @@ import {
   personCircleOutline, contrastOutline, 
   alertCircleOutline, logOutOutline,
   phonePortraitOutline, cardOutline,
-  cloudUploadOutline
+  cloudUploadOutline, fingerPrintOutline
 } from 'ionicons/icons';
 import { alertController } from '@ionic/vue';
 import CompPage from '../components/estructura/comp_page.vue';
@@ -240,6 +252,12 @@ const toggleVibracion = () => {
   vibracionActiva.value = alternar_vibracion();
 };
 
+const bloquearPantalla = () => {
+  vibrar_toque();
+  sesion_store.bloquear();
+  router.replace('/login');
+};
+
 const confirmarCerrarSesion = async () => {
   if (offline_store.pendientes_count > 0) {
     const alert = await alertController.create({
@@ -277,6 +295,16 @@ onIonViewWillEnter(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.mercury-acciones-sesion {
+  display: flex;
+  gap: 10px;
+  margin-top: 1rem;
+}
+.mercury-btn-bloquear,
+.mercury-btn-cerrar {
+  flex: 1;
+  margin: 0;
 }
 
 .mercury-card-cuenta-corriente {

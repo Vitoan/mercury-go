@@ -223,22 +223,7 @@ public sealed class SesionController(MercuryGoDbContext db, TokenService tokens,
     // puede operar el autoservicio.
     private async Task<long?> ResolverClienteIdAsync(Usuario usuario, Rol? rol, CancellationToken cancellationToken)
     {
-        if (rol?.Codigo != RolCodigos.Cliente)
-            return null;
-
-        if (usuario.ClienteId.HasValue && usuario.ClienteId.Value > 0)
-        {
-            var existe = await db.Clientes.AsNoTracking()
-                .AnyAsync(c => c.Id == usuario.ClienteId.Value && c.Activo, cancellationToken);
-            if (existe) return usuario.ClienteId.Value;
-        }
-
-        if (string.IsNullOrWhiteSpace(usuario.Email))
-            return null;
-
-        return await db.Clientes.AsNoTracking()
-            .Where(c => c.Email == usuario.Email && c.Activo)
-            .Select(c => (long?)c.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        if (rol?.Codigo != RolCodigos.Cliente) return null;
+        return (await db.ResolverClienteDeUsuarioAsync(usuario.Id, usuario.Email, cancellationToken))?.Id;
     }
 }
