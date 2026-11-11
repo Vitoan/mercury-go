@@ -44,15 +44,13 @@ public sealed class CuentasCorrientesController(
         // Solo se cobra una orden en reparto. El Admin puede registrar el cobro
         // después de la entrega como ajuste; el Chofer, no.
         var esAdmin = User.IsInRole(RolCodigos.Admin);
-        var estadosCobrables = esAdmin
-            ? new[] { EstadoPedido.Despachado, EstadoPedido.EnPuerta, EstadoPedido.Entregado }
-            : new[] { EstadoPedido.Despachado, EstadoPedido.EnPuerta };
+        var estadosCobrables = new[] { EstadoPedido.Despachado, EstadoPedido.EnPuerta, EstadoPedido.Entregado };
 
         if (!estadosCobrables.Contains(pedido.Estado))
             return BadRequest(new { codigo = "estado_invalido", mensaje = $"No se puede registrar un cobro sobre un pedido en estado '{pedido.Estado}'." });
 
         // Un chofer solo cobra los pedidos que tiene asignados.
-        if (!esAdmin && pedido.ChoferId.HasValue && pedido.ChoferId.Value != User.UsuarioId())
+        if (!esAdmin && (!pedido.ChoferId.HasValue || pedido.ChoferId.Value != User.UsuarioId()))
             return StatusCode(403, new { codigo = "chofer_no_asignado", mensaje = "El pedido está asignado a otro chofer." });
 
         CobroPedido nuevoCobro;
@@ -140,6 +138,7 @@ public sealed class CuentasCorrientesController(
     }
 
     // Resumen de Cuenta Corriente y Deuda para el CLIENTE autenticado
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Cliente}")]
     [HttpGet("cuenta-corriente")]
     public async Task<IActionResult> ObtenerCuentaCorriente(CancellationToken ct)
     {
@@ -408,6 +407,7 @@ public sealed class CuentasCorrientesController(
     }
 
     // Subir pago directo a Cuenta Corriente con comprobante (D1)
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Cliente}")]
     [HttpPost("cuenta-corriente/pagos")]
     public async Task<IActionResult> RegistrarPagoCuentaCorriente(
         [FromForm] decimal monto,
@@ -481,6 +481,7 @@ public sealed class CuentasCorrientesController(
     }
 
     // Listar pagos de cuenta corriente
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Cliente}")]
     [HttpGet("cuenta-corriente/pagos")]
     public async Task<IActionResult> ListarPagosCuentaCorriente(CancellationToken ct)
     {
@@ -589,20 +590,14 @@ public sealed class CuentasCorrientesController(
 
         var rutaRelativa = pedido.ComprobanteUrl;
         if (string.IsNullOrWhiteSpace(rutaRelativa))
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(pedido.Observaciones ?? string.Empty, @"/uploads/comprobantes/[^\s\]]+");
-            if (match.Success)
-            {
-                rutaRelativa = match.Value;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(rutaRelativa))
             return NotFound(new { codigo = "sin_comprobante", mensaje = "Esta orden no tiene ningún comprobante de pago adjunto." });
 
         var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
-        var rutaLimpia = rutaRelativa.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-        var rutaFisica = Path.Combine(webRoot, rutaLimpia);
+        var carpetaPermitida = Path.GetFullPath(Path.Combine(webRoot, "uploads", "comprobantes"));
+        var nombreSeguro = Path.GetFileName(rutaRelativa);
+        var rutaFisica = Path.GetFullPath(Path.Combine(carpetaPermitida, nombreSeguro));
+        if (!rutaFisica.StartsWith(carpetaPermitida + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { codigo = "ruta_invalida", mensaje = "Ruta de comprobante inválida." });
 
         if (!System.IO.File.Exists(rutaFisica))
             return NotFound(new { codigo = "archivo_no_encontrado", mensaje = "El archivo físico del comprobante no existe en el servidor." });
@@ -621,6 +616,7 @@ public sealed class CuentasCorrientesController(
     }
 
     // Descarga segura y autenticada de comprobante de pago directo a cuenta corriente (P0-3)
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Cliente}")]
     [HttpGet("cuenta-corriente/pagos/{id:long}/archivo")]
     public async Task<IActionResult> ObtenerArchivoPagoCuentaCorriente(long id, CancellationToken ct)
     {
@@ -639,8 +635,11 @@ public sealed class CuentasCorrientesController(
             return NotFound(new { codigo = "sin_comprobante", mensaje = "Este abono no contiene un comprobante adjunto." });
 
         var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
-        var rutaLimpia = pago.ComprobanteUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-        var rutaFisica = Path.Combine(webRoot, rutaLimpia);
+        var carpetaPermitida = Path.GetFullPath(Path.Combine(webRoot, "uploads", "comprobantes"));
+        var nombreSeguro = Path.GetFileName(pago.ComprobanteUrl);
+        var rutaFisica = Path.GetFullPath(Path.Combine(carpetaPermitida, nombreSeguro));
+        if (!rutaFisica.StartsWith(carpetaPermitida + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { codigo = "ruta_invalida", mensaje = "Ruta de comprobante inválida." });
 
         if (!System.IO.File.Exists(rutaFisica))
             return NotFound(new { codigo = "archivo_no_encontrado", mensaje = "El archivo físico del comprobante no existe en el servidor." });

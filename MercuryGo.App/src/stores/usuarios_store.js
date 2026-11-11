@@ -4,7 +4,8 @@ import {
   cambiar_rol_usuario,
   crear_usuario,
   eliminar_usuario,
-  obtener_usuarios
+  obtener_usuarios,
+  resetear_password
 } from '@/services/usuarios_service';
 
 export const useUsuariosStore = defineStore('usuarios', () => {
@@ -135,6 +136,7 @@ export const useUsuariosStore = defineStore('usuarios', () => {
     cargar_mas,
     crear,
     cambiar_rol,
+    resetear_clave,
     eliminar
   };
 });

@@ -3,15 +3,27 @@ import { defineStore } from 'pinia';
 import { pedidos_service } from '@/services/pedidos_service';
 import { use_offline_store } from '@/stores/offline_store';
 
+const MAPA_ESTADO_OFFLINE = {
+  EN_PUERTA: 'EnPuerta',
+  ENTREGAR: 'Entregado',
+  ENTREGA_PARCIAL: 'Entregado',
+  NO_ENTREGADO: 'NoEntregado',
+  DESPACHADO: 'Despachado',
+  ENPREPARACION: 'EnPreparacion',
+  CONFIRMADO: 'Confirmado',
+  CANCELADO: 'Cancelado'
+};
+
 export function con_cambios_sin_enviar(pedido) {
   if (!pedido) return pedido;
   const offline = use_offline_store();
-  const cambios = (offline.cola || []).filter((c) => c.pedido_id == pedido.id);
+  const cambios = (offline.cola || []).filter((c) => c.pedido_id == pedido.id && c.estado !== 'enviada');
   if (cambios.length === 0) return pedido;
   const ultimo = cambios[cambios.length - 1];
+  const estadoNegocio = ultimo.payload?.estado || MAPA_ESTADO_OFFLINE[ultimo.tipo] || pedido.estado;
   return {
     ...pedido,
-    estado: ultimo.estado,
+    estado: estadoNegocio,
     sin_enviar: true
   };
 }

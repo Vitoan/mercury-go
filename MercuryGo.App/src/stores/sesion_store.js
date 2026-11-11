@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 import { cerrar_sesion, iniciar_sesion, obtener_mi_usuario } from '@/services/sesion_service';
 import { usePedidosStore } from '@/stores/pedidos_store';
 import { useCarritoStore } from '@/stores/carrito_store';
-import { borrar_copias } from '@/services/copia_local_service';
+import { borrar_copias, guardar_copia } from '@/services/copia_local_service';
 import { use_offline_store } from '@/stores/offline_store';
 import { notificaciones_service } from '@/services/notificaciones_service';
 import {
@@ -81,7 +81,16 @@ export const useSesionStore = defineStore('sesion', () => {
         error.value = 'No se pudo iniciar sesión.';
         return false;
       }
+      const ultimoUsuarioId = localStorage.getItem('mercurygo_ultimo_usuario_id');
+      if (ultimoUsuarioId && String(sesion.usuario?.id) !== ultimoUsuarioId) {
+        await borrar_copias();
+        try { use_offline_store().guardar_cola([]); } catch {}
+      }
+      if (sesion.usuario?.id) {
+        localStorage.setItem('mercurygo_ultimo_usuario_id', String(sesion.usuario.id));
+      }
       await guardar_sesion(sesion.token, sesion.expira_en, sesion.refresh_token, sesion.refresh_expira_en);
+      guardar_copia('/api/sesion/yo', { usuario: sesion.usuario });
       usuario.value = sesion.usuario;
       await notificaciones_service.registrar_dispositivo_en_api();
       return true;
@@ -165,11 +174,13 @@ export const useSesionStore = defineStore('sesion', () => {
   };
 });
 
-// Registrar callback para limpiar el estado si el token caduca
-al_expirar(() => {
+// Registrar callback para limpiar el estado de sesión si el token caduca,
+// sin borrar la cola offline de entregas pendientes (DEF-08)
+al_expirar(async () => {
   try {
     const store = useSesionStore();
-    store.limpiar();
+    store.bloquear();
+    await borrar_sesion();
   } catch {
     // Si pinia aún no está montado
   }

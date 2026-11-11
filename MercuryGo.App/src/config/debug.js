@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 
-const api_url_remota = 'http://mercurygo.runasp.net';
+const api_url_remota = 'https://mercurygo.runasp.net';
 
 export const debug_config = {
   debug_activado: import.meta.env.VITE_DEBUG_ACTIVADO !== 'false',

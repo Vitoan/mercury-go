@@ -328,11 +328,10 @@ const guardarCliente = async (datos) => {
   guardando.value = true;
   errorModal.value = '';
   try {
+    await clientes_store.guardar_cliente(datos, clienteSeleccionado.value?.id || null);
     if (clienteSeleccionado.value?.id) {
-      await clientes_store.actualizar_cliente(clienteSeleccionado.value.id, datos);
       toast.mostrarExito('Cliente actualizado con éxito.');
     } else {
-      await clientes_store.crear_cliente(datos);
       toast.mostrarExito('¡Cliente creado exitosamente!');
     }
     cerrarModal();

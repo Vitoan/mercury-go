@@ -137,7 +137,8 @@ import { vibrar_exito, vibrar_error } from '@/services/vibracion_service';
 
 const props = defineProps({
   abierto: { type: Boolean, default: false },
-  pedido: { type: Object, default: null }
+  pedido: { type: Object, default: null },
+  es_cuenta_corriente: { type: Boolean, default: false }
 });
 
 const emit = defineEmits(['cerrar', 'comprobante_subido']);

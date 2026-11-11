@@ -513,12 +513,26 @@ public sealed class DespachoController(
 
         await db.SaveChangesAsync(ct);
 
-        return Ok(new
+        var respuestaReintento = new
         {
             mensaje = $"Orden {pedido.Numero} reprogramada y despachada nuevamente.",
             estado = pedido.Estado.ToString(),
             chofer_id = pedido.ChoferId
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await idempotenciaService.RegistrarOperacionAsync(
+                idempotencyKey,
+                "REINTENTAR_ENTREGA",
+                User.UsuarioId(),
+                pedido.Id,
+                System.Text.Json.JsonSerializer.Serialize(respuestaReintento),
+                ct
+            );
+        }
+
+        return Ok(respuestaReintento);
     }
 
     // Cierre de entrega parcial con ítems rechazados (CU-13 / Decisión 14)
@@ -565,11 +579,11 @@ public sealed class DespachoController(
                 d.CantidadEntregada = d.Cantidad - cantRechazada;
                 d.MotivoRechazo = NormalizarTexto(rechazo.Motivo);
 
-                // Devolver unidades al stock físico y ajustar el total facturado de la orden
+                // Devolver unidades al stock físico (solo si no estaba ya Cancelado) y ajustar el total facturado
                 if (cantRechazada > 0)
                 {
                     d.Cantidad = d.CantidadEntregada.Value;
-                    if (d.Producto is not null)
+                    if (d.Producto is not null && pedido.Estado != EstadoPedido.Cancelado)
                     {
                         d.Producto.StockActual += cantRechazada;
                         d.Producto.Disponible = d.Producto.StockActual > 0;
@@ -607,12 +621,26 @@ public sealed class DespachoController(
 
         await db.SaveChangesAsync(ct);
 
-        return Ok(new
+        var respuestaParcial = new
         {
             mensaje = $"Entrega registrada con ajustes por ítems rechazados.",
             estado = pedido.Estado.ToString(),
             total_ajustado = detalles.Sum(d => d.Cantidad * d.PrecioUnitario)
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await idempotenciaService.RegistrarOperacionAsync(
+                idempotencyKey,
+                "ENTREGA_PARCIAL",
+                User.UsuarioId(),
+                pedido.Id,
+                System.Text.Json.JsonSerializer.Serialize(respuestaParcial),
+                ct
+            );
+        }
+
+        return Ok(respuestaParcial);
     }
 
 

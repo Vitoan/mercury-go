@@ -194,6 +194,7 @@ public sealed class PedidosController(
 
     // Creación de orden de carga: LOS PRECIOS NO VIAJAN DESDE EL TELÉFONO.
     // El servidor lee los precios vigentes de la base de datos para preservar la integridad contable.
+    [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Operario},{RolCodigos.Cliente}")]
     [HttpPost]
     public async Task<IActionResult> Crear(
         [FromBody] CrearPedidoRequest request,

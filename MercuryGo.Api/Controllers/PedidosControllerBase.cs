@@ -36,8 +36,7 @@ public abstract class PedidosControllerBase(
         if (User.IsInRole(RolCodigos.Chofer))
         {
             var usuarioId = User.UsuarioId();
-            return (pedido.ChoferId.HasValue && pedido.ChoferId.Value == usuarioId)
-                || pedido.Estado == EstadoPedido.Despachado;
+            return pedido.ChoferId.HasValue && pedido.ChoferId.Value == usuarioId;
         }
 
         if (User.EsCliente())

@@ -15,18 +15,18 @@
       </ion-button>
 
       <!-- Estado: Cargando primera vez -->
-      <comp-esqueleto v-if="usuarios_store.cargando && !usuarios_store.hay_usuarios.value" />
+      <comp-esqueleto v-if="usuarios_store.cargando && !usuarios_store.hay_usuarios" />
 
       <!-- Estado: Error al conectar -->
       <comp-estado-error
-        v-else-if="usuarios_store.error && !usuarios_store.hay_usuarios.value"
+        v-else-if="usuarios_store.error && !usuarios_store.hay_usuarios"
         :mensaje="usuarios_store.error"
         @reintentar="cargar"
       />
 
       <!-- Estado: Sin resultados -->
       <comp-estado-vacio
-        v-else-if="!usuarios_store.hay_usuarios.value"
+        v-else-if="!usuarios_store.hay_usuarios"
         mensaje="No se encontraron usuarios registrados con ese filtro."
       />
 
@@ -34,9 +34,9 @@
       <comp-lista
         v-else
         :cargando="usuarios_store.cargando"
-        :hay_mas="usuarios_store.hay_mas.value"
+        :hay_mas="usuarios_store.hay_mas"
         :mostrados="usuarios_store.usuarios.length"
-        :total="usuarios_store.total.value"
+        :total="usuarios_store.total"
         :cargar_mas="usuarios_store.cargar_mas"
         @cargar_mas="usuarios_store.cargar_mas"
       >
