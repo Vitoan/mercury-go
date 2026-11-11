@@ -105,8 +105,7 @@ public sealed class DespachoController(
 
         pedido.ActualizadoEn = DateTime.UtcNow;
 
-        // Aviso al Admin cuando falta mercadería: sin esto, el faltante solo se ve
-        // si alguien abre la orden.
+        // Aviso al Admin cuando falta mercadería o cuando el picking queda completo y listo
         if (request.EsOffline && pedidoCancelado)
         {
             // Decisión 16: el picking se guardó, pero sobre una orden que el Admin
@@ -124,6 +123,18 @@ public sealed class DespachoController(
                 RolCodigos.Admin,
                 $"⚠️ Picking incompleto ({pedido.Numero})",
                 $"Faltantes: {detalleFaltantes}",
+                "PEDIDO",
+                pedido.Id,
+                ct);
+        }
+        else if (!pedidoCancelado)
+        {
+            await notificacionService.NotificarRolAsync(
+                RolCodigos.Admin,
+                $"✅ Picking completo - Pedido listo ({pedido.Numero})",
+                pedido.ChoferId.HasValue
+                    ? $"El depósito completó la preparación de la orden {pedido.Numero}."
+                    : $"El depósito completó la preparación de la orden {pedido.Numero}. Lista para asignar chofer y despachar.",
                 "PEDIDO",
                 pedido.Id,
                 ct);
@@ -155,6 +166,36 @@ public sealed class DespachoController(
             {
                 requiereChofer = true;
             }
+        }
+
+        // Si no se autodespachó, notificar al Cliente y al Operario sobre el avance de preparación
+        if (!despachado && !pedidoCancelado)
+        {
+            var usuarioCliente = await db.ResolverUsuarioDeClienteAsync(pedido.ClienteId, ct);
+            if (usuarioCliente is not null)
+            {
+                db.Notificaciones.Add(new Notificacion
+                {
+                    UsuarioId = usuarioCliente.Id,
+                    Titulo = $"📦 Pedido en preparación ({pedido.Numero})",
+                    Mensaje = esCompleto
+                        ? $"El equipo de depósito completó el armado de tu orden {pedido.Numero} y está lista para salir a reparto."
+                        : $"El depósito preparó tu orden {pedido.Numero} con ajuste por disponibilidad y está lista para despacho.",
+                    Tipo = "PEDIDO",
+                    ReferenciaId = pedido.Id,
+                    CreadoEn = DateTime.UtcNow
+                });
+            }
+
+            await notificacionService.NotificarRolAsync(
+                RolCodigos.Operario,
+                $"📦 Picking registrado ({pedido.Numero})",
+                esCompleto
+                    ? $"Registraste el picking completo de la orden {pedido.Numero}. Pendiente de asignación de chofer."
+                    : $"Registraste el picking con faltantes de la orden {pedido.Numero}.",
+                "PEDIDO",
+                pedido.Id,
+                ct);
         }
 
         await db.SaveChangesAsync(ct);
@@ -378,6 +419,14 @@ public sealed class DespachoController(
             ReferenciaId = pedido.Id,
             CreadoEn = DateTime.UtcNow
         });
+
+        await notificacionService.NotificarRolAsync(
+            RolCodigos.Operario,
+            $"🚚 Chofer asignado ({pedido.Numero})",
+            $"Se asignó a '{chofer.Nombre}' para la entrega de la orden {pedido.Numero}.",
+            "PEDIDO",
+            pedido.Id,
+            ct);
 
         await db.SaveChangesAsync(ct);
 

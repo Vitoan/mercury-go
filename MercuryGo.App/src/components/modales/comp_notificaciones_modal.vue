@@ -83,6 +83,9 @@ import {
   informationCircleOutline
 } from 'ionicons/icons';
 import { notificaciones_service } from '@/services/notificaciones_service';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
 
 const props = defineProps({
   abierto: { type: Boolean, default: false }
@@ -116,6 +119,10 @@ const tocarNotificacion = async (item) => {
     } catch (err) {
       console.warn('Error al marcar leída:', err);
     }
+  }
+  if (item.referencia_id) {
+    emit('cerrar');
+    router.push({ path: '/app/pedidos', query: { pedido_id: item.referencia_id } });
   }
 };
 

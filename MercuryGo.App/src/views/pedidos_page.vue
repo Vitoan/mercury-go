@@ -263,7 +263,7 @@
 <script setup>
 import { formatearMoneda } from '@/utils/formato';
 import { ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   IonItem,
   IonLabel,
@@ -362,11 +362,34 @@ const tieneSubEtiquetas = (pedido) => {
   );
 };
 
-onIonViewWillEnter(() => {
+const route = useRoute();
+const router = useRouter();
+
+const procesarDeepLinkPedido = () => {
+  const idQuery = Number(route.query?.pedido_id);
+  if (idQuery > 0) {
+    const existente = pedidos_store.items.find((p) => Number(p.id) === idQuery);
+    workflow.pedidoSeleccionado.value = existente || { id: idQuery, numero: `PED-${String(idQuery).padStart(6, '0')}` };
+    workflow.mostrarModalDetalle.value = true;
+    router.replace({ path: '/app/pedidos', query: {} });
+  }
+};
+
+onIonViewWillEnter(async () => {
   busqueda.value = pedidos_store.filtros.busqueda || '';
   estadoSeleccionado.value = pedidos_store.filtros.estados || '';
-  pedidos_store.cargar(true);
+  await pedidos_store.cargar(true);
+  procesarDeepLinkPedido();
 });
+
+watch(
+  () => route.query?.pedido_id,
+  (nuevoId) => {
+    if (nuevoId) {
+      procesarDeepLinkPedido();
+    }
+  }
+);
 
 watch(
   () => sesion_store.usuario?.id,

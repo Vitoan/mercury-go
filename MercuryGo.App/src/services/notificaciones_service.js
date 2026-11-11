@@ -159,6 +159,10 @@ export const notificaciones_service = {
    * Dispara una notificación local en el canal de alta prioridad con ID int32 seguro.
    */
   async disparar_notificacion_local(titulo, cuerpo, datos = {}) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('mercury:notificaciones-actualizadas'));
+    }
+
     if (!Capacitor.isPluginAvailable('LocalNotifications')) {
       console.log(`[LocalNotification Simulado] ${titulo}: ${cuerpo}`);
       return { ok: false, mensaje: null };

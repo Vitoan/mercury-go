@@ -78,7 +78,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { 
   IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonMenuButton, IonContent, IonRefresher, IonRefresherContent,
-  IonIcon, IonBadge, IonChip, IonLabel
+  IonIcon, IonBadge, IonChip, IonLabel, onIonViewWillEnter
 } from '@ionic/vue';
 import { notificationsOutline, cloudOfflineOutline, syncOutline } from 'ionicons/icons';
 import CompNotificacionesModal from '@/components/modales/comp_notificaciones_modal.vue';
@@ -118,19 +118,29 @@ const consultarNoLeidas = async () => {
 
 let intervaloNotificaciones = null;
 
+onIonViewWillEnter(() => {
+  consultarNoLeidas();
+});
+
 onMounted(() => {
   consultarNoLeidas();
-  // Sondeo suave cada 35 segundos para mantener actualizado el badge de la campana
+  if (typeof window !== 'undefined') {
+    window.addEventListener('mercury:notificaciones-actualizadas', consultarNoLeidas);
+  }
+  // Sondeo frecuente cada 15 segundos para mantener actualizado el badge de la campana en vivo
   if (!intervaloNotificaciones) {
     intervaloNotificaciones = setInterval(() => {
       if (sesion_store.autenticado && typeof document !== 'undefined' && !document.hidden) {
         consultarNoLeidas();
       }
-    }, 35000);
+    }, 15000);
   }
 });
 
 onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('mercury:notificaciones-actualizadas', consultarNoLeidas);
+  }
   if (intervaloNotificaciones) {
     clearInterval(intervaloNotificaciones);
     intervaloNotificaciones = null;

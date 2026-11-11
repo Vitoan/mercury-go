@@ -279,7 +279,7 @@ public sealed class PedidosController(
             nuevoPedido = new Pedido
             {
                 ClienteId = clienteId,
-                Numero = $"TMP-{Guid.NewGuid():N}",
+                Numero = $"TMP-{Guid.NewGuid():N}"[..20],
                 Estado = estadoInicial,
                 FechaPedido = DateTime.UtcNow,
                 Observaciones = NormalizarTexto(request.Observaciones),
@@ -321,6 +321,33 @@ public sealed class PedidosController(
             "PEDIDO",
             nuevoPedido.Id,
             ct);
+
+        // Dejar constancia en la campanita del Cliente dueño de la orden
+        var usuarioCliente = await db.ResolverUsuarioDeClienteAsync(cliente.Id, ct);
+        if (usuarioCliente is not null)
+        {
+            db.Notificaciones.Add(new Notificacion
+            {
+                UsuarioId = usuarioCliente.Id,
+                Titulo = $"📦 Pedido registrado ({nuevoPedido.Numero})",
+                Mensaje = $"Tu orden {nuevoPedido.Numero} fue ingresada exitosamente en el sistema.",
+                Tipo = "PEDIDO",
+                ReferenciaId = nuevoPedido.Id,
+                CreadoEn = DateTime.UtcNow
+            });
+        }
+
+        // Si el pedido nace Confirmado, avisar al Operario de depósito
+        if (nuevoPedido.Estado == EstadoPedido.Confirmado)
+        {
+            await notificacionService.NotificarRolAsync(
+                RolCodigos.Operario,
+                $"📦 Pedido listo para picking ({nuevoPedido.Numero})",
+                $"La orden {nuevoPedido.Numero} fue ingresada como Confirmada y está lista para preparar en depósito.",
+                "PEDIDO",
+                nuevoPedido.Id,
+                ct);
+        }
 
         await db.SaveChangesAsync(ct);
         if (tx != null)
@@ -730,6 +757,20 @@ public sealed class PedidosController(
         else
         {
             pedido.CancelacionEstado = "Rechazada";
+
+            var usuarioCliente = await db.ResolverUsuarioDeClienteAsync(pedido.ClienteId, ct);
+            if (usuarioCliente is not null)
+            {
+                db.Notificaciones.Add(new Notificacion
+                {
+                    UsuarioId = usuarioCliente.Id,
+                    Titulo = $"ℹ️ Solicitud de cancelación rechazada ({pedido.Numero})",
+                    Mensaje = $"Tu solicitud para cancelar el pedido {pedido.Numero} fue rechazada por administración; la orden continúa en curso.",
+                    Tipo = "PEDIDO",
+                    ReferenciaId = pedido.Id,
+                    CreadoEn = DateTime.UtcNow
+                });
+            }
         }
 
         pedido.ActualizadoEn = DateTime.UtcNow;

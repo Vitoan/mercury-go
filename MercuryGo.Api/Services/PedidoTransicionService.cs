@@ -170,10 +170,231 @@ public sealed class PedidoTransicionService(MercuryGoDbContext db) : IPedidoTran
                 break;
         }
 
-        // Crear notificación in-app para el cliente
+        // Crear notificaciones in-app y push para el cliente y los roles operativos involucrados
         await GenerarNotificacionClienteAsync(pedido, nuevoEstado, ct);
+        await GenerarNotificacionesOperativasAsync(pedido, nuevoEstado, contexto, ct);
 
         return ResultadoTransicion.Correcto(estadoAnterior, nuevoEstado);
+    }
+
+    private async Task GenerarNotificacionesOperativasAsync(
+        Pedido pedido,
+        EstadoPedido nuevoEstado,
+        ContextoTransicion contexto,
+        CancellationToken ct)
+    {
+        var choferId = pedido.ChoferId ?? (contexto.RolCodigo == RolCodigos.Chofer ? contexto.UsuarioId : (long?)null);
+
+        switch (nuevoEstado)
+        {
+            case EstadoPedido.Confirmado:
+                await NotificarRolInternoAsync(
+                    RolCodigos.Admin,
+                    $"📋 Pedido confirmado ({pedido.Numero})",
+                    $"La orden {pedido.Numero} fue confirmada y enviada a preparación de depósito.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                await NotificarRolInternoAsync(
+                    RolCodigos.Operario,
+                    $"📦 Pedido listo para picking ({pedido.Numero})",
+                    $"La orden {pedido.Numero} fue confirmada por administración y está lista para armar en depósito.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                break;
+
+            case EstadoPedido.EnPreparacion:
+                await NotificarRolInternoAsync(
+                    RolCodigos.Admin,
+                    $"📦 Pedido en preparación ({pedido.Numero})",
+                    $"La orden {pedido.Numero} se encuentra en preparación en el depósito.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                await NotificarRolInternoAsync(
+                    RolCodigos.Operario,
+                    $"📦 Preparación iniciada ({pedido.Numero})",
+                    $"La orden {pedido.Numero} pasó al estado En Depósito.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                break;
+
+            case EstadoPedido.Despachado:
+                await NotificarRolInternoAsync(
+                    RolCodigos.Admin,
+                    $"🚚 Pedido despachado ({pedido.Numero})",
+                    $"La orden {pedido.Numero} salió del depósito hacia reparto.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                await NotificarRolInternoAsync(
+                    RolCodigos.Operario,
+                    $"🚚 Orden despachada ({pedido.Numero})",
+                    $"La orden {pedido.Numero} fue despachada hacia la ruta de entrega.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                if (choferId.HasValue)
+                {
+                    await NotificarUsuarioInternoAsync(
+                        choferId.Value,
+                        $"🛣️ Orden activa en tu ruta ({pedido.Numero})",
+                        $"La orden {pedido.Numero} fue despachada y está lista para entrega en tu hoja de ruta.",
+                        "PEDIDO",
+                        pedido.Id,
+                        ct);
+                }
+                break;
+
+            case EstadoPedido.EnPuerta:
+                await NotificarRolInternoAsync(
+                    RolCodigos.Admin,
+                    $"📍 Chofer en puerta ({pedido.Numero})",
+                    $"El repartidor arribó al domicilio del cliente para la orden {pedido.Numero}.",
+                    "GPS",
+                    pedido.Id,
+                    ct);
+                if (choferId.HasValue)
+                {
+                    await NotificarUsuarioInternoAsync(
+                        choferId.Value,
+                        $"📍 Arribo en puerta registrado ({pedido.Numero})",
+                        $"Se registró tu ubicación en puerta para la orden {pedido.Numero}.",
+                        "GPS",
+                        pedido.Id,
+                        ct);
+                }
+                break;
+
+            case EstadoPedido.Entregado:
+                await NotificarRolInternoAsync(
+                    RolCodigos.Admin,
+                    $"✅ Pedido entregado ({pedido.Numero})",
+                    $"El chofer completó la entrega en destino de la orden {pedido.Numero}.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                if (choferId.HasValue)
+                {
+                    await NotificarUsuarioInternoAsync(
+                        choferId.Value,
+                        $"✅ Entrega completada ({pedido.Numero})",
+                        $"Completaste satisfactoriamente la entrega de la orden {pedido.Numero}.",
+                        "PEDIDO",
+                        pedido.Id,
+                        ct);
+                }
+                break;
+
+            case EstadoPedido.NoEntregado:
+                await NotificarRolInternoAsync(
+                    RolCodigos.Admin,
+                    $"⚠️ Entrega fallida en calle ({pedido.Numero})",
+                    $"El repartidor reportó que no se pudo concretar la entrega de la orden {pedido.Numero}.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                if (choferId.HasValue)
+                {
+                    await NotificarUsuarioInternoAsync(
+                        choferId.Value,
+                        $"⚠️ Intento fallido registrado ({pedido.Numero})",
+                        $"Quedó asentado el intento de entrega no concretado de la orden {pedido.Numero}.",
+                        "PEDIDO",
+                        pedido.Id,
+                        ct);
+                }
+                break;
+
+            case EstadoPedido.Cancelado:
+                await NotificarRolInternoAsync(
+                    RolCodigos.Admin,
+                    $"❌ Pedido cancelado ({pedido.Numero})",
+                    $"La orden {pedido.Numero} fue cancelada y su stock restituido.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                await NotificarRolInternoAsync(
+                    RolCodigos.Operario,
+                    $"❌ Orden cancelada ({pedido.Numero})",
+                    $"La orden {pedido.Numero} fue cancelada.",
+                    "PEDIDO",
+                    pedido.Id,
+                    ct);
+                if (choferId.HasValue)
+                {
+                    await NotificarUsuarioInternoAsync(
+                        choferId.Value,
+                        $"❌ Orden cancelada ({pedido.Numero})",
+                        $"La orden {pedido.Numero} asignada a tu ruta fue cancelada.",
+                        "PEDIDO",
+                        pedido.Id,
+                        ct);
+                }
+                break;
+        }
+    }
+
+    private async Task NotificarRolInternoAsync(
+        string rolCodigo,
+        string titulo,
+        string mensaje,
+        string tipo,
+        long pedidoId,
+        CancellationToken ct)
+    {
+        var roles = await db.Roles.AsNoTracking()
+            .Where(r => r.Codigo == rolCodigo)
+            .Select(r => r.Id)
+            .ToListAsync(ct);
+
+        if (roles.Count == 0)
+            return;
+
+        var usuariosIds = await db.Usuarios.AsNoTracking()
+            .Where(u => u.Activo && u.RolId.HasValue && roles.Contains(u.RolId.Value))
+            .Select(u => u.Id)
+            .ToListAsync(ct);
+
+        var ahora = DateTime.UtcNow;
+        foreach (var uid in usuariosIds)
+        {
+            db.Notificaciones.Add(new Notificacion
+            {
+                UsuarioId = uid,
+                Titulo = titulo,
+                Mensaje = mensaje,
+                Tipo = tipo,
+                ReferenciaId = pedidoId,
+                CreadoEn = ahora
+            });
+        }
+    }
+
+    private async Task NotificarUsuarioInternoAsync(
+        long usuarioId,
+        string titulo,
+        string mensaje,
+        string tipo,
+        long pedidoId,
+        CancellationToken ct)
+    {
+        var existe = await db.Usuarios.AsNoTracking()
+            .AnyAsync(u => u.Id == usuarioId && u.Activo, ct);
+        if (!existe)
+            return;
+
+        db.Notificaciones.Add(new Notificacion
+        {
+            UsuarioId = usuarioId,
+            Titulo = titulo,
+            Mensaje = mensaje,
+            Tipo = tipo,
+            ReferenciaId = pedidoId,
+            CreadoEn = DateTime.UtcNow
+        });
     }
 
     private async Task GenerarNotificacionClienteAsync(Pedido pedido, EstadoPedido nuevoEstado, CancellationToken ct)

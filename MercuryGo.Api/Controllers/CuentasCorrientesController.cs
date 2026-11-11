@@ -14,7 +14,8 @@ namespace MercuryGo.Api.Controllers;
 public sealed class CuentasCorrientesController(
     MercuryGoDbContext db,
     IWebHostEnvironment env,
-    MercuryGo.Api.Services.IdempotenciaService idempotenciaService) : PedidosControllerBase(db)
+    MercuryGo.Api.Services.IdempotenciaService idempotenciaService,
+    MercuryGo.Api.Services.NotificacionService notificacionService) : PedidosControllerBase(db)
 {
     // Registro de cobro en destino por parte del CHOFER (Efectivo o Transferencia / CU-13 / Decisión 9)
     [Authorize(Roles = $"{RolCodigos.Admin},{RolCodigos.Chofer}")]
@@ -96,6 +97,41 @@ public sealed class CuentasCorrientesController(
             var obs = pedido.Observaciones ?? string.Empty;
             pedido.Observaciones = string.IsNullOrWhiteSpace(obs) ? logCobro : $"{obs} · {logCobro}";
             pedido.ActualizadoEn = DateTime.UtcNow;
+
+            await notificacionService.NotificarRolAsync(
+                RolCodigos.Admin,
+                $"💵 Cobro en destino registrado ({pedido.Numero})",
+                $"Se registró un cobro de ${request.Monto:N2} ({metodo}) para la orden {pedido.Numero}.",
+                "PAGO",
+                pedido.Id,
+                ct);
+
+            var usuarioCliente = await db.ResolverUsuarioDeClienteAsync(pedido.ClienteId, ct);
+            if (usuarioCliente is not null)
+            {
+                db.Notificaciones.Add(new Notificacion
+                {
+                    UsuarioId = usuarioCliente.Id,
+                    Titulo = $"💵 Pago registrado ({pedido.Numero})",
+                    Mensaje = $"Se acreditó tu pago de ${request.Monto:N2} ({metodo}) correspondiente a la orden {pedido.Numero}.",
+                    Tipo = "PAGO",
+                    ReferenciaId = pedido.Id,
+                    CreadoEn = DateTime.UtcNow
+                });
+            }
+
+            if (User.IsInRole(RolCodigos.Chofer) && User.UsuarioId() > 0)
+            {
+                db.Notificaciones.Add(new Notificacion
+                {
+                    UsuarioId = User.UsuarioId(),
+                    Titulo = $"💵 Cobro asentado ({pedido.Numero})",
+                    Mensaje = $"Registraste el cobro de ${request.Monto:N2} ({metodo}) de la orden {pedido.Numero}.",
+                    Tipo = "PAGO",
+                    ReferenciaId = pedido.Id,
+                    CreadoEn = DateTime.UtcNow
+                });
+            }
 
             await db.SaveChangesAsync(ct);
             if (tx != null)
@@ -354,6 +390,21 @@ public sealed class CuentasCorrientesController(
             : $"{obsLimpia} · {nuevaEtiqueta}";
 
         pedido.ActualizadoEn = DateTime.UtcNow;
+
+        var usuarioClienteAprob = await db.ResolverUsuarioDeClienteAsync(pedido.ClienteId, ct);
+        if (usuarioClienteAprob is not null)
+        {
+            db.Notificaciones.Add(new Notificacion
+            {
+                UsuarioId = usuarioClienteAprob.Id,
+                Titulo = $"💳 Comprobante aprobado ({pedido.Numero})",
+                Mensaje = $"Tu comprobante de pago por ${montoAprobado:N2} de la orden {pedido.Numero} fue aprobado y acreditado.",
+                Tipo = "PAGO",
+                ReferenciaId = pedido.Id,
+                CreadoEn = DateTime.UtcNow
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
         return Ok(new
@@ -395,6 +446,21 @@ public sealed class CuentasCorrientesController(
             : $"{obsLimpia} · {nuevaEtiqueta}";
 
         pedido.ActualizadoEn = DateTime.UtcNow;
+
+        var usuarioClienteRech = await db.ResolverUsuarioDeClienteAsync(pedido.ClienteId, ct);
+        if (usuarioClienteRech is not null)
+        {
+            db.Notificaciones.Add(new Notificacion
+            {
+                UsuarioId = usuarioClienteRech.Id,
+                Titulo = $"⚠️ Comprobante rechazado ({pedido.Numero})",
+                Mensaje = $"El comprobante de pago de la orden {pedido.Numero} fue rechazado. Motivo: {motivo}",
+                Tipo = "PAGO",
+                ReferenciaId = pedido.Id,
+                CreadoEn = DateTime.UtcNow
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
         return Ok(new
@@ -467,6 +533,15 @@ public sealed class CuentasCorrientesController(
         };
 
         db.PagosCuentaCorriente.Add(pago);
+
+        await notificacionService.NotificarRolAsync(
+            RolCodigos.Admin,
+            $"🧾 Nuevo pago a cuenta corriente",
+            $"El cliente '{cliente.RazonSocial}' registró un pago por ${pago.Monto:N2} pendiente de auditoría.",
+            "PAGO",
+            null,
+            ct);
+
         await db.SaveChangesAsync(ct);
 
         return Ok(new
@@ -535,6 +610,20 @@ public sealed class CuentasCorrientesController(
         pago.AuditadoEn = DateTime.UtcNow;
         pago.ActualizadoEn = DateTime.UtcNow;
 
+        var usuarioClienteAprob = await db.ResolverUsuarioDeClienteAsync(pago.ClienteId, ct);
+        if (usuarioClienteAprob is not null)
+        {
+            db.Notificaciones.Add(new Notificacion
+            {
+                UsuarioId = usuarioClienteAprob.Id,
+                Titulo = $"💳 Pago a cuenta corriente aprobado",
+                Mensaje = $"Tu pago a cuenta corriente #{pago.Id} por ${pago.Monto:N2} fue aprobado y acreditado.",
+                Tipo = "PAGO",
+                ReferenciaId = null,
+                CreadoEn = DateTime.UtcNow
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
         return Ok(new
@@ -563,6 +652,20 @@ public sealed class CuentasCorrientesController(
         pago.AuditadoPorId = User.UsuarioId();
         pago.AuditadoEn = DateTime.UtcNow;
         pago.ActualizadoEn = DateTime.UtcNow;
+
+        var usuarioClienteRech = await db.ResolverUsuarioDeClienteAsync(pago.ClienteId, ct);
+        if (usuarioClienteRech is not null)
+        {
+            db.Notificaciones.Add(new Notificacion
+            {
+                UsuarioId = usuarioClienteRech.Id,
+                Titulo = $"⚠️ Pago a cuenta corriente rechazado",
+                Mensaje = $"Tu comprobante de pago #{pago.Id} fue rechazado. Motivo: {motivo}",
+                Tipo = "PAGO",
+                ReferenciaId = null,
+                CreadoEn = DateTime.UtcNow
+            });
+        }
 
         await db.SaveChangesAsync(ct);
 
@@ -699,6 +802,29 @@ public sealed class CuentasCorrientesController(
             : $"{obsLimpia} · {etiquetaComprobante}";
 
         pedido.ActualizadoEn = DateTime.UtcNow;
+
+        await notificacionService.NotificarRolAsync(
+            RolCodigos.Admin,
+            $"🧾 Comprobante de pago recibido ({pedido.Numero})",
+            $"Se adjuntó un comprobante de pago a la orden {pedido.Numero} para su verificación.",
+            "PAGO",
+            pedido.Id,
+            ct);
+
+        var usuarioClienteComp = await db.ResolverUsuarioDeClienteAsync(pedido.ClienteId, ct);
+        if (usuarioClienteComp is not null)
+        {
+            db.Notificaciones.Add(new Notificacion
+            {
+                UsuarioId = usuarioClienteComp.Id,
+                Titulo = $"🧾 Comprobante enviado ({pedido.Numero})",
+                Mensaje = $"Tu comprobante de pago para la orden {pedido.Numero} fue recibido y se encuentra en revisión.",
+                Tipo = "PAGO",
+                ReferenciaId = pedido.Id,
+                CreadoEn = DateTime.UtcNow
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
         return Ok(new
