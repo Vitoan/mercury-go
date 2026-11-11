@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { Network } from '@capacitor/network';
 import { pedidos_service } from '@/services/pedidos_service';
-import { obtener_token } from '@/services/token_service';
+import { asegurar_token, obtener_token } from '@/services/token_service';
 import { usePedidosStore } from '@/stores/pedidos_store';
 import { notificaciones_service } from '@/services/notificaciones_service';
 import { vibrar_exito, vibrar_advertencia, vibrar_error } from '@/services/vibracion_service';
@@ -200,7 +200,7 @@ export const use_offline_store = defineStore('offline', {
 
     // Ejecución FIFO agrupada por pedido_id
     sincronizar: async function () {
-      const token = await obtener_token();
+      const token = await asegurar_token();
       if (this.sincronizando || this.cola.length === 0 || !token) return;
 
       this.sincronizando = true;

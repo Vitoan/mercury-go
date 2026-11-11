@@ -90,11 +90,13 @@ async function ejecutar_fetch(metodo, endpoint, cuerpo, opciones, reintentado = 
     cabeceras['Idempotency-Key'] = String(opciones.idempotency_key);
   }
 
+  const { headers: _headersExt, ...restoOpciones } = opciones;
+
   const config = {
     method: metodo,
     signal: controller.signal,
-    headers: cabeceras,
-    ...opciones
+    ...restoOpciones,
+    headers: cabeceras
   };
 
   const esFormData = cuerpo instanceof FormData;

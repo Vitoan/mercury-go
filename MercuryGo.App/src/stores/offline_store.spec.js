@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 
 vi.mock('@/services/token_service', () => ({
-  obtener_token: vi.fn(async () => 'token-de-prueba')
+  obtener_token: vi.fn(async () => 'token-de-prueba'),
+  asegurar_token: vi.fn(async () => 'token-de-prueba')
 }));
 
 vi.mock('@/services/pedidos_service', () => ({
