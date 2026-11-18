@@ -296,28 +296,30 @@ const cerrar = () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--ion-color-light-shade, #e2e8f0);
+  border-bottom: 1px solid var(--mercury-border-subtle);
 }
 
 .mercury-picking-info h2 {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
 }
 
 .mercury-picking-cliente {
   margin: 4px 0 0;
   font-size: 0.9rem;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-picking-badge-resumen {
   font-size: 0.8rem;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--mercury-radius-sm, 8px);
 }
 
 .mercury-picking-acciones-rapidas {
@@ -326,28 +328,32 @@ const cerrar = () => {
   margin-bottom: 12px;
 }
 
+.mercury-picking-acciones-rapidas ion-button {
+  min-height: var(--mercury-touch-min, 44px);
+}
+
 .mercury-picking-loading,
 .mercury-picking-error {
   text-align: center;
   padding: 40px 16px;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-picking-card {
   margin: 0 0 12px 0;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  border-left: 4px solid var(--ion-color-medium, #94a3b8);
+  border-radius: var(--mercury-radius-md, 12px);
+  box-shadow: var(--mercury-card-shadow);
+  border-left: 4px solid var(--ion-color-medium);
   transition: border-color 0.2s ease;
 }
 
 .mercury-picking-card.item-listo {
-  border-left-color: var(--ion-color-success, #16a34a);
+  border-left-color: var(--ion-color-success);
 }
 
 .mercury-picking-card.item-falta {
-  border-left-color: var(--ion-color-danger, #dc2626);
-  background: rgba(220, 38, 38, 0.02);
+  border-left-color: var(--ion-color-danger);
+  background: var(--mercury-danger-bg);
 }
 
 .mercury-card-content-picking {
@@ -358,6 +364,8 @@ const cerrar = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -366,34 +374,41 @@ const cerrar = () => {
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
 }
 
 .mercury-item-icono {
   font-size: 1.1rem;
-  color: var(--ion-color-primary, #0284c7);
+  color: var(--mercury-accent);
 }
 
 .mercury-item-cantidades {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 0.85rem;
   margin-bottom: 10px;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
 }
 
 .text-ok {
-  color: var(--ion-color-success, #16a34a);
+  color: var(--mercury-success-text);
 }
 
 .text-alerta {
-  color: var(--ion-color-danger, #dc2626);
+  color: var(--mercury-danger-text);
 }
 
 .mercury-item-controles {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.mercury-item-controles ion-button {
+  min-height: var(--mercury-touch-min, 44px);
 }
 
 .mercury-stepper {
@@ -401,9 +416,14 @@ const cerrar = () => {
   align-items: center;
   gap: 4px;
   margin-left: auto;
-  background: var(--ion-color-light, #f1f5f9);
-  border-radius: 8px;
+  background: var(--mercury-bg-item);
+  border-radius: var(--mercury-radius-sm, 8px);
   padding: 2px 6px;
+}
+
+.mercury-stepper ion-button {
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .mercury-stepper-valor {
@@ -411,31 +431,33 @@ const cerrar = () => {
   font-size: 0.95rem;
   min-width: 24px;
   text-align: center;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-picking-footer {
   margin-top: 18px;
   padding-top: 14px;
-  border-top: 1px solid var(--ion-color-light-shade, #e2e8f0);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--mercury-border-subtle);
 }
 
 .mercury-resumen-caja {
   padding: 12px;
-  border-radius: 10px;
+  border-radius: var(--mercury-radius-md, 10px);
   margin-bottom: 14px;
 }
 
 .mercury-resumen-caja.resumen-ok {
-  background: rgba(22, 163, 74, 0.08);
-  border: 1px solid rgba(22, 163, 74, 0.3);
-  color: #15803d;
+  background: var(--mercury-success-bg);
+  border: 1px solid var(--mercury-success-border);
+  color: var(--mercury-success-text);
 }
 
 .mercury-resumen-caja.resumen-alerta {
-  background: rgba(234, 179, 8, 0.1);
-  border: 1px solid rgba(234, 179, 8, 0.35);
-  color: #a16207;
+  background: var(--mercury-warning-bg);
+  border: 1px solid var(--mercury-warning-border);
+  color: var(--mercury-warning-text);
 }
 
 .mercury-resumen-caja p {
@@ -445,11 +467,12 @@ const cerrar = () => {
 
 .mercury-resumen-caja small {
   font-size: 0.8rem;
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 .mercury-btn-confirmar {
   margin-top: 8px;
   font-weight: 600;
+  min-height: 48px;
 }
 </style>

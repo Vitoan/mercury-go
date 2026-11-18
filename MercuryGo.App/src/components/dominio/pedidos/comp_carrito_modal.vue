@@ -24,7 +24,7 @@
         <ion-list>
           <ion-item v-for="item in carrito_store.items" :key="item.producto_id" class="mercury-carrito-item">
             <ion-icon :icon="cubeOutline" slot="start" color="primary" />
-            <ion-label>
+            <ion-label class="ion-text-wrap">
               <h3>{{ item.nombre }}</h3>
               <p class="mercury-precio-unitario">{{ formatearMoneda(item.precio) }} c/u</p>
               <p class="mercury-subtotal-item">Subtotal: <strong>{{ formatearMoneda(item.precio * item.cantidad) }}</strong></p>
@@ -229,12 +229,12 @@ const enviarPedido = async () => {
   justify-content: center;
   text-align: center;
   min-height: 60vh;
-  color: var(--ion-color-step-600, #94a3b8);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-icono-vacio {
   font-size: 4rem;
-  color: var(--ion-color-step-400, #cbd5e1);
+  color: var(--mercury-text-muted);
   margin-bottom: 12px;
 }
 
@@ -245,13 +245,14 @@ const enviarPedido = async () => {
 
 .mercury-precio-unitario {
   font-size: 0.82rem;
-  color: var(--ion-color-step-600, #64748b);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-subtotal-item {
   font-size: 0.88rem;
-  color: var(--ion-color-primary, #38bdf8);
+  color: var(--mercury-accent);
   margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-control-cantidad {
@@ -260,22 +261,30 @@ const enviarPedido = async () => {
   gap: 4px;
 }
 
+.mercury-control-cantidad ion-button {
+  min-width: 40px;
+  min-height: 40px;
+}
+
 .mercury-cantidad-valor {
   min-width: 24px;
   text-align: center;
   font-weight: 700;
   font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-card-resumen {
   margin: 16px 0 0 0;
-  border-radius: 12px;
-  background: var(--ion-color-step-50, #f8fafc);
+  border-radius: var(--mercury-radius-md, 12px);
+  background: var(--mercury-bg-item);
 }
 
 .mercury-fila-resumen {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
   font-size: 0.9rem;
 }
@@ -283,19 +292,25 @@ const enviarPedido = async () => {
 .mercury-total-destacado {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px dashed var(--ion-color-step-200, #e2e8f0);
+  border-top: 1px dashed var(--mercury-border);
   font-size: 1.1rem;
   font-weight: 700;
 }
 
 .mercury-monto-total {
-  color: var(--ion-color-success, #22c55e);
+  color: var(--mercury-success-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-acciones-carrito {
   margin-top: 20px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.mercury-acciones-carrito ion-button {
+  min-height: var(--mercury-touch-min, 44px);
 }
 </style>
