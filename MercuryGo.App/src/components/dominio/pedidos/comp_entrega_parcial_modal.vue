@@ -219,51 +219,68 @@ const cerrar = () => {
   font-size: 1.2rem;
   font-weight: 800;
   margin: 0;
+  color: var(--mercury-text-title);
 }
 .mercury-parcial-cliente {
   margin: 4px 0;
-  color: var(--ion-color-medium);
+  color: var(--mercury-text-muted);
   font-size: 0.9rem;
 }
 .mercury-parcial-sub {
   margin: 6px 0 14px 0;
   font-size: 0.88rem;
+  color: var(--mercury-text-body);
 }
 .mercury-parcial-card {
   margin: 0 0 10px 0;
-  border-radius: 10px;
+  border-radius: var(--mercury-radius-md, 10px);
 }
 .mercury-linea-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
 }
 .mercury-prod-nombre {
   font-weight: 700;
   font-size: 0.95rem;
+  color: var(--mercury-text-title);
 }
 .mercury-cant-rechazo-fila {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .mercury-stepper-rechazo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+.mercury-stepper-rechazo ion-button {
+  min-width: 40px;
+  min-height: 40px;
 }
 .mercury-valor-rechazo {
   font-size: 1.1rem;
-  color: var(--ion-color-warning-shade);
+  color: var(--mercury-warning-text);
+  font-variant-numeric: tabular-nums;
 }
 .mercury-cant-entregada-resumen {
   margin: 8px 0 0 0;
   font-size: 0.85rem;
-  color: var(--ion-color-medium);
+  color: var(--mercury-text-muted);
 }
 .mercury-parcial-loading {
   text-align: center;
   padding: 40px;
+  color: var(--mercury-text-muted);
+}
+ion-content ion-button[expand="block"] {
+  min-height: 48px;
+  margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 </style>

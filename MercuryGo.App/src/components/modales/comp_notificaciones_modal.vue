@@ -175,7 +175,12 @@ watch(() => props.abierto, (val) => {
 .mercury-notif-acciones-top {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
+}
+.mercury-notif-acciones-top ion-button {
+  min-height: var(--mercury-touch-min, 44px);
 }
 .mercury-notif-centrado,
 .mercury-notif-vacio {
@@ -185,32 +190,37 @@ watch(() => props.abierto, (val) => {
   justify-content: center;
   text-align: center;
   padding: 40px 20px;
-  color: var(--ion-color-medium);
+  color: var(--mercury-text-muted);
 }
 .icono-vacio {
   font-size: 56px;
   margin-bottom: 12px;
 }
 .item-no-leido {
-  --background: rgba(var(--ion-color-primary-rgb), 0.06);
+  --background: var(--mercury-accent-badge-bg);
   font-weight: 600;
 }
 .notif-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .notif-header h2 {
-  font-size: 15px;
+  font-size: 0.95rem;
   margin: 0;
+  color: var(--mercury-text-title);
 }
 .badge-nuevo {
-  font-size: 9px;
-  padding: 2px 5px;
+  font-size: 0.72rem;
+  padding: 3px 6px;
 }
 .notif-fecha {
-  font-size: 11px;
-  color: var(--ion-color-medium);
+  font-size: 0.78rem;
+  color: var(--mercury-text-muted);
+}
+ion-list {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 </style>

@@ -148,6 +148,12 @@ const cerrar = () => {
   font-size: 1.2rem;
   font-weight: 800;
   margin: 0;
+  color: var(--mercury-text-title);
+}
+
+ion-content ion-button[expand="block"] {
+  min-height: 48px;
+  margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 .mercury-fallida-cliente {
   margin: 4px 0;

@@ -161,22 +161,28 @@ const cerrar = () => {
   font-size: 1.25rem;
   font-weight: 800;
   margin: 0;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
 }
 
 .mercury-cobro-cliente {
   margin: 4px 0;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
   font-size: 0.9rem;
 }
 
 .mercury-cobro-total {
   font-size: 1.05rem;
   margin: 6px 0 0 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-cobro-card {
   margin: 0;
-  border-radius: 12px;
+  border-radius: var(--mercury-radius-md, 12px);
+}
+
+ion-content ion-button[expand="block"] {
+  min-height: 48px;
+  margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 </style>

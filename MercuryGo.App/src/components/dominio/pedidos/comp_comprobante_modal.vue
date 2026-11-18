@@ -261,17 +261,19 @@ const enviarComprobante = async () => {
   font-size: 1.4rem;
   font-weight: 700;
   margin: 0;
+  color: var(--mercury-text-title);
 }
 
 .mercury-comprobante-total {
   font-size: 1.05rem;
-  color: var(--ion-color-step-700, #334155);
+  color: var(--mercury-text-body);
   margin-top: 4px;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-card-banco {
-  border-radius: 12px;
-  background: var(--ion-color-step-50, #f8fafc);
+  border-radius: var(--mercury-radius-md, 12px);
+  background: var(--mercury-bg-item);
   margin: 0 0 16px 0;
 }
 
@@ -282,25 +284,43 @@ const enviarComprobante = async () => {
   margin-top: 14px;
 }
 
+.mercury-opciones-captura ion-button,
+ion-content ion-button[expand="block"] {
+  min-height: var(--mercury-touch-min, 44px);
+}
+
+ion-content ion-button[expand="block"]:last-of-type {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 .mercury-archivo-previo {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--ion-color-step-100, #f1f5f9);
+  background: var(--mercury-bg-item);
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--mercury-radius-sm, 8px);
   margin-bottom: 12px;
+}
+
+.mercury-archivo-previo ion-button {
+  min-width: var(--mercury-touch-min, 44px);
+  min-height: var(--mercury-touch-min, 44px);
+  flex-shrink: 0;
 }
 
 .mercury-archivo-icono {
   font-size: 1.8rem;
-  color: var(--ion-color-primary, #38bdf8);
+  color: var(--mercury-accent);
+  flex-shrink: 0;
 }
 
 .mercury-archivo-info {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 0.88rem;
 }
 
@@ -308,10 +328,11 @@ const enviarComprobante = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(var(--ion-color-danger-rgb, 239, 68, 68), 0.1);
-  color: var(--ion-color-danger, #ef4444);
+  background: var(--mercury-danger-bg);
+  border: 1px solid var(--mercury-danger-border);
+  color: var(--mercury-danger-text);
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--mercury-radius-sm, 8px);
   margin-top: 14px;
   font-size: 0.88rem;
 }

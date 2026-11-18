@@ -222,30 +222,39 @@ const formatearFecha = (fechaStr) => {
 .mercury-cola-resumen {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .mercury-cola-badge.online {
-  color: var(--ion-color-success);
+  color: var(--mercury-success-text);
   font-weight: 700;
   font-size: 0.9rem;
 }
 .mercury-cola-badge.offline {
-  color: var(--ion-color-danger);
+  color: var(--mercury-danger-text);
   font-weight: 700;
   font-size: 0.9rem;
 }
 .mercury-cola-pendientes {
   font-size: 0.85rem;
-  color: var(--ion-color-medium);
+  color: var(--mercury-text-muted);
 }
 .mercury-cola-acciones-top {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+.mercury-cola-acciones-top ion-button,
+.mercury-accion-botones ion-button {
+  min-height: var(--mercury-touch-min, 44px);
+}
+.mercury-cola-lista {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 .mercury-cola-vacia {
   text-align: center;
   padding: 40px 16px;
-  color: var(--ion-color-medium);
+  color: var(--mercury-text-muted);
 }
 .mercury-icono-vacio {
   font-size: 3rem;
@@ -253,12 +262,14 @@ const formatearFecha = (fechaStr) => {
 }
 .mercury-accion-card {
   margin: 0 0 10px 0;
-  border-radius: 10px;
+  border-radius: var(--mercury-radius-md, 10px);
 }
 .mercury-accion-fila-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 6px;
 }
 .mercury-accion-tipo {
@@ -268,11 +279,12 @@ const formatearFecha = (fechaStr) => {
 .mercury-accion-pedido {
   margin: 4px 0;
   font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 }
 .mercury-accion-fecha {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--ion-color-medium);
+  color: var(--mercury-text-muted);
 }
 .mercury-accion-error {
   margin-top: 8px;
@@ -280,9 +292,12 @@ const formatearFecha = (fechaStr) => {
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
-  color: var(--ion-color-danger);
+  color: var(--mercury-danger-text);
 }
 .mercury-accion-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 10px;
 }
 </style>
