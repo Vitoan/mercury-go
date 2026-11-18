@@ -406,20 +406,22 @@ watch(
 .mercury-pedido-item {
   --padding-start: 12px;
   --padding-end: 12px;
-  --padding-top: 10px;
-  --padding-bottom: 10px;
-  --border-color: var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  --border-color: var(--mercury-border-subtle);
 }
 
 .mercury-icono-pedido {
   font-size: 1.6rem;
-  color: var(--ion-color-primary, #38bdf8);
+  color: var(--mercury-accent);
 }
 
 .mercury-pedido-cabecera {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 2px;
 }
 
@@ -428,12 +430,14 @@ watch(
   font-size: 0.95rem;
   color: var(--mercury-accent);
   letter-spacing: 0.3px;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-pedido-total {
   font-weight: 700;
   font-size: 1rem;
   color: var(--mercury-text-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-pedido-cliente {
@@ -445,15 +449,26 @@ watch(
 
 .mercury-pedido-fecha {
   margin: 3px 0 0 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--mercury-text-muted);
 }
 
+.mercury-pedido-estado-columna {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
 .mercury-badge-estado {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 5px 8px;
-  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--mercury-radius-sm, 8px);
   cursor: pointer;
 }
 
@@ -461,32 +476,38 @@ watch(
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
 .mercury-sub-tag {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 6px;
+  padding: 3px 8px;
+  border-radius: var(--mercury-radius-sm, 6px);
   display: inline-block;
 }
 
 .tag-warning {
-  background: rgba(234, 179, 8, 0.15);
-  color: #b45309;
-  border: 1px solid rgba(234, 179, 8, 0.3);
+  background: var(--mercury-warning-bg);
+  color: var(--mercury-warning-text);
+  border: 1px solid var(--mercury-warning-border);
 }
 
 .tag-success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #15803d;
-  border: 1px solid rgba(22, 163, 74, 0.3);
+  background: var(--mercury-success-bg);
+  color: var(--mercury-success-text);
+  border: 1px solid var(--mercury-success-border);
+}
+
+.tag-danger {
+  background: var(--mercury-danger-bg);
+  color: var(--mercury-danger-text);
+  border: 1px solid var(--mercury-danger-border);
 }
 
 .tag-info {
-  background: rgba(2, 132, 199, 0.12);
-  color: #0284c7;
-  border: 1px solid rgba(2, 132, 199, 0.3);
+  background: var(--mercury-info-bg);
+  color: var(--mercury-info-text);
+  border: 1px solid var(--mercury-info-border);
 }
 </style>

@@ -913,45 +913,59 @@ const cerrar = () => {
   justify-content: center;
   padding: 40px 16px;
   text-align: center;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
+}
+
+.mercury-detalle-contenido {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
 }
 
 .mercury-seccion-card {
   margin: 0 0 14px 0;
-  border-radius: 12px;
+  border-radius: var(--mercury-radius-md, 12px);
 }
 
 .mercury-cabecera-fila {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mercury-cabecera-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .mercury-numero-orden {
   font-size: 1.3rem;
   font-weight: 800;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-badge-estado-grande {
   font-size: 0.85rem;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--mercury-radius-sm, 8px);
 }
 
 .mercury-comprobante-seccion {
   margin: 12px 0;
   padding: 12px;
-  background: var(--ion-color-step-50, rgba(0, 0, 0, 0.03));
-  border-radius: 8px;
-  border-left: 4px solid var(--ion-color-primary, #38bdf8);
+  background: var(--mercury-bg-item);
+  border-radius: var(--mercury-radius-sm, 8px);
+  border-left: 4px solid var(--mercury-accent);
 }
 
 .mercury-gps-seccion {
   margin-top: 12px;
   padding: 10px;
-  background: rgba(var(--ion-color-secondary-rgb), 0.08);
-  border-radius: 8px;
+  background: var(--mercury-info-bg);
+  border: 1px solid var(--mercury-info-border);
+  border-radius: var(--mercury-radius-sm, 8px);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -961,17 +975,20 @@ const cerrar = () => {
   display: flex;
   flex-direction: column;
   font-size: 0.9rem;
+  color: var(--mercury-text-body);
 }
 
 .mercury-gps-fecha {
   font-size: 0.8rem;
-  color: var(--ion-color-medium);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-comprobante-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -979,6 +996,30 @@ const cerrar = () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.mercury-comprobante-acciones ion-button,
+.mercury-acciones-detalle-fila ion-button,
+.mercury-botones-edicion-acciones ion-button,
+.mercury-botones-resolucion ion-button {
+  min-height: var(--mercury-touch-min, 44px);
+}
+
+.mercury-cancelacion-banner {
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: var(--mercury-radius-sm, 8px);
+  background: var(--mercury-danger-bg);
+  border: 1px solid var(--mercury-danger-border);
+  color: var(--mercury-danger-text);
+  font-size: 0.88rem;
+}
+
+.mercury-botones-resolucion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .mercury-botones-pdf-fila {
@@ -993,13 +1034,19 @@ const cerrar = () => {
 .mercury-stepper {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+}
+
+.mercury-stepper ion-button {
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .mercury-cant-num {
   font-weight: 700;
   min-width: 24px;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-edicion-obs {
@@ -1008,6 +1055,7 @@ const cerrar = () => {
 
 .mercury-botones-edicion-acciones {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 10px;
 }
@@ -1016,15 +1064,18 @@ const cerrar = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid var(--ion-color-light, #f1f5f9);
+  border-top: 1px solid var(--mercury-border-subtle);
   font-size: 1.05rem;
 }
 
 .mercury-total-destacado {
   font-size: 1.3rem;
-  color: var(--ion-color-primary, #2563eb);
+  color: var(--mercury-accent);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-chofer-seccion {
@@ -1033,54 +1084,61 @@ const cerrar = () => {
 
 .mercury-chofer-aviso {
   margin: 6px 0 0 0;
-  font-size: 0.8rem;
-  color: var(--ion-color-warning-shade, #b45309);
+  font-size: 0.82rem;
+  color: var(--mercury-warning-text);
 }
 
 .mercury-edicion-aviso {
   margin: 0 0 10px 0;
   padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--ion-color-warning-tint, #fef3c7);
-  color: var(--ion-color-warning-shade, #b45309);
-  font-size: 0.8rem;
+  border-radius: var(--mercury-radius-sm, 8px);
+  background: var(--mercury-warning-bg);
+  border: 1px solid var(--mercury-warning-border);
+  color: var(--mercury-warning-text);
+  font-size: 0.82rem;
 }
 
 .mercury-edicion-precio-fila {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   margin: 4px 0;
 }
 
 .mercury-label-precio {
   font-size: 0.85rem;
-  color: var(--ion-color-step-600, #64748b);
+  color: var(--mercury-text-muted);
   font-weight: 500;
 }
 
 .mercury-input-precio {
-  width: 90px;
+  min-width: 90px;
+  width: 100%;
+  max-width: 140px;
+  min-height: 40px;
   padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--ion-color-step-300, #cbd5e1);
-  background: var(--ion-background-color, #ffffff);
-  color: var(--ion-text-color, #0f172a);
+  border-radius: var(--mercury-radius-sm, 6px);
+  border: 1px solid var(--mercury-border);
+  background: var(--mercury-bg-item);
+  color: var(--mercury-text-title);
   font-size: 0.9rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-agregar-item-edicion {
   margin-top: 12px;
   padding: 8px;
-  background: var(--ion-color-step-50, #f8fafc);
-  border-radius: 8px;
-  border: 1px dashed var(--ion-color-step-300, #cbd5e1);
+  background: var(--mercury-bg-item);
+  border-radius: var(--mercury-radius-sm, 8px);
+  border: 1px dashed var(--mercury-border);
 }
 
 .mercury-agregar-item-fila {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
