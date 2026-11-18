@@ -390,7 +390,7 @@ onIonViewWillEnter(() => {
   --padding-end: 12px;
   --padding-top: 12px;
   --padding-bottom: 12px;
-  --border-color: var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
+  --border-color: var(--mercury-border-subtle);
 }
 
 .mercury-cliente-avatar {
@@ -398,16 +398,16 @@ onIonViewWillEnter(() => {
   height: 46px;
   min-width: 46px;
   margin-right: 12px;
-  background: linear-gradient(135deg, var(--ion-color-primary, #2563eb), var(--ion-color-primary-shade, #1d4ed8));
+  background: linear-gradient(135deg, var(--ion-color-primary), var(--ion-color-primary-shade));
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.3);
+  border-radius: var(--mercury-radius-md, 12px);
+  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), 0.25);
 }
 
 .mercury-avatar-iniciales {
-  color: #ffffff;
+  color: var(--ion-color-primary-contrast);
   font-weight: 700;
   font-size: 1rem;
   letter-spacing: 0.5px;
@@ -469,7 +469,7 @@ onIonViewWillEnter(() => {
 .mercury-cliente-direccion {
   margin: 2px 0 4px 0;
   font-size: 0.86rem;
-  color: var(--ion-color-step-600, #475569);
+  color: var(--mercury-text-muted);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -478,7 +478,7 @@ onIonViewWillEnter(() => {
 
 .mercury-mini-icono {
   font-size: 0.95rem;
-  color: var(--ion-color-primary);
+  color: var(--mercury-accent);
   flex-shrink: 0;
 }
 
@@ -493,31 +493,36 @@ onIonViewWillEnter(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.8rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  min-height: 36px;
+  font-size: 0.82rem;
   font-weight: 500;
-  color: var(--ion-color-step-750, #334155);
-  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.04));
-  border: 1px solid var(--ion-color-step-200, rgba(0, 0, 0, 0.08));
-  padding: 4px 10px;
-  border-radius: 8px;
+  color: var(--mercury-text-body);
+  background: var(--mercury-bg-item);
+  border: 1px solid var(--mercury-border);
+  padding: 6px 10px;
+  border-radius: var(--mercury-radius-sm, 8px);
   text-decoration: none;
   transition: all 0.2s ease;
 }
 
 .mercury-chip-contacto:hover,
 .mercury-chip-contacto:active {
-  background: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.12);
-  color: var(--ion-color-primary, #2563eb);
-  border-color: rgba(var(--ion-color-primary-rgb, 37, 99, 235), 0.3);
+  background: var(--mercury-accent-badge-bg);
+  color: var(--mercury-accent);
+  border-color: var(--mercury-accent-badge-border);
 }
 
 .mercury-chip-contacto ion-icon {
   font-size: 0.9rem;
-  color: var(--ion-color-primary);
+  color: var(--mercury-accent);
 }
 
 .mercury-btn-toolbar-nuevo {
-  --color: var(--ion-color-primary-contrast, #ffffff);
+  --color: var(--ion-color-primary);
+  min-width: var(--mercury-touch-min, 44px);
+  min-height: var(--mercury-touch-min, 44px);
 }
 
 /* Botón flotante anclado estrictamente en la esquina inferior derecha */

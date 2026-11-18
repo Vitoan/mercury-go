@@ -414,6 +414,8 @@ onIonViewWillEnter(async () => {
 <style scoped>
 .mercury-btn-carrito {
   position: relative;
+  min-width: var(--mercury-touch-min, 44px);
+  min-height: var(--mercury-touch-min, 44px);
   --padding-start: 8px;
   --padding-end: 8px;
 }
@@ -448,7 +450,7 @@ onIonViewWillEnter(async () => {
   position: relative;
   width: 100%;
   height: 150px;
-  background: var(--ion-color-light, #f1f5f9);
+  background: var(--mercury-bg-item);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -491,8 +493,8 @@ onIonViewWillEnter(async () => {
 
 .mercury-btn-accion-flotante {
   --border-radius: 50%;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   opacity: 0.95;
 }
 
@@ -506,13 +508,13 @@ onIonViewWillEnter(async () => {
   font-size: 1.05rem;
   font-weight: 700;
   margin: 0 0 2px 0;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
 }
 
 .mercury-producto-categoria-texto {
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--ion-color-primary, #2563eb);
+  color: var(--mercury-accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 4px 0;
@@ -520,7 +522,7 @@ onIonViewWillEnter(async () => {
 
 .mercury-producto-desc-texto {
   font-size: 0.85rem;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
   margin: 0 0 12px 0;
   line-height: 1.35;
 }
@@ -529,19 +531,23 @@ onIonViewWillEnter(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: auto;
-  border-top: 1px solid var(--ion-color-light, #f1f5f9);
+  border-top: 1px solid var(--mercury-border-subtle);
   padding-top: 10px;
 }
 
 .mercury-producto-precio-grande {
   font-size: 1.25rem;
   font-weight: 800;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-btn-agregar {
-  --border-radius: 8px;
+  --border-radius: var(--mercury-radius-sm, 8px);
   font-weight: 600;
+  min-height: 40px;
 }
 </style>

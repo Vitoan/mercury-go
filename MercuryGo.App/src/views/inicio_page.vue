@@ -213,12 +213,12 @@ onIonViewWillEnter(() => {
   font-size: 1.15rem;
   font-weight: 800;
   margin: 0;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
 }
 
 .mercury-ofertas-subtitulo {
   font-size: 0.85rem;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
   margin: 4px 0 0 0;
   line-height: 1.35;
 }
@@ -230,7 +230,7 @@ onIonViewWillEnter(() => {
   justify-content: center;
   text-align: center;
   padding: 48px 16px;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-icono-vacio {
@@ -259,7 +259,7 @@ onIonViewWillEnter(() => {
   position: relative;
   width: 100%;
   height: 170px;
-  background: var(--ion-color-light, #f1f5f9);
+  background: var(--mercury-bg-item);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -292,8 +292,8 @@ onIonViewWillEnter(() => {
   top: 8px;
   right: 8px;
   --border-radius: 50%;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   opacity: 0.95;
 }
 
@@ -307,13 +307,13 @@ onIonViewWillEnter(() => {
   font-size: 1.08rem;
   font-weight: 700;
   margin: 0 0 2px 0;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
 }
 
 .mercury-oferta-cat {
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--ion-color-primary, #2563eb);
+  color: var(--mercury-accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 4px 0;
@@ -321,7 +321,7 @@ onIonViewWillEnter(() => {
 
 .mercury-oferta-desc {
   font-size: 0.85rem;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
   margin: 0 0 14px 0;
   line-height: 1.35;
 }
@@ -330,18 +330,22 @@ onIonViewWillEnter(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid var(--ion-color-light, #f1f5f9);
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--mercury-border-subtle);
   padding-top: 10px;
 }
 
 .mercury-oferta-precio-grande {
   font-size: 1.35rem;
   font-weight: 800;
-  color: var(--ion-color-dark, #0f172a);
+  color: var(--mercury-text-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-btn-sumar {
-  --border-radius: 8px;
+  --border-radius: var(--mercury-radius-sm, 8px);
   font-weight: 600;
+  min-height: 40px;
 }
 </style>

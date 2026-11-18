@@ -268,10 +268,12 @@ const abrirAcciones = (u) => {
 }
 
 .mercury-btn-nuevo {
-  --background: #0284c7;
-  --border-radius: 12px;
+  --background: var(--ion-color-primary);
+  --color: var(--ion-color-primary-contrast);
+  --border-radius: var(--mercury-radius-md, 12px);
   font-weight: 700;
   margin-top: 4px;
+  min-height: 48px;
 }
 
 .mercury-usuario-item {
@@ -295,6 +297,8 @@ const abrirAcciones = (u) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .mercury-usuario-cabecera h3 {
@@ -322,11 +326,11 @@ const abrirAcciones = (u) => {
 }
 
 .mercury-modal-error {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--ion-color-danger, #ef4444);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: var(--mercury-danger-bg);
+  color: var(--mercury-danger-text);
+  border: 1px solid var(--mercury-danger-border);
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--mercury-radius-sm, 8px);
   margin-top: 10px;
   font-size: 0.85rem;
 }

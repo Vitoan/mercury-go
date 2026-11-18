@@ -298,37 +298,41 @@ onIonViewWillEnter(() => {
 }
 .mercury-acciones-sesion {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 1rem;
 }
 .mercury-btn-bloquear,
 .mercury-btn-cerrar {
-  flex: 1;
+  flex: 1 1 140px;
+  min-height: var(--mercury-touch-min, 44px);
   margin: 0;
 }
 
 .mercury-card-cuenta-corriente {
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border-radius: var(--mercury-radius-md, 12px);
+  box-shadow: var(--mercury-card-shadow);
 }
 
 .mercury-cc-cabecera {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .mercury-cc-loading {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
   padding: 8px 0;
 }
 
 .mercury-cc-balance-caja {
-  background: var(--ion-color-light, #f8fafc);
-  border-radius: 10px;
+  background: var(--mercury-bg-item);
+  border-radius: var(--mercury-radius-sm, 10px);
   padding: 14px;
   margin-bottom: 14px;
   display: flex;
@@ -338,14 +342,15 @@ onIonViewWillEnter(() => {
 
 .mercury-cc-balance-label {
   font-size: 0.85rem;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
   font-weight: 500;
 }
 
 .mercury-cc-balance-monto {
   font-size: 1.6rem;
   font-weight: 800;
-  color: var(--ion-color-danger, #ef4444);
+  color: var(--mercury-danger-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-cc-desglose {
@@ -359,11 +364,13 @@ onIonViewWillEnter(() => {
 .mercury-cc-fila {
   display: flex;
   justify-content: space-between;
-  color: var(--ion-color-medium, #64748b);
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--mercury-text-muted);
 }
 
 .text-success {
-  color: var(--ion-color-success, #16a34a);
+  color: var(--mercury-success-text);
   font-weight: 600;
 }
 
@@ -432,11 +439,11 @@ onIonViewWillEnter(() => {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #fbbf24;
+  background: var(--mercury-warning-bg);
+  border: 1px solid var(--mercury-warning-border);
+  color: var(--mercury-warning-text);
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--mercury-radius-md, 12px);
   margin-top: 1rem;
   font-size: 0.88rem;
 }
