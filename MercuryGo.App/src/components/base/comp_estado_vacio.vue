@@ -34,18 +34,19 @@ defineProps({
 }
 
 .color-vacio {
-  color: var(--ion-color-step-400, #94a3b8);
+  color: var(--mercury-text-muted);
 }
 
 .titulo-estado {
   font-size: 1.15rem;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--mercury-text-title);
   margin: 4px 0 8px 0;
 }
 
 .mensaje-estado {
-  color: var(--ion-color-step-600, #64748b);
-  max-width: 320px;
+  color: var(--mercury-text-muted);
+  max-width: 100%;
   font-size: 0.95rem;
 }
 </style>

@@ -40,19 +40,24 @@ defineEmits(['reintentar']);
 }
 
 .color-error {
-  color: var(--ion-color-danger, #ef4444);
+  color: var(--ion-color-danger);
 }
 
 .titulo-estado {
   font-size: 1.15rem;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--mercury-text-title);
   margin: 4px 0 8px 0;
 }
 
 .mensaje-estado {
-  color: var(--ion-color-step-600, #64748b);
-  max-width: 320px;
+  color: var(--mercury-text-muted);
+  max-width: 100%;
   font-size: 0.95rem;
   margin-bottom: 20px;
+}
+
+.contenedor-estado ion-button {
+  min-height: var(--mercury-touch-min, 44px);
 }
 </style>

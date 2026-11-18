@@ -162,21 +162,30 @@ const ejecutar_actualizar = (event) => {
 </script>
 
 <style scoped>
+ion-header ion-title {
+  font-size: clamp(0.95rem, 4vw, 1.15rem);
+  font-weight: 700;
+  padding-inline: 4px;
+}
+
 .btn-notificaciones,
 .btn-cola-offline {
   position: relative;
+  min-width: var(--mercury-touch-min, 44px);
+  min-height: var(--mercury-touch-min, 44px);
 }
 .badge-cola {
   position: absolute;
   top: 2px;
   right: 2px;
-  font-size: 10px;
-  padding: 2px 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 5px;
   border-radius: 10px;
 }
 .chip-sin-conexion {
-  height: 26px;
-  font-size: 11px;
+  min-height: 30px;
+  font-size: 0.75rem;
   font-weight: 600;
   margin-right: 4px;
 }
@@ -191,8 +200,9 @@ const ejecutar_actualizar = (event) => {
   position: absolute;
   top: 2px;
   right: 2px;
-  font-size: 10px;
-  padding: 2px 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 5px;
   border-radius: 10px;
 }
 </style>

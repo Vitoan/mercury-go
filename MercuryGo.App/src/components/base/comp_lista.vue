@@ -94,7 +94,7 @@ const al_scrollear = async (evento) => {
   justify-content: center;
   gap: 8px;
   padding: 14px 0;
-  color: var(--ion-color-step-600, #94a3b8);
+  color: var(--mercury-text-muted);
   font-size: 0.85rem;
   font-weight: 500;
   min-height: 48px;
@@ -103,8 +103,8 @@ const al_scrollear = async (evento) => {
 .mercury-pie-conteo {
   text-align: center;
   font-size: 0.8rem;
-  color: var(--ion-color-step-600, #94a3b8);
+  color: var(--mercury-text-muted);
   margin-top: 6px;
-  margin-bottom: 24px;
+  margin-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 </style>

@@ -52,10 +52,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .mercury-buscador {
   padding-inline: 12px;
-  padding-top: 4px;
+  padding-top: 6px;
   padding-bottom: 8px;
   --box-shadow: none;
-  --background: var(--ion-color-step-100, rgba(255, 255, 255, 0.05));
-  --border-radius: 10px;
+  --background: var(--mercury-bg-item);
+  --color: var(--mercury-text-title);
+  --placeholder-color: var(--mercury-text-muted);
+  --icon-color: var(--mercury-text-muted);
+  --border-radius: var(--mercury-radius-md, 12px);
 }
 </style>
