@@ -26,6 +26,15 @@ public sealed class PedidosController(
         EstadoPedido.EnPreparacion
     ];
 
+    // Estados operativos e históricos visibles para el chofer en su ruta.
+    private static readonly EstadoPedido[] EstadosVisiblesChofer =
+    [
+        EstadoPedido.Despachado,
+        EstadoPedido.EnPuerta,
+        EstadoPedido.Entregado,
+        EstadoPedido.NoEntregado
+    ];
+
     // Listado paginado con filtros de texto, estados múltiples ("Pendiente,EnPreparacion") y cliente.
     [HttpGet]
     public async Task<IActionResult> Listar(
@@ -56,9 +65,10 @@ public sealed class PedidosController(
         }
         else if (User.IsInRole(RolCodigos.Chofer))
         {
-            // Cada chofer ve solo su propia ruta.
+            // Cada chofer ve solo su propia ruta, y nunca órdenes que aún no salieron del depósito
+            // (aunque un admin le haya asignado el chofer antes de despachar).
             var choferId = User.UsuarioId();
-            consulta = consulta.Where(p => p.ChoferId == choferId);
+            consulta = consulta.Where(p => p.ChoferId == choferId && EstadosVisiblesChofer.Contains(p.Estado));
 
             if (string.IsNullOrWhiteSpace(estados))
             {
@@ -122,7 +132,7 @@ public sealed class PedidosController(
         else if (User.IsInRole(RolCodigos.Chofer))
         {
             var choferId = User.UsuarioId();
-            consulta = consulta.Where(p => p.ChoferId == choferId);
+            consulta = consulta.Where(p => p.ChoferId == choferId && EstadosVisiblesChofer.Contains(p.Estado));
         }
 
         var conteosPorEstado = await consulta

@@ -288,14 +288,19 @@ export function usePedidosWorkflow(toast) {
       });
     }
 
-    if (estadoActual === 'Pendiente' || estadoActual === 'Confirmado') {
+    const esCliente = sesion_store.rol_activo === 'CLIENTE';
+    const esAdmin = sesion_store.es_admin;
+    const esOperario = sesion_store.rol_activo === 'OPERARIO';
+    const esChofer = sesion_store.rol_activo === 'CHOFER';
+
+    if ((esCliente || esAdmin) && (estadoActual === 'Pendiente' || estadoActual === 'Confirmado')) {
       botones.push({
         text: '💳 Adjuntar Comprobante de Pago (Foto / PDF)',
         handler: () => abrirModalComprobante(pedidoSeleccionado.value)
       });
     }
 
-    const puedePicking = !sesion_store.rol_activo || sesion_store.rol_activo === 'ADMIN' || sesion_store.rol_activo === 'OPERARIO';
+    const puedePicking = esAdmin || esOperario;
     if (puedePicking && (estadoActual === 'Confirmado' || estadoActual === 'EnPreparacion')) {
       botones.push({
         text: '📦 Realizar Picking / Preparación en Depósito',
@@ -303,7 +308,6 @@ export function usePedidosWorkflow(toast) {
       });
     }
 
-    const esCliente = sesion_store.rol_activo === 'CLIENTE';
     if (esCliente) {
       if (!sinRed && estadoActual === 'Pendiente') {
         botones.push({
@@ -339,8 +343,31 @@ export function usePedidosWorkflow(toast) {
       });
     }
 
+    if (esChofer) {
+      if (estadoActual === 'Despachado') {
+        botones.push({
+          text: 'Llegando al Destino (▶ En Puerta)',
+          handler: () => ejecutarCambioEstado('EnPuerta')
+        });
+        botones.push({
+          text: 'Confirmar Entrega Directa (✔ Entregado)',
+          handler: () => ejecutarCambioEstado('Entregado')
+        });
+      } else if (estadoActual === 'EnPuerta') {
+        botones.push({
+          text: 'Confirmar Entrega Final (✔ Entregado)',
+          handler: () => ejecutarCambioEstado('Entregado')
+        });
+      }
+      botones.push({
+        text: 'Cerrar',
+        role: 'cancel'
+      });
+      return botones;
+    }
+
     // Acciones de Reintento para NoEntregado (solo el Admin reautoriza el despacho)
-    if (sesion_store.es_admin && estadoActual === 'NoEntregado') {
+    if (esAdmin && estadoActual === 'NoEntregado') {
       botones.push({
         text: '🔄 Reintentar Entrega (▶ Despachado)',
         handler: async () => {
@@ -356,23 +383,27 @@ export function usePedidosWorkflow(toast) {
     }
 
     if (estadoActual === 'Pendiente') {
-      botones.push({
-        text: 'Confirmar Pedido (▶ Confirmado)',
-        handler: () => ejecutarCambioEstado('Confirmado')
-      });
-      if (!sinRed) {
+      if (esAdmin) {
         botones.push({
-          text: 'Cancelar Pedido (✖ Cancelado)',
-          role: 'destructive',
-          handler: () => ejecutarCambioEstado('Cancelado')
+          text: 'Confirmar Pedido (▶ Confirmado)',
+          handler: () => ejecutarCambioEstado('Confirmado')
         });
+        if (!sinRed) {
+          botones.push({
+            text: 'Cancelar Pedido (✖ Cancelado)',
+            role: 'destructive',
+            handler: () => ejecutarCambioEstado('Cancelado')
+          });
+        }
       }
     } else if (estadoActual === 'Confirmado') {
-      botones.push({
-        text: 'Iniciar Carga en Depósito (▶ En Preparación)',
-        handler: () => ejecutarCambioEstado('EnPreparacion')
-      });
-      if (!sinRed) {
+      if (esAdmin || esOperario) {
+        botones.push({
+          text: 'Iniciar Carga en Depósito (▶ En Preparación)',
+          handler: () => ejecutarCambioEstado('EnPreparacion')
+        });
+      }
+      if (esAdmin && !sinRed) {
         botones.push({
           text: 'Cancelar Pedido (✖ Cancelado)',
           role: 'destructive',
@@ -380,11 +411,13 @@ export function usePedidosWorkflow(toast) {
         });
       }
     } else if (estadoActual === 'EnPreparacion') {
-      botones.push({
-        text: 'Despachar al Camión (▶ En Ruta)',
-        handler: () => ejecutarCambioEstado('Despachado')
-      });
-      if (!sinRed) {
+      if (esAdmin || esOperario) {
+        botones.push({
+          text: 'Despachar al Camión (▶ En Ruta)',
+          handler: () => ejecutarCambioEstado('Despachado')
+        });
+      }
+      if (esAdmin && !sinRed) {
         botones.push({
           text: 'Cancelar Pedido (✖ Cancelado)',
           role: 'destructive',
@@ -400,7 +433,7 @@ export function usePedidosWorkflow(toast) {
         text: 'Confirmar Entrega Directa (✔ Entregado)',
         handler: () => ejecutarCambioEstado('Entregado')
       });
-      if (!sinRed) {
+      if (esAdmin && !sinRed) {
         botones.push({
           text: 'Devolución / Cancelación (✖ Cancelado)',
           role: 'destructive',
@@ -412,7 +445,7 @@ export function usePedidosWorkflow(toast) {
         text: 'Confirmar Entrega Final (✔ Entregado)',
         handler: () => ejecutarCambioEstado('Entregado')
       });
-      if (!sinRed) {
+      if (esAdmin && !sinRed) {
         botones.push({
           text: 'Devolución / Cancelación (✖ Cancelado)',
           role: 'destructive',
