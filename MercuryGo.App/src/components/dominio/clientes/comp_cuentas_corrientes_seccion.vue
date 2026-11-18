@@ -285,18 +285,19 @@ defineExpose({
 
 <style scoped>
 .mercury-finanzas-seccion {
-  padding: 0 12px 24px 12px;
+  padding: 0 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px;
 }
 
 .mercury-card-metricas {
   margin: 0 0 16px 0;
-  border-radius: 12px;
-  background: var(--ion-color-step-50, #f8fafc);
+  border-radius: var(--mercury-radius-md, 12px);
+  background: var(--mercury-bg-card);
+  border: 1px solid var(--mercury-border-subtle);
 }
 
 .mercury-metricas-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
 }
 
@@ -308,12 +309,14 @@ defineExpose({
 
 .mercury-metrica-label {
   font-size: 0.8rem;
-  color: var(--ion-color-step-600, #64748b);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-metrica-valor {
   font-size: 1.25rem;
   font-weight: 800;
+  color: var(--mercury-text-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-alerta-pendientes {
@@ -322,53 +325,60 @@ defineExpose({
   gap: 8px;
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px dashed var(--ion-color-step-200, #e2e8f0);
+  border-top: 1px dashed var(--mercury-border-subtle);
   font-size: 0.88rem;
+  color: var(--mercury-text-body);
 }
 
 .mercury-finanzas-loading {
   text-align: center;
   padding: 30px;
-  color: var(--ion-color-medium, #64748b);
+  color: var(--mercury-text-muted);
 }
 
 .mercury-card-cliente-cc {
   margin: 0 0 14px 0;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: var(--mercury-radius-md, 12px);
+  box-shadow: var(--mercury-card-shadow);
 }
 
 .mercury-cc-cabecera {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .mercury-cc-titulo {
   font-size: 1.05rem;
   font-weight: 700;
+  color: var(--mercury-text-title);
 }
 
 .mercury-badge-deuda {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--mercury-radius-sm, 6px);
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-cc-totales-fila {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 0.9rem;
   margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-cc-comprobantes-box {
   margin-top: 10px;
   padding: 10px;
-  border-radius: 8px;
-  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.04));
-  border-left: 3px solid var(--ion-color-warning, #f59e0b);
+  border-radius: var(--mercury-radius-sm, 8px);
+  background: var(--mercury-bg-item);
+  border-left: 3px solid var(--ion-color-warning);
 }
 
 .mercury-box-titulo {
@@ -378,6 +388,7 @@ defineExpose({
   font-size: 0.85rem;
   font-weight: 700;
   margin-bottom: 8px;
+  color: var(--mercury-text-title);
 }
 
 .mercury-item-comprobante-fila {
@@ -387,17 +398,23 @@ defineExpose({
   flex-wrap: wrap;
   gap: 8px;
   padding: 8px 0;
-  border-top: 1px dashed var(--ion-color-step-200, rgba(0, 0, 0, 0.08));
+  border-top: 1px dashed var(--mercury-border-subtle);
 }
 
 .mercury-comp-info {
   display: flex;
   flex-direction: column;
   font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .mercury-comp-botones {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mercury-comp-botones ion-button {
+  min-height: var(--mercury-touch-min, 44px);
 }
 </style>

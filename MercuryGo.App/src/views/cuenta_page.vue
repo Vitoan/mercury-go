@@ -137,7 +137,7 @@
           </ion-item>
           <ion-item lines="none">
             <ion-icon slot="start" :icon="phonePortraitOutline" />
-            <ion-label>
+            <ion-label class="ion-text-wrap">
               <h3>Vibración y Respuesta Táctil</h3>
               <p>Feedback al tocar botones y confirmar acciones</p>
             </ion-label>
@@ -155,7 +155,7 @@
         <ion-card-content>
           <ion-item lines="none" button @click="mostrarModalCola = true">
             <ion-icon slot="start" :icon="cloudUploadOutline" color="primary" />
-            <ion-label>
+            <ion-label class="ion-text-wrap">
               <h3>Operaciones en Cola</h3>
               <p>{{ offline_store.pendientes_count }} cambio(s) pendiente(s) de sincronizar</p>
             </ion-label>
@@ -295,6 +295,15 @@ onIonViewWillEnter(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+.cuenta-stack ion-card {
+  margin: 0;
+}
+.cuenta-stack ion-card ion-item {
+  --background: transparent;
+  --padding-start: 0;
+  --inner-padding-end: 0;
 }
 .mercury-acciones-sesion {
   display: flex;
@@ -306,7 +315,14 @@ onIonViewWillEnter(() => {
 .mercury-btn-cerrar {
   flex: 1 1 140px;
   min-height: var(--mercury-touch-min, 44px);
+  --padding-start: 10px;
+  --padding-end: 10px;
+  font-size: 0.85rem;
   margin: 0;
+}
+
+.mercury-cc-acciones ion-button {
+  min-height: var(--mercury-touch-min, 44px);
 }
 
 .mercury-card-cuenta-corriente {
