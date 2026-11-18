@@ -1,15 +1,15 @@
 /* ==========================================================================
-   MercuryGO - Paleta Corporativa B2B & Sistema de Temas Accesibles
+   MercuryGO - Paleta Corporativa B2B & Sistema de Temas Accesibles (Propuesta A)
    ========================================================================== */
 
 :root {
-  /* Paleta Primaria: Azul Logístico Corporativo (Modo Claro) */
-  --ion-color-primary: #0284c7;
-  --ion-color-primary-rgb: 2, 132, 199;
+  /* Paleta Primaria: Azul Logístico Corporativo (Modo Claro, WCAG AA >= 4.5:1) */
+  --ion-color-primary: #0369a1;
+  --ion-color-primary-rgb: 3, 105, 161;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #0274af;
-  --ion-color-primary-tint: #1b90cd;
+  --ion-color-primary-shade: #025c8e;
+  --ion-color-primary-tint: #1c78aa;
 
   /* Paleta Secundaria */
   --ion-color-secondary: #0f766e;
@@ -20,34 +20,58 @@
   --ion-color-secondary-tint: #27847c;
 
   /* Paleta Terciaria: Chofer / Flota */
-  --ion-color-tertiary: #6366f1;
-  --ion-color-tertiary-rgb: 99, 102, 241;
+  --ion-color-tertiary: #4f46e5;
+  --ion-color-tertiary-rgb: 79, 70, 229;
   --ion-color-tertiary-contrast: #ffffff;
   --ion-color-tertiary-contrast-rgb: 255, 255, 255;
-  --ion-color-tertiary-shade: #575ad4;
-  --ion-color-tertiary-tint: #7375f2;
+  --ion-color-tertiary-shade: #463ec9;
+  --ion-color-tertiary-tint: #6159e8;
 
-  /* Estados */
-  --ion-color-success: #16a34a;
-  --ion-color-success-rgb: 22, 163, 74;
+  /* Estados (WCAG AA >= 4.5:1 con texto blanco) */
+  --ion-color-success: #15803d;
+  --ion-color-success-rgb: 21, 128, 61;
   --ion-color-success-contrast: #ffffff;
   --ion-color-success-contrast-rgb: 255, 255, 255;
+  --ion-color-success-shade: #127136;
+  --ion-color-success-tint: #2c8d50;
 
-  --ion-color-warning: #d97706;
-  --ion-color-warning-rgb: 217, 119, 6;
+  --ion-color-warning: #b45309;
+  --ion-color-warning-rgb: 180, 83, 9;
   --ion-color-warning-contrast: #ffffff;
   --ion-color-warning-contrast-rgb: 255, 255, 255;
+  --ion-color-warning-shade: #9e4908;
+  --ion-color-warning-tint: #bc6422;
 
   --ion-color-danger: #dc2626;
   --ion-color-danger-rgb: 220, 38, 38;
   --ion-color-danger-contrast: #ffffff;
   --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #c22121;
+  --ion-color-danger-tint: #e03c3c;
+
+  --ion-color-medium: #475569;
+  --ion-color-medium-rgb: 71, 85, 105;
+  --ion-color-medium-contrast: #ffffff;
+  --ion-color-medium-contrast-rgb: 255, 255, 255;
+  --ion-color-medium-shade: #3e4b5c;
+  --ion-color-medium-tint: #596678;
 
   /* Fondos y textos base Modo Claro (Ratio WCAG AA > 4.5:1) */
   --ion-background-color: #f1f5f9;
   --ion-background-color-rgb: 241, 245, 249;
   --ion-text-color: #0f172a;
   --ion-text-color-rgb: 15, 23, 42;
+
+  /* Radios, espaciado y ergonomía táctil */
+  --mercury-radius-sm: 8px;
+  --mercury-radius-md: 12px;
+  --mercury-radius-lg: 16px;
+  --mercury-radius-pill: 9999px;
+  --mercury-space-xs: 4px;
+  --mercury-space-sm: 8px;
+  --mercury-space-md: 12px;
+  --mercury-space-lg: 16px;
+  --mercury-touch-min: 44px;
 
   /* Variables Semánticas MercuryGO - Modo Claro */
   --mercury-bg-page: #f8fafc;
@@ -56,18 +80,32 @@
   --mercury-bg-subtle: #e2e8f0;
   --mercury-border: #cbd5e1;
   --mercury-border-subtle: rgba(15, 23, 42, 0.08);
-  
+
   --mercury-text-title: #0f172a;
   --mercury-text-body: #1e293b;
   --mercury-text-muted: #475569;
-  --mercury-text-hint: #64748b;
-  
-  --mercury-accent: #0284c7;
-  --mercury-accent-contrast: #ffffff;
-  --mercury-accent-badge-bg: rgba(2, 132, 199, 0.12);
-  --mercury-accent-badge-border: rgba(2, 132, 199, 0.3);
+  --mercury-text-hint: #475569;
 
-  --mercury-card-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --mercury-accent: #0369a1;
+  --mercury-accent-contrast: #ffffff;
+  --mercury-accent-badge-bg: rgba(3, 105, 161, 0.10);
+  --mercury-accent-badge-border: rgba(3, 105, 161, 0.30);
+
+  /* Estados semánticos para badges, avisos y sub-etiquetas */
+  --mercury-warning-bg: #fef3c7;
+  --mercury-warning-border: #f59e0b;
+  --mercury-warning-text: #92400e;
+  --mercury-success-bg: #dcfce7;
+  --mercury-success-border: #86efac;
+  --mercury-success-text: #166534;
+  --mercury-danger-bg: #fee2e2;
+  --mercury-danger-border: #fca5a5;
+  --mercury-danger-text: #991b1b;
+  --mercury-info-bg: #e0f2fe;
+  --mercury-info-border: #7dd3fc;
+  --mercury-info-text: #075985;
+
+  --mercury-card-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
 
 /* ==========================================================================
@@ -85,22 +123,32 @@
   --ion-color-secondary: #2dd4bf;
   --ion-color-secondary-rgb: 45, 212, 191;
   --ion-color-secondary-contrast: #042f2e;
+  --ion-color-secondary-contrast-rgb: 4, 47, 46;
 
   --ion-color-tertiary: #818cf8;
   --ion-color-tertiary-rgb: 129, 140, 248;
-  --ion-color-tertiary-contrast: #1e1b4b;
+  --ion-color-tertiary-contrast: #0f172a;
+  --ion-color-tertiary-contrast-rgb: 15, 23, 42;
 
   --ion-color-success: #22c55e;
   --ion-color-success-rgb: 34, 197, 94;
   --ion-color-success-contrast: #052e16;
+  --ion-color-success-contrast-rgb: 5, 46, 22;
 
   --ion-color-warning: #f59e0b;
   --ion-color-warning-rgb: 245, 158, 11;
-  --ion-color-warning-contrast: #451a03;
+  --ion-color-warning-contrast: #1c1917;
+  --ion-color-warning-contrast-rgb: 28, 25, 23;
 
-  --ion-color-danger: #ef4444;
-  --ion-color-danger-rgb: 239, 68, 68;
-  --ion-color-danger-contrast: #450a0a;
+  --ion-color-danger: #f87171;
+  --ion-color-danger-rgb: 248, 113, 113;
+  --ion-color-danger-contrast: #0f172a;
+  --ion-color-danger-contrast-rgb: 15, 23, 42;
+
+  --ion-color-medium: #94a3b8;
+  --ion-color-medium-rgb: 148, 163, 184;
+  --ion-color-medium-contrast: #0f172a;
+  --ion-color-medium-contrast-rgb: 15, 23, 42;
 
   /* Fondos y textos base Modo Oscuro */
   --ion-background-color: #090d16;
@@ -113,20 +161,34 @@
   --mercury-bg-card: #0f172a;
   --mercury-bg-item: #1e293b;
   --mercury-bg-subtle: #1e293b;
-  --mercury-border: rgba(148, 163, 184, 0.18);
+  --mercury-border: rgba(148, 163, 184, 0.22);
   --mercury-border-subtle: rgba(255, 255, 255, 0.08);
 
   --mercury-text-title: #f8fafc;
   --mercury-text-body: #e2e8f0;
   --mercury-text-muted: #94a3b8;
-  --mercury-text-hint: #64748b;
+  --mercury-text-hint: #94a3b8;
 
   --mercury-accent: #38bdf8;
   --mercury-accent-contrast: #031427;
   --mercury-accent-badge-bg: rgba(56, 189, 248, 0.14);
-  --mercury-accent-badge-border: rgba(56, 189, 248, 0.3);
+  --mercury-accent-badge-border: rgba(56, 189, 248, 0.30);
 
-  --mercury-card-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  /* Estados semánticos Modo Oscuro */
+  --mercury-warning-bg: rgba(245, 158, 11, 0.18);
+  --mercury-warning-border: rgba(245, 158, 11, 0.40);
+  --mercury-warning-text: #fcd34d;
+  --mercury-success-bg: rgba(34, 197, 94, 0.18);
+  --mercury-success-border: rgba(34, 197, 94, 0.40);
+  --mercury-success-text: #86efac;
+  --mercury-danger-bg: rgba(239, 68, 68, 0.20);
+  --mercury-danger-border: rgba(248, 113, 113, 0.40);
+  --mercury-danger-text: #fca5a5;
+  --mercury-info-bg: rgba(56, 189, 248, 0.18);
+  --mercury-info-border: rgba(56, 189, 248, 0.40);
+  --mercury-info-text: #7dd3fc;
+
+  --mercury-card-shadow: 0 6px 18px rgba(0, 0, 0, 0.40);
 }
 
 /* ==========================================================================
@@ -137,7 +199,7 @@ ion-card {
   --color: var(--mercury-text-body);
   border: 1px solid var(--mercury-border-subtle);
   box-shadow: var(--mercury-card-shadow);
-  border-radius: 14px;
+  border-radius: var(--mercury-radius-lg, 14px);
 }
 
 ion-card-title {
@@ -165,4 +227,20 @@ ion-item {
 
 .mercury-texto-principal {
   color: var(--mercury-text-title) !important;
+}
+
+.mercury-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.text-success {
+  color: var(--mercury-success-text);
+}
+
+.text-warning {
+  color: var(--mercury-warning-text);
+}
+
+.text-danger {
+  color: var(--mercury-danger-text);
 }
